@@ -1,0 +1,96 @@
+Cpss Version: Cpss-PP-DxCh-4.0_339
+
+Files imported:
+
+Cpss-PP-DxCh-4.0_339.zip
+EnablerSuite-4.0_339.zip
+ExtUtils-4.0_339.zip
+GaltisSuite-4.0_339.zip
+lsp-4.0_339.zip
+luaCli-4.0_339.zip
+LuaSuite-4.0_339.zip
+ReferenceCode-4.0_339.zip
+Simulation-4.0_339.zip
+UT-4.0_339.zip
+
+
+
+These files were copied from the Marvell Cpss LSP patch file:
+
+mvTypes.h
+pssBspApis.c
+pssBspApis.h
+
+from lsp/intel64_lsp/linux-2.6.35.13/arch/x86/kernel/pss/
+
+Note: The Linux version may change in the future.
+
+
+
+These files were copied from the Marvell Cpss SDK:
+
+mv_KernelExt/mv_KernelExt.c
+mv_KernelExt/mv_KernelExt.h
+
+from cpss/cpssEnabler/mainOs/src/gtOs/linux/kernelExt/kerneldrv/2_6/
+
+Note: The Linux version may change in the future.
+
+
+
+These files were copied from the Marvell Cpss SDK:
+
+common/mv_KernelExt.c
+common/mv_KernelExt.h
+common/mv_KernelExtMsgQ.c
+common/mv_KernelExtSem.c
+
+from cpss/cpssEnabler/mainOs/src/gtOs/linux/kernelExt/kerneldrv/
+
+
+
+These files were copied from the Marvell Cpss SDK:
+
+mvPpDrv/prestera.c
+mvPpDrv/presteraIrq.c
+mvPpDrv/presteraSmi.c
+mvPpDrv/presteraSmiIrq.c
+
+mvPpDrv/include/presteraDebug.h
+mvPpDrv/include/presteraGlob.h
+mvPpDrv/include/prestera.h
+mvPpDrv/include/presteraIrq.h
+mvPpDrv/include/presteraSmiGlob.h
+mvPpDrv/include/presteraSmiIrq.h
+
+from cpss/cpssEnabler/mainExtDrv/src/gtExtDrv/genericLinuxDrv/kerneldrv/
+
+
+
+These include trees were copied from the Marvell Cpss SDK:
+
+mvPpDrv/cpss/extServices/os/gtOs/gtGenTypes.h
+mvPpDrv/cpss/extServices/os/gtOs/cpssOsSem.h
+mvPpDrv/cpss/extServices/os/gtOs/gtEnvDep.h
+
+from cpss/common/h/cpss/extServices/os/gtOs/
+
+
+mvPpDrv/cpss/generic/cpssTypes.h
+
+from cpss/common/h/cpss/generic/
+
+
+mvPpDrv/cpssCommon/cpssPresteraDefs.h
+
+from cpss/common/h/cpssCommon/
+
+
+mvPpDrv/cpssCommon/private/prvCpssMisc.h
+
+from cpss/common/h/cpssCommon/private/
+
+
+mvPpDrv/gtExtDrv/drivers/pssBspApis.h
+
+from cpss/cpssEnabler/mainExtDrv/h/gtExtDrv/drivers/

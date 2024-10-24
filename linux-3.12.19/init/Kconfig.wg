@@ -1,0 +1,191 @@
+# use this file to hold WatchGuard specific settings
+# For instance, add a 'Kconfig.wg' in net/xxx
+# and add:
+# menuconfig WG_XXX
+# if WG_XXX
+# <options>
+# endif # WG_XXX
+#
+# And source the file between menu and endmenu below:
+# source net/xxx/Kconfig.wg
+#
+config WG_PLATFORM_OLD_PROC_API
+	bool "Retains the old proc API"
+	default y
+	help
+	  This option retains the old proc API."
+
+config WG_PLATFORM_OLD_TIMER_HOOK
+	bool "Retains the old timer hook"
+	default y
+	help
+	  This option retains the old timer hook."
+
+menuconfig WG_PLATFORM
+	bool "WatchGuard Specific Settings"
+
+if WG_PLATFORM
+
+if PPC64
+
+config WG_ARCH_FREESCALE
+	bool
+	depends on WG_PLATFORM
+	default y
+
+endif # PPC64
+
+if PPC32
+
+config WG_ARCH_FREESCALE_P1010
+	bool
+	depends on WG_PLATFORM
+	select P1010_RDB
+	default n
+
+config WG_ARCH_FREESCALE
+	bool
+	depends on WG_PLATFORM
+	select WG_ARCH_FREESCALE_P1010
+	default y
+
+endif # PPC32
+
+if ARM
+
+config WG_ARCH_IXP4XX
+	bool
+	depends on WG_PLATFORM
+	default y
+
+endif # ARM
+
+if X86
+
+config WG_ARCH_X86
+	bool
+	depends on WG_PLATFORM
+	default y
+
+if X86_64
+
+config WG_ARCH_X86_64
+	bool
+	select WG_ARCH_X86
+	depends on WG_PLATFORM
+	default y
+
+endif # X86_64
+
+if SMP
+
+config WG_ARCH_X86_SMP
+	bool
+	select WG_ARCH_X86
+	depends on WG_PLATFORM
+	default y
+
+endif # SMP
+
+endif # X86
+
+config WG_PLATFORM_MODULES
+	tristate
+	depends on WG_PLATFORM
+	depends on !CRASH_DUMP
+	select WG_PLATFORM_OLD_PROC_API
+	select WG_PLATFORM_OLD_TIMER_HOOK
+	default m
+
+config WG_PLATFORM_CMDLINE_APPEND
+	bool "Append wgmode to the kernel cmdline"
+	depends on WG_PLATFORM
+	help
+	  This option enables a hack to parse 'wgmode' from the kernel cmdline.
+
+config WG_PLATFORM_LRO
+	bool "Enable Large Receive Offload"
+	depends on WG_PLATFORM
+	help
+	  This option enables networking Large Receive Offload support.
+
+config WG_PLATFORM_PANIC_TIMEOUT
+	int "Number of seconds after a panic to reboot"
+	depends on WG_PLATFORM
+	default 5
+	help
+	  This option changes how long the system waits before doing a panic reboot
+
+config WG_PLATFORM_PATCHES
+	bool "Enable Platform Patches"
+	depends on WG_PLATFORM
+	help
+	  I'm not sure what this option really means. Maybe this should be
+	  obsolited for WG_GIT or visa-versa.
+
+config WG_PLATFORM_QUEUE
+	bool "Support for wg_queue"
+	depends on WG_PLATFORM
+	depends on (X86 || X86_64 || PPC64) && !CRASH_DUMP
+	default y
+	help
+	  This option enables support for the WG queuing module
+
+config WG_PLATFORM_WARNING
+	bool "Fix compilation warnings"
+	depends on WG_PLATFORM
+	help
+	  This option enables fixes to correct build time warnings.
+
+config WG_PLATFORM_BUG79878
+	bool "Force keys to NOT be inline in caam driver"
+	depends on WG_PLATFORM
+	depends on CRYPTO_DEV_FSL_CAAM
+	default y
+	help
+	  This forces keys in the caam driver to not be inline.
+
+config WG_PLATFORM_SKIP_PCI_BUS_SCAN
+	int "Bit mask of PCI Buses to not scan"
+	depends on WG_PLATFORM
+	depends on CRASH_DUMP
+	depends on X86
+	default 0
+	help
+	  This causes a kdump kernel to scan only certain PCI Buses
+
+config WG_PROC_ENTRY
+	bool "Create /proc/wg at startup."
+	depends on WG_PLATFORM
+	default y
+
+config WG_PLATFORM_KEEP_BOOTCON
+	bool "Keep boot console active."
+	depends on WG_PLATFORM
+	depends on WG_ARCH_FREESCALE
+	depends on PPC64
+	depends on CRASH_DUMP
+	default y
+
+config WG_PLATFORM_DEV_OLDMEM
+	bool "Restore code for /dev/oldmem"
+	depends on WG_PLATFORM
+	depends on CRASH_DUMP
+	default y
+
+config WG_PLATFORM_DSA
+	tristate
+	default m
+	depends on NET_DSA
+        help
+          WG_PLATFORM_DSA
+
+config WG_PLATFORM_PSS
+	tristate
+	default m
+	depends on X86_64
+	depends on NET
+        help
+          WG_PLATFORM_PSS
+
+endif # WG_PLATFORM

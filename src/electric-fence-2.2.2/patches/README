@@ -1,0 +1,4 @@
+The following patches have been applied:
+patches/ElectricFence-2.0.5-longjmp.patch
+patches/ElectricFence-2.1-syserr.patch
+patches/ElectricFence-2.1-vaarg.patch

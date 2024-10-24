@@ -1,0 +1,3978 @@
+WatchGuard patches to sources for crosstool-ng-1.20.0 as of
+Thu May 26 11:27:40 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- crosstool-ng-1.20.0/samples/armeb-unknown-eabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/armeb-unknown-eabi/crosstool.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,14 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_BE=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_arm=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_none=y
++# CT_CC_GCC_USE_GRAPHITE is not set
++# CT_CC_GCC_USE_LTO is not set
++CT_DEBUG_gdb=y
+--- crosstool-ng-1.20.0/samples/i686-nptl-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/i686-nptl-linux-gnu/crosstool.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,20 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="i686"
++CT_ARCH_x86=y
++CT_TARGET_VENDOR="nptl"
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_DEBUG_ltrace=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/mips-unknown-linux-uclibc/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips-unknown-linux-uclibc/uClibc-0.9.33.2.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,256 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Sat Sep  6 00:33:32 2014
++#
++# TARGET_alpha is not set
++# TARGET_arm is not set
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++TARGET_mips=y
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="mips"
++FORCE_OPTIONS_FOR_ARCH=y
++CONFIG_MIPS_O32_ABI=y
++# CONFIG_MIPS_N32_ABI is not set
++# CONFIG_MIPS_N64_ABI is not set
++CONFIG_MIPS_ISA_1=y
++# CONFIG_MIPS_ISA_2 is not set
++# CONFIG_MIPS_ISA_3 is not set
++# CONFIG_MIPS_ISA_4 is not set
++# CONFIG_MIPS_ISA_MIPS32 is not set
++# CONFIG_MIPS_ISA_MIPS32R2 is not set
++# CONFIG_MIPS_ISA_MIPS64 is not set
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_ANY_ENDIAN=y
++ARCH_BIG_ENDIAN=y
++ARCH_WANTS_BIG_ENDIAN=y
++# ARCH_WANTS_LITTLE_ENDIAN is not set
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++# UCLIBC_HAS_FPU is not set
++UCLIBC_HAS_SOFT_FLOAT=y
++DO_C99_MATH=y
++DO_XSI_MATH=y
++UCLIBC_HAS_FENV=y
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++# LDSO_SEARCH_INTERP_PATH is not set
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++PTHREADS_DEBUG_SUPPORT=y
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++# UCLIBC_SUSV4_LEGACY is not set
++UCLIBC_STRICT_HEADERS=y
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++# UCLIBC_HAS_PROGRAM_INVOCATION_NAME is not set
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++UCLIBC_HAS_LIBUTIL=y
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++UCLIBC_FALLBACK_TO_ETC_LOCALTIME=y
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++UCLIBC_LINUX_MODULE_24=y
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++# UCLIBC_BSD_SPECIFIC is not set
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++UCLIBC_HAS_IPV6=y
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++# UCLIBC_HAS_RESOLVER_SUPPORT is not set
++UCLIBC_HAS_LIBRESOLV_STUB=y
++UCLIBC_HAS_LIBNSL_STUB=y
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++UCLIBC_HAS_CTYPE_ENFORCED=y
++UCLIBC_HAS_WCHAR=y
++# UCLIBC_HAS_LOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++UCLIBC_HAS_REGEX_OLD=y
++UCLIBC_HAS_FNMATCH=y
++UCLIBC_HAS_FNMATCH_OLD=y
++# UCLIBC_HAS_WORDEXP is not set
++UCLIBC_HAS_NFTW=y
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++UCLIBC_HAS_UTMPX=y
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++# HARDWIRED_ABSPATH is not set
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++# UCLIBC_HAS_BACKTRACE is not set
++WARNINGS="-Wall"
++EXTRA_WARNINGS=y
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/mips-unknown-linux-uclibc/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips-unknown-linux-uclibc/crosstool.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,17 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="mips1"
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_mips=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_LIBC_UCLIBC_WCHAR=y
++CT_CC_LANG_CXX=y
++CT_CC_GCC_mips_plt=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/powerpc-860-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc-860-linux-gnu/crosstool.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,15 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="860"
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_powerpc=y
++CT_TARGET_VENDOR="860"
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_LIBC_GLIBC_EXTRA_CONFIG_ARRAY="--without-fp"
++CT_CC_LANG_CXX=y
++CT_CC_EXTRA_CONFIG_ARRAY="--with-cpu=860 --enable-cxx-flags=-mcpu=860 --with-float=soft --enable-cxx-flags=-msoft-float"
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/sparc-unknown-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/sparc-unknown-linux-gnu/crosstool.config	2022-05-26 11:27:33.381332445 -0700
+@@ -0,0 +1,7 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_sparc=y
++CT_KERNEL_linux=y
++CT_LIBC_glibc=y
++CT_LIBC_GLIBC_USE_PORTS=y
+--- crosstool-ng-1.20.0/samples/powerpc-405-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc-405-linux-gnu/crosstool.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,15 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="405"
++CT_ARCH_TUNE="405"
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_powerpc=y
++CT_TARGET_VENDOR="405"
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_LIBC_GLIBC_USE_PORTS=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/mips-unknown-elf/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips-unknown-elf/crosstool.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,9 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_mips=y
++CT_LIBC_none=y
++CT_CC_GCC_mips_plt=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/arm-unknown-linux-gnueabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-unknown-linux-gnueabi/crosstool.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,21 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++# CT_REMOVE_DOCS is not set
++CT_LOG_EXTRA=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_arm=y
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++# CT_CC_GCC_SJLJ_EXCEPTIONS is not set
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_DEBUG_ltrace=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/x86_64-unknown-mingw32/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/x86_64-unknown-mingw32/crosstool.config	2022-05-26 11:27:33.381332445 -0700
+@@ -0,0 +1,10 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_64=y
++CT_ARCH_x86=y
++CT_KERNEL_windows=y
++CT_BINUTILS_PLUGINS=y
++CT_MINGW_DIRECTX=y
++CT_MINGW_DDK=y
++CT_CC_LANG_CXX=y
+--- crosstool-ng-1.20.0/samples/mips-malta-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips-malta-linux-gnu/crosstool.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,12 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_mips=y
++CT_TARGET_VENDOR="malta"
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_CC_GCC_mips_plt=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/mipsel-unknown-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mipsel-unknown-linux-gnu/crosstool.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,18 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="mips1"
++CT_ARCH_LE=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_mips=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_CC_GCC_mips_plt=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/arm-unknown-eabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-unknown-eabi/crosstool.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,10 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_arm=y
++CT_LIBC_NEWLIB_IO_C99FMT=y
++CT_LIBC_NEWLIB_IO_LL=y
++CT_LIBC_NEWLIB_IO_FLOAT=y
++CT_LIBC_NEWLIB_DISABLE_SUPPLIED_SYSCALLS=y
++CT_CC_LANG_CXX=y
+--- crosstool-ng-1.20.0/samples/sh4-unknown-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/sh4-unknown-linux-gnu/crosstool.config	2022-05-26 11:27:33.381332445 -0700
+@@ -0,0 +1,11 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_sh=y
++CT_ARCH_SH_SH4=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/armeb-unknown-linux-gnueabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/armeb-unknown-linux-gnueabi/crosstool.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,22 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="armv5te"
++CT_ARCH_BE=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_arm=y
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++# CT_CC_GCC_SJLJ_EXCEPTIONS is not set
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_DEBUG_ltrace=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/i686-unknown-mingw32/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/i686-unknown-mingw32/crosstool.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,11 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="i686"
++CT_ARCH_x86=y
++CT_KERNEL_windows=y
++CT_BINUTILS_PLUGINS=y
++CT_MINGW_DIRECTX=y
++CT_MINGW_DDK=y
++CT_CC_V_4_8_3=y
++CT_CC_LANG_CXX=y
+--- crosstool-ng-1.20.0/samples/mips64el-n32-linux-uclibc/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips64el-n32-linux-uclibc/uClibc-0.9.33.2.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,256 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Fri Sep  5 15:55:00 2014
++#
++# TARGET_alpha is not set
++# TARGET_arm is not set
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++TARGET_mips=y
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="mips"
++FORCE_OPTIONS_FOR_ARCH=y
++# CONFIG_MIPS_O32_ABI is not set
++CONFIG_MIPS_N32_ABI=y
++# CONFIG_MIPS_N64_ABI is not set
++# CONFIG_MIPS_ISA_1 is not set
++# CONFIG_MIPS_ISA_2 is not set
++CONFIG_MIPS_ISA_3=y
++# CONFIG_MIPS_ISA_4 is not set
++# CONFIG_MIPS_ISA_MIPS32 is not set
++# CONFIG_MIPS_ISA_MIPS32R2 is not set
++# CONFIG_MIPS_ISA_MIPS64 is not set
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_ANY_ENDIAN=y
++ARCH_LITTLE_ENDIAN=y
++# ARCH_WANTS_BIG_ENDIAN is not set
++ARCH_WANTS_LITTLE_ENDIAN=y
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++# UCLIBC_HAS_FPU is not set
++UCLIBC_HAS_SOFT_FLOAT=y
++DO_C99_MATH=y
++# DO_XSI_MATH is not set
++UCLIBC_HAS_FENV=y
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++LDSO_SEARCH_INTERP_PATH=y
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++# PTHREADS_DEBUG_SUPPORT is not set
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++# UCLIBC_SUSV3_LEGACY is not set
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++# UCLIBC_SUSV4_LEGACY is not set
++# UCLIBC_STRICT_HEADERS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++# UCLIBC_HAS_PROGRAM_INVOCATION_NAME is not set
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++# UCLIBC_HAS_LIBUTIL is not set
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++UCLIBC_FALLBACK_TO_ETC_LOCALTIME=y
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++UCLIBC_LINUX_MODULE_24=y
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++# UCLIBC_BSD_SPECIFIC is not set
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++# UCLIBC_HAS_RESOLVER_SUPPORT is not set
++# UCLIBC_HAS_LIBRESOLV_STUB is not set
++# UCLIBC_HAS_LIBNSL_STUB is not set
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++UCLIBC_HAS_CTYPE_ENFORCED=y
++UCLIBC_HAS_WCHAR=y
++# UCLIBC_HAS_LOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++UCLIBC_HAS_REGEX_OLD=y
++UCLIBC_HAS_FNMATCH=y
++UCLIBC_HAS_FNMATCH_OLD=y
++# UCLIBC_HAS_WORDEXP is not set
++# UCLIBC_HAS_NFTW is not set
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++# UCLIBC_HAS_UTMPX is not set
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++HARDWIRED_ABSPATH=y
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++# UCLIBC_HAS_BACKTRACE is not set
++WARNINGS="-Wall"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/mips64el-n32-linux-uclibc/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips64el-n32-linux-uclibc/crosstool.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,17 @@
++CT_EXPERIMENTAL=y
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_LE=y
++CT_ARCH_64=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_mips=y
++CT_TARGET_VENDOR="n32"
++CT_KERNEL_linux=y
++CT_BINUTILS_V_2_22=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_LIBC_UCLIBC_WCHAR=y
++CT_CC_LANG_CXX=y
++CT_CC_GCC_mips_plt=y
+--- crosstool-ng-1.20.0/samples/powerpc-unknown-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc-unknown-linux-gnu/crosstool.config	2022-05-26 11:27:33.377332608 -0700
+@@ -0,0 +1,13 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_powerpc=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/armeb-unknown-linux-uclibcgnueabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/armeb-unknown-linux-uclibcgnueabi/crosstool.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,25 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="armv5te"
++CT_ARCH_CPU="xscale"
++CT_ARCH_TUNE="xscale"
++CT_ARCH_BE=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_arm=y
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_LIBC_UCLIBC_LOCALES=y
++CT_CC_LANG_CXX=y
++# CT_CC_GCC_SJLJ_EXCEPTIONS is not set
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/armeb-unknown-linux-uclibcgnueabi/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/armeb-unknown-linux-uclibcgnueabi/uClibc-0.9.33.2.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,256 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Tue Sep  2 17:35:34 2014
++#
++# TARGET_alpha is not set
++TARGET_arm=y
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="arm"
++FORCE_OPTIONS_FOR_ARCH=y
++CONFIG_ARM_EABI=y
++# COMPILE_IN_THUMB_MODE is not set
++# USE_BX is not set
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_ANY_ENDIAN=y
++ARCH_BIG_ENDIAN=y
++ARCH_WANTS_BIG_ENDIAN=y
++# ARCH_WANTS_LITTLE_ENDIAN is not set
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++# UCLIBC_HAS_FPU is not set
++UCLIBC_HAS_SOFT_FLOAT=y
++DO_C99_MATH=y
++DO_XSI_MATH=y
++UCLIBC_HAS_FENV=y
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++# LDSO_SEARCH_INTERP_PATH is not set
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++# PTHREADS_DEBUG_SUPPORT is not set
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++UCLIBC_SUSV4_LEGACY=y
++# UCLIBC_STRICT_HEADERS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++# UCLIBC_HAS_PROGRAM_INVOCATION_NAME is not set
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++UCLIBC_HAS_LIBUTIL=y
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++# UCLIBC_FALLBACK_TO_ETC_LOCALTIME is not set
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++UCLIBC_LINUX_MODULE_24=y
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++# UCLIBC_BSD_SPECIFIC is not set
++# UCLIBC_HAS_BSD_ERR is not set
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++UCLIBC_HAS_IPV6=y
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++# UCLIBC_HAS_RESOLVER_SUPPORT is not set
++# UCLIBC_HAS_LIBRESOLV_STUB is not set
++# UCLIBC_HAS_LIBNSL_STUB is not set
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++UCLIBC_HAS_CTYPE_ENFORCED=y
++UCLIBC_HAS_WCHAR=y
++UCLIBC_HAS_LOCALE=y
++# UCLIBC_BUILD_ALL_LOCALE is not set
++# UCLIBC_BUILD_MINIMAL_LOCALE is not set
++UCLIBC_PREGENERATED_LOCALE_DATA=y
++# UCLIBC_DOWNLOAD_PREGENERATED_LOCALE_DATA is not set
++# UCLIBC_HAS_XLOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++# UCLIBC_HAS_GLIBC_DIGIT_GROUPING is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++# UCLIBC_HAS_REGEX_OLD is not set
++UCLIBC_HAS_FNMATCH=y
++# UCLIBC_HAS_FNMATCH_OLD is not set
++# UCLIBC_HAS_WORDEXP is not set
++UCLIBC_HAS_NFTW=y
++# UCLIBC_HAS_FTW is not set
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++# UCLIBC_HAS_UTMPX is not set
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++# HARDWIRED_ABSPATH is not set
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++UCLIBC_HAS_BACKTRACE=y
++WARNINGS="-Wall"
++EXTRA_WARNINGS=y
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/mips64el-n64-linux-uclibc/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips64el-n64-linux-uclibc/uClibc-0.9.33.2.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,256 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Fri Sep  5 19:48:28 2014
++#
++# TARGET_alpha is not set
++# TARGET_arm is not set
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++TARGET_mips=y
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="mips"
++FORCE_OPTIONS_FOR_ARCH=y
++# CONFIG_MIPS_O32_ABI is not set
++# CONFIG_MIPS_N32_ABI is not set
++CONFIG_MIPS_N64_ABI=y
++# CONFIG_MIPS_ISA_1 is not set
++# CONFIG_MIPS_ISA_2 is not set
++# CONFIG_MIPS_ISA_3 is not set
++# CONFIG_MIPS_ISA_4 is not set
++# CONFIG_MIPS_ISA_MIPS32 is not set
++# CONFIG_MIPS_ISA_MIPS32R2 is not set
++CONFIG_MIPS_ISA_MIPS64=y
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_ANY_ENDIAN=y
++ARCH_LITTLE_ENDIAN=y
++# ARCH_WANTS_BIG_ENDIAN is not set
++ARCH_WANTS_LITTLE_ENDIAN=y
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++# UCLIBC_HAS_FPU is not set
++UCLIBC_HAS_SOFT_FLOAT=y
++DO_C99_MATH=y
++# DO_XSI_MATH is not set
++UCLIBC_HAS_FENV=y
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++LDSO_SEARCH_INTERP_PATH=y
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++PTHREADS_DEBUG_SUPPORT=y
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++# UCLIBC_SUSV3_LEGACY is not set
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++# UCLIBC_SUSV4_LEGACY is not set
++# UCLIBC_STRICT_HEADERS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++# UCLIBC_HAS_PROGRAM_INVOCATION_NAME is not set
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++# UCLIBC_HAS_LIBUTIL is not set
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++UCLIBC_FALLBACK_TO_ETC_LOCALTIME=y
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++UCLIBC_LINUX_MODULE_24=y
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++# UCLIBC_BSD_SPECIFIC is not set
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++# UCLIBC_HAS_RESOLVER_SUPPORT is not set
++# UCLIBC_HAS_LIBRESOLV_STUB is not set
++# UCLIBC_HAS_LIBNSL_STUB is not set
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++UCLIBC_HAS_CTYPE_ENFORCED=y
++UCLIBC_HAS_WCHAR=y
++# UCLIBC_HAS_LOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++UCLIBC_HAS_REGEX_OLD=y
++UCLIBC_HAS_FNMATCH=y
++UCLIBC_HAS_FNMATCH_OLD=y
++# UCLIBC_HAS_WORDEXP is not set
++# UCLIBC_HAS_NFTW is not set
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++# UCLIBC_HAS_UTMPX is not set
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++HARDWIRED_ABSPATH=y
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++# UCLIBC_HAS_BACKTRACE is not set
++WARNINGS="-Wall"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/mips64el-n64-linux-uclibc/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips64el-n64-linux-uclibc/crosstool.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,18 @@
++CT_EXPERIMENTAL=y
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_LE=y
++CT_ARCH_64=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_mips=y
++CT_ARCH_mips_n64=y
++CT_TARGET_VENDOR="n64"
++CT_KERNEL_linux=y
++CT_BINUTILS_V_2_22=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_LIBC_UCLIBC_WCHAR=y
++CT_CC_LANG_CXX=y
++CT_CC_GCC_mips_plt=y
+--- crosstool-ng-1.20.0/samples/alphaev56-unknown-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/alphaev56-unknown-linux-gnu/crosstool.config	2022-05-26 11:27:33.357333426 -0700
+@@ -0,0 +1,11 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="ev56"
++CT_ARCH_TUNE="ev56"
++CT_ARCH_ALPHA_EV56=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_LIBC_GLIBC_USE_PORTS=y
++CT_CC_LANG_CXX=y
+--- crosstool-ng-1.20.0/samples/arm-bare_newlib_cortex_m3_nommu-eabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-bare_newlib_cortex_m3_nommu-eabi/crosstool.config	2022-05-26 11:27:33.357333426 -0700
+@@ -0,0 +1,18 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="cortex-m3"
++CT_ARCH_TUNE="cortex-m3"
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_arm=y
++# CT_ARCH_USE_MMU is not set
++CT_ARCH_ARM_MODE_THUMB=y
++CT_TARGET_VENDOR="bare_newlib_cortex_m3_nommu"
++CT_ARCH_BINFMT_FLAT=y
++CT_LIBC_NEWLIB_IO_C99FMT=y
++CT_LIBC_NEWLIB_IO_LL=y
++CT_LIBC_NEWLIB_IO_FLOAT=y
++CT_LIBC_NEWLIB_IO_LDBL=y
++CT_LIBC_NEWLIB_DISABLE_SUPPLIED_SYSCALLS=y
++CT_CC_LANG_CXX=y
++CT_CC_GCC_BUILD_ID=y
+--- crosstool-ng-1.20.0/samples/powerpc-e300c3-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc-e300c3-linux-gnu/crosstool.config	2022-05-26 11:27:33.377332608 -0700
+@@ -0,0 +1,12 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="e300c3"
++CT_ARCH_TUNE="e300c3"
++CT_ARCH_powerpc=y
++CT_TARGET_VENDOR="e300c3"
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++# CT_CC_GCC_ENABLE_TARGET_OPTSPACE is not set
+--- crosstool-ng-1.20.0/samples/i586-geode-linux-uclibc/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/i586-geode-linux-uclibc/uClibc-0.9.33.2.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,271 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Mon Sep  1 18:15:30 2014
++#
++# TARGET_alpha is not set
++# TARGET_arm is not set
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++TARGET_i386=y
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="i386"
++FORCE_OPTIONS_FOR_ARCH=y
++# CONFIG_GENERIC_386 is not set
++# CONFIG_386 is not set
++# CONFIG_486 is not set
++CONFIG_586=y
++# CONFIG_586MMX is not set
++# CONFIG_686 is not set
++# CONFIG_PENTIUMII is not set
++# CONFIG_PENTIUMIII is not set
++# CONFIG_PENTIUM4 is not set
++# CONFIG_K6 is not set
++# CONFIG_K7 is not set
++# CONFIG_ELAN is not set
++# CONFIG_CRUSOE is not set
++# CONFIG_WINCHIPC6 is not set
++# CONFIG_WINCHIP2 is not set
++# CONFIG_CYRIXIII is not set
++# CONFIG_NEHEMIAH is not set
++TARGET_SUBARCH="i586"
++
++#
++# Using ELF file format
++#
++ARCH_LITTLE_ENDIAN=y
++
++#
++# Using Little Endian
++#
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++UCLIBC_HAS_FPU=y
++DO_C99_MATH=y
++# DO_XSI_MATH is not set
++UCLIBC_HAS_FENV=y
++UCLIBC_HAS_LONG_DOUBLE_MATH=y
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++LDSO_SEARCH_INTERP_PATH=y
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++# PTHREADS_DEBUG_SUPPORT is not set
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++UCLIBC_SUSV4_LEGACY=y
++# UCLIBC_STRICT_HEADERS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++# UCLIBC_HAS_PROGRAM_INVOCATION_NAME is not set
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++# UCLIBC_HAS_LIBUTIL is not set
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++UCLIBC_FALLBACK_TO_ETC_LOCALTIME=y
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++UCLIBC_LINUX_MODULE_24=y
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++# UCLIBC_BSD_SPECIFIC is not set
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++# UCLIBC_HAS_RESOLVER_SUPPORT is not set
++# UCLIBC_HAS_LIBRESOLV_STUB is not set
++# UCLIBC_HAS_LIBNSL_STUB is not set
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++UCLIBC_HAS_CTYPE_ENFORCED=y
++UCLIBC_HAS_WCHAR=y
++UCLIBC_HAS_LOCALE=y
++# UCLIBC_BUILD_ALL_LOCALE is not set
++# UCLIBC_BUILD_MINIMAL_LOCALE is not set
++UCLIBC_PREGENERATED_LOCALE_DATA=y
++# UCLIBC_DOWNLOAD_PREGENERATED_LOCALE_DATA is not set
++# UCLIBC_HAS_XLOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++# UCLIBC_HAS_GLIBC_DIGIT_GROUPING is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++UCLIBC_HAS_REGEX_OLD=y
++UCLIBC_HAS_FNMATCH=y
++UCLIBC_HAS_FNMATCH_OLD=y
++# UCLIBC_HAS_WORDEXP is not set
++# UCLIBC_HAS_NFTW is not set
++# UCLIBC_HAS_FTW is not set
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++# UCLIBC_HAS_UTMPX is not set
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++HARDWIRED_ABSPATH=y
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++# UCLIBC_HAS_BACKTRACE is not set
++WARNINGS="-Wall -pipe -pipe"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/i586-geode-linux-uclibc/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/i586-geode-linux-uclibc/crosstool.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,21 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="pentium-mmx"
++CT_ARCH_x86=y
++CT_TARGET_VENDOR="geode"
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_LIBC_UCLIBC_LOCALES=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/mipsel-sde-elf/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mipsel-sde-elf/crosstool.config	2022-05-26 11:27:33.373332772 -0700
+@@ -0,0 +1,11 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_LE=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_mips=y
++CT_TARGET_VENDOR="sde"
++CT_LIBC_none=y
++# CT_CC_GCC_ENABLE_TARGET_OPTSPACE is not set
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/powerpc-e500v2-linux-gnuspe/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc-e500v2-linux-gnuspe/crosstool.config	2022-05-26 11:27:33.377332608 -0700
+@@ -0,0 +1,22 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="8548"
++CT_ARCH_TUNE="8548"
++CT_ARCH_FLOAT_SW=y
++CT_TARGET_CFLAGS="-mfloat-gprs=double -Wa,-me500x2"
++CT_ARCH_powerpc=y
++CT_ARCH_powerpc_ABI_SPE=y
++CT_TARGET_VENDOR="e500v2"
++CT_KERNEL_linux=y
++CT_BINUTILS_EXTRA_CONFIG_ARRAY="--enable-spe=yes --enable-e500x2 --with-e500x2"
++CT_LIBC_glibc=y
++# CT_LIBC_GLIBC_FORCE_UNWIND is not set
++CT_CC_GCC_SHOW_LINARO=y
++CT_CC_V_4_6_4=y
++CT_CC_LANG_CXX=y
++CT_CC_CORE_EXTRA_CONFIG_ARRAY="--with-long-double-128 --enable-e500_double"
++CT_CC_EXTRA_CONFIG_ARRAY="--with-long-double-128 --enable-e500_double"
++# CT_CC_GCC_ENABLE_TARGET_OPTSPACE is not set
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/arm-cortexa9_neon-linux-gnueabihf/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-cortexa9_neon-linux-gnueabihf/crosstool.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,30 @@
++CT_EXPERIMENTAL=y
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="armv7-a"
++CT_ARCH_CPU="cortex-a9"
++CT_ARCH_TUNE="cortex-a9"
++CT_ARCH_FPU="neon"
++CT_ARCH_FLOAT_HW=y
++CT_ARCH_arm=y
++CT_ARCH_ARM_TUPLE_USE_EABIHF=y
++CT_TARGET_VENDOR="cortexa9_neon"
++CT_TOOLCHAIN_ENABLE_NLS=y
++CT_KERNEL_linux=y
++CT_BINUTILS_V_2_22=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_LIBC_ADDONS_LIST="libidn"
++CT_LIBC_LOCALES=y
++CT_LIBC_GLIBC_KERNEL_VERSION_NONE=y
++CT_CC_GCC_SHOW_LINARO=y
++CT_CC_LANG_CXX=y
++# CT_CC_GCC_ENABLE_TARGET_OPTSPACE is not set
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_GDB_NATIVE_STATIC=y
+--- crosstool-ng-1.20.0/samples/alphaev67-unknown-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/alphaev67-unknown-linux-gnu/crosstool.config	2022-05-26 11:27:33.357333426 -0700
+@@ -0,0 +1,12 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="ev56"
++CT_ARCH_TUNE="ev56"
++CT_ARCH_ALPHA_EV67=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_LIBC_GLIBC_USE_PORTS=y
++CT_CC_LANG_CXX=y
++# CT_CC_GCC_ENABLE_TARGET_OPTSPACE is not set
+--- crosstool-ng-1.20.0/samples/arm-cortexa5-linux-uclibcgnueabihf/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-cortexa5-linux-uclibcgnueabihf/crosstool.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,29 @@
++CT_EXPERIMENTAL=y
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="armv7-a"
++CT_ARCH_CPU="cortex-a5"
++CT_ARCH_TUNE="cortex-a5"
++CT_ARCH_FPU="vfpv4-d16"
++CT_ARCH_FLOAT_HW=y
++CT_ARCH_arm=y
++CT_ARCH_ARM_TUPLE_USE_EABIHF=y
++CT_TARGET_VENDOR="cortexa5"
++CT_KERNEL_linux=y
++CT_BINUTILS_V_2_22=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_LIBC_UCLIBC_WCHAR=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++CT_GDB_CROSS_STATIC=y
++CT_GDB_NATIVE=y
++CT_DEBUG_ltrace=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/arm-cortexa5-linux-uclibcgnueabihf/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-cortexa5-linux-uclibcgnueabihf/uClibc-0.9.33.2.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,252 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Wed Sep  3 17:02:28 2014
++#
++# TARGET_alpha is not set
++TARGET_arm=y
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="arm"
++FORCE_OPTIONS_FOR_ARCH=y
++CONFIG_ARM_EABI=y
++# COMPILE_IN_THUMB_MODE is not set
++USE_BX=y
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_ANY_ENDIAN=y
++ARCH_LITTLE_ENDIAN=y
++# ARCH_WANTS_BIG_ENDIAN is not set
++ARCH_WANTS_LITTLE_ENDIAN=y
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++UCLIBC_HAS_FPU=y
++DO_C99_MATH=y
++# DO_XSI_MATH is not set
++# UCLIBC_HAS_FENV is not set
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++# LDSO_CACHE_SUPPORT is not set
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++# UCLIBC_STATIC_LDCONFIG is not set
++LDSO_RUNPATH=y
++LDSO_SEARCH_INTERP_PATH=y
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++PTHREADS_DEBUG_SUPPORT=y
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++MALLOC_GLIBC_COMPAT=y
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++UCLIBC_SUSV4_LEGACY=y
++# UCLIBC_STRICT_HEADERS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++UCLIBC_HAS_PROGRAM_INVOCATION_NAME=y
++UCLIBC_HAS___PROGNAME=y
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++UCLIBC_HAS_GETPT=y
++UCLIBC_HAS_LIBUTIL=y
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++UCLIBC_FALLBACK_TO_ETC_LOCALTIME=y
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++# UCLIBC_LINUX_MODULE_24 is not set
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++UCLIBC_BSD_SPECIFIC=y
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++# UCLIBC_HAS_RPC is not set
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++UCLIBC_HAS_RESOLVER_SUPPORT=y
++UCLIBC_HAS_LIBRESOLV_STUB=y
++UCLIBC_HAS_LIBNSL_STUB=y
++
++#
++# String and Stdio Support
++#
++# UCLIBC_HAS_STRING_GENERIC_OPT is not set
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++UCLIBC_HAS_CTYPE_CHECKED=y
++# UCLIBC_HAS_CTYPE_ENFORCED is not set
++UCLIBC_HAS_WCHAR=y
++# UCLIBC_HAS_LOCALE is not set
++UCLIBC_HAS_HEXADECIMAL_FLOATS=y
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++UCLIBC_HAS_SCANF_GLIBC_A_FLAG=y
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++# UCLIBC_HAS_STDIO_GETC_MACRO is not set
++# UCLIBC_HAS_STDIO_PUTC_MACRO is not set
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE=y
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++UCLIBC_HAS_GLIBC_CUSTOM_STREAMS=y
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++# UCLIBC_HAS_GNU_GETSUBOPT is not set
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++# UCLIBC_HAS_REGEX_OLD is not set
++UCLIBC_HAS_FNMATCH=y
++# UCLIBC_HAS_FNMATCH_OLD is not set
++# UCLIBC_HAS_WORDEXP is not set
++UCLIBC_HAS_NFTW=y
++UCLIBC_HAS_FTW=y
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++UCLIBC_HAS_UTMPX=y
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++HARDWIRED_ABSPATH=y
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++UCLIBC_HAS_SSP=y
++# UCLIBC_HAS_SSP_COMPAT is not set
++# SSP_QUICK_CANARY is not set
++PROPOLICE_BLOCK_ABRT=y
++# PROPOLICE_BLOCK_SEGV is not set
++# UCLIBC_BUILD_SSP is not set
++UCLIBC_BUILD_RELRO=y
++UCLIBC_BUILD_NOW=y
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++# UCLIBC_HAS_BACKTRACE is not set
++WARNINGS="-Wall"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/powerpc-unknown_nofpu-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc-unknown_nofpu-linux-gnu/crosstool.config	2022-05-26 11:27:33.377332608 -0700
+@@ -0,0 +1,15 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_powerpc=y
++CT_TARGET_VENDOR="unknown_nofpu"
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++CT_GDB_V_6_8a=y
++CT_DEBUG_strace=y
++CT_STRACE_V_4_5_19=y
+--- crosstool-ng-1.20.0/samples/armv6-rpi-linux-gnueabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/armv6-rpi-linux-gnueabi/crosstool.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,28 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="armv6zk"
++CT_ARCH_CPU="arm1176jzf-s"
++CT_ARCH_TUNE="arm1176jzf-s"
++CT_ARCH_FPU="vfp"
++CT_ARCH_arm=y
++CT_ARCH_SUFFIX="v6"
++CT_TARGET_VENDOR="rpi"
++CT_KERNEL_linux=y
++CT_KERNEL_V_3_12=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_LIBC_LOCALES=y
++CT_LIBC_GLIBC_KERNEL_VERSION_CHOSEN=y
++CT_LIBC_GLIBC_MIN_KERNEL_VERSION="3.2.27"
++CT_CC_GCC_SHOW_LINARO=y
++CT_CC_LANG_CXX=y
++# CT_CC_STATIC_LIBSTDCXX is not set
++CT_CC_GCC_DISABLE_PCH=y
++CT_CC_GCC_BUILD_ID=y
++CT_CC_GCC_LNK_HASH_STYLE_BOTH=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/x86_64-unknown-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/x86_64-unknown-linux-gnu/crosstool.config	2022-05-26 11:27:33.381332445 -0700
+@@ -0,0 +1,15 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_64=y
++CT_ARCH_x86=y
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_LIBC_GLIBC_KERNEL_VERSION_NONE=y
++CT_CC_LANG_CXX=y
++CT_CC_GCC_LNK_HASH_STYLE_BOTH=y
++CT_DEBUG_gdb=y
+--- crosstool-ng-1.20.0/samples/x86_64-unknown-linux-uclibc/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/x86_64-unknown-linux-uclibc/uClibc-0.9.33.2.config	2022-05-26 11:27:33.381332445 -0700
+@@ -0,0 +1,248 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Sun Aug 31 15:27:07 2014
++#
++# TARGET_alpha is not set
++# TARGET_arm is not set
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++TARGET_x86_64=y
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="x86_64"
++FORCE_OPTIONS_FOR_ARCH=y
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_LITTLE_ENDIAN=y
++
++#
++# Using Little Endian
++#
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++UCLIBC_HAS_FPU=y
++DO_C99_MATH=y
++# DO_XSI_MATH is not set
++UCLIBC_HAS_FENV=y
++UCLIBC_HAS_LONG_DOUBLE_MATH=y
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++LDSO_SEARCH_INTERP_PATH=y
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++# PTHREADS_DEBUG_SUPPORT is not set
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++UCLIBC_SUSV3_LEGACY_MACROS=y
++UCLIBC_SUSV4_LEGACY=y
++# UCLIBC_STRICT_HEADERS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++# UCLIBC_HAS_PROGRAM_INVOCATION_NAME is not set
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++# UCLIBC_HAS_LIBUTIL is not set
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++UCLIBC_FALLBACK_TO_ETC_LOCALTIME=y
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++UCLIBC_LINUX_MODULE_24=y
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++# UCLIBC_BSD_SPECIFIC is not set
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++# UCLIBC_HAS_RESOLVER_SUPPORT is not set
++# UCLIBC_HAS_LIBRESOLV_STUB is not set
++# UCLIBC_HAS_LIBNSL_STUB is not set
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++UCLIBC_HAS_CTYPE_ENFORCED=y
++# UCLIBC_HAS_WCHAR is not set
++# UCLIBC_HAS_LOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++# USE_OLD_VFPRINTF is not set
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++UCLIBC_HAS_REGEX_OLD=y
++UCLIBC_HAS_FNMATCH=y
++UCLIBC_HAS_FNMATCH_OLD=y
++UCLIBC_HAS_WORDEXP=y
++# UCLIBC_HAS_NFTW is not set
++# UCLIBC_HAS_FTW is not set
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++# UCLIBC_HAS_UTMPX is not set
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/usr/$(TARGET_ARCH)-linux-uclibc/"
++DEVEL_PREFIX="/usr/$(TARGET_ARCH)-linux-uclibc/usr/"
++MULTILIB_DIR="lib"
++HARDWIRED_ABSPATH=y
++
++#
++# Security options
++#
++# UCLIBC_HAS_ARC4RANDOM is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++# UCLIBC_HAS_BACKTRACE is not set
++WARNINGS="-Wall"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/x86_64-unknown-linux-uclibc/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/x86_64-unknown-linux-uclibc/crosstool.config	2022-05-26 11:27:33.381332445 -0700
+@@ -0,0 +1,20 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_64=y
++CT_ARCH_x86=y
++CT_KERNEL_linux=y
++# CT_KERNEL_LINUX_INSTALL_CHECK is not set
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_LIBC_UCLIBC_LOCALES=y
++CT_CC_LANG_CXX=y
++CT_CC_EXTRA_CONFIG_ARRAY="--disable-libsanitizer"
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++CT_GDB_NATIVE=y
+--- crosstool-ng-1.20.0/samples/mips-ar2315-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/mips-ar2315-linux-gnu/crosstool.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,15 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="4kc"
++CT_ARCH_TUNE="4kc"
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_mips=y
++CT_TARGET_VENDOR="ar2315"
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_CC_GCC_mips_plt=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
+--- crosstool-ng-1.20.0/samples/m68k-unknown-elf/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/m68k-unknown-elf/crosstool.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,13 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="cpu32"
++CT_ARCH_m68k=y
++CT_ARCH_BINFMT_FLAT=y
++CT_LIBC_none=y
++# CT_CC_GCC_USE_GRAPHITE is not set
++# CT_CC_GCC_USE_LTO is not set
++CT_COMP_TOOLS=y
++CT_COMP_TOOLS_autoconf=y
++CT_COMP_TOOLS_automake=y
++CT_COMP_TOOLS_libtool=y
+--- crosstool-ng-1.20.0/samples/m68k-unknown-uclinux-uclibc/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/m68k-unknown-uclinux-uclibc/crosstool.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,8 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_m68k=y
++CT_KERNEL_linux=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_THREADS_LT=y
+--- crosstool-ng-1.20.0/samples/m68k-unknown-uclinux-uclibc/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/m68k-unknown-uclinux-uclibc/uClibc-0.9.33.2.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,261 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.32.1-git
++# Mon Sep 12 22:41:20 2011
++#
++# TARGET_alpha is not set
++# TARGET_arm is not set
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++TARGET_m68k=y
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++# TARGET_c6x is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="m68k"
++FORCE_OPTIONS_FOR_ARCH=y
++CONFIG_ARM_OABI=y
++# CONFIG_ARM_EABI is not set
++CONFIG_GENERIC_ARM=y
++# CONFIG_ARM610 is not set
++# CONFIG_ARM710 is not set
++# CONFIG_ARM7TDMI is not set
++# CONFIG_ARM720T is not set
++# CONFIG_ARM920T is not set
++# CONFIG_ARM922T is not set
++# CONFIG_ARM926T is not set
++# CONFIG_ARM10T is not set
++# CONFIG_ARM1136JF_S is not set
++# CONFIG_ARM1176JZ_S is not set
++# CONFIG_ARM1176JZF_S is not set
++# CONFIG_ARM_CORTEX_M3 is not set
++# CONFIG_ARM_CORTEX_M1 is not set
++# CONFIG_ARM_SA110 is not set
++# CONFIG_ARM_SA1100 is not set
++# CONFIG_ARM_XSCALE is not set
++# CONFIG_ARM_IWMMXT is not set
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_ANY_ENDIAN=y
++ARCH_BIG_ENDIAN=y
++ARCH_WANTS_BIG_ENDIAN=y
++# ARCH_WANTS_LITTLE_ENDIAN is not set
++# ARCH_HAS_MMU is not set
++UCLIBC_HAS_FLOATS=y
++# UCLIBC_HAS_FPU is not set
++UCLIBC_HAS_SOFT_FLOAT=y
++DO_C99_MATH=y
++DO_XSI_MATH=y
++UCLIBC_HAS_FENV=y
++KERNEL_HEADERS=""
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++# HAVE_NO_PIC is not set
++DOPIC=y
++# ARCH_HAS_NO_SHARED is not set
++# ARCH_HAS_NO_LDSO is not set
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++# LDSO_SEARCH_INTERP_PATH is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++LINUXTHREADS_OLD=y
++# LINUXTHREADS_NEW is not set
++# UCLIBC_HAS_THREADS_NATIVE is not set
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++PTHREADS_DEBUG_SUPPORT=y
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++# UCLIBC_SUSV4_LEGACY is not set
++UCLIBC_STRICT_HEADERS=y
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++# UCLIBC_HAS_PROGRAM_INVOCATION_NAME is not set
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++UCLIBC_HAS_LIBUTIL=y
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++# UCLIBC_FALLBACK_TO_ETC_LOCALTIME is not set
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_24=y
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++# UCLIBC_BSD_SPECIFIC is not set
++# UCLIBC_HAS_BSD_ERR is not set
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++UCLIBC_HAS_IPV6=y
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++# UCLIBC_HAS_LIBRESOLV_STUB is not set
++# UCLIBC_HAS_LIBNSL_STUB is not set
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++UCLIBC_HAS_CTYPE_ENFORCED=y
++UCLIBC_HAS_WCHAR=n
++# UCLIBC_HAS_LOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++# USE_OLD_VFPRINTF is not set
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++# UCLIBC_HAS_REGEX_OLD is not set
++UCLIBC_HAS_FNMATCH=y
++# UCLIBC_HAS_FNMATCH_OLD is not set
++# UCLIBC_HAS_WORDEXP is not set
++UCLIBC_HAS_NFTW=y
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++# UCLIBC_HAS_UTMPX is not set
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++# HARDWIRED_ABSPATH is not set
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++# HAVE_NO_SSP is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# uClibc development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++UCLIBC_HAS_BACKTRACE=y
++WARNINGS="-Wall"
++EXTRA_WARNINGS=y
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/i586-mingw32msvc,i686-none-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/i586-mingw32msvc,i686-none-linux-gnu/crosstool.config	2022-05-26 11:27:33.369332935 -0700
+@@ -0,0 +1,13 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="i686"
++CT_ARCH_TUNE="i686"
++CT_ARCH_x86=y
++CT_TARGET_VENDOR="none"
++CT_CANADIAN=y
++CT_HOST="i586-mingw32msvc"
++CT_KERNEL_linux=y
++CT_LIBC_glibc=y
++# CT_LIBC_XLDD is not set
++CT_CC_LANG_CXX=y
+--- crosstool-ng-1.20.0/samples/bfin-unknown-linux-uclibc/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/bfin-unknown-linux-uclibc/uClibc-0.9.33.2.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,225 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.30.2
++# Tue Apr  6 16:47:32 2010
++#
++# TARGET_alpha is not set
++# TARGET_arm is not set
++# TARGET_avr32 is not set
++TARGET_bfin=y
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="bfin"
++FORCE_OPTIONS_FOR_ARCH=y
++TARGET_SUBARCH=""
++# UCLIBC_FORMAT_ELF is not set
++UCLIBC_FORMAT_FDPIC_ELF=y
++# UCLIBC_FORMAT_FLAT is not set
++# UCLIBC_FORMAT_FLAT_SEP_DATA is not set
++# UCLIBC_FORMAT_SHARED_FLAT is not set
++ARCH_LITTLE_ENDIAN=y
++
++#
++# Using Little Endian
++#
++ARCH_HAS_NO_MMU=y
++
++#
++# Target CPU lacks a memory management unit (MMU)
++#
++UCLIBC_HAS_FLOATS=y
++UCLIBC_HAS_FPU=y
++DO_C99_MATH=y
++# UCLIBC_HAS_FENV is not set
++KERNEL_HEADERS="/usr/include"
++UCLIBC_UCLINUX_BROKEN_MUNMAP=y
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++# HAVE_NO_PIC is not set
++DOPIC=y
++# ARCH_HAS_NO_SHARED is not set
++# ARCH_HAS_NO_LDSO is not set
++HAVE_SHARED=y
++FORCE_SHAREABLE_TEXT_SEGMENTS=y
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++UCLIBC_HAS_THREADS=y
++PTHREADS_DEBUG_SUPPORT=y
++LINUXTHREADS_OLD=y
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++MALLOC=y
++# MALLOC_SIMPLE is not set
++# MALLOC_STANDARD is not set
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++UCLIBC_SUSV3_LEGACY_MACROS=y
++# UCLIBC_HAS_STUBS is not set
++# UCLIBC_HAS_SHADOW is not set
++UCLIBC_HAS_PROGRAM_INVOCATION_NAME=y
++UCLIBC_HAS___PROGNAME=y
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++UCLIBC_HAS_TM_EXTENSIONS=y
++# UCLIBC_HAS_TZ_CACHING is not set
++# UCLIBC_HAS_TZ_FILE is not set
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++# UCLIBC_LINUX_MODULE_24 is not set
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++UCLIBC_BSD_SPECIFIC=y
++UCLIBC_HAS_BSD_ERR=y
++UCLIBC_HAS_OBSOLETE_BSD_SIGNAL=y
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++UCLIBC_SV4_DEPRECATED=y
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++# UCLIBC_USE_NETLINK is not set
++UCLIBC_HAS_BSD_RES_CLOSE=y
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++UCLIBC_HAS_CTYPE_UNSAFE=y
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++# UCLIBC_HAS_CTYPE_ENFORCED is not set
++# UCLIBC_HAS_WCHAR is not set
++# UCLIBC_HAS_LOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_PRINTF is not set
++# USE_OLD_VFPRINTF is not set
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++UCLIBC_HAS_STDIO_BUFSIZ_256=y
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_4096 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++# UCLIBC_HAS_PRINTF_M_SPEC is not set
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++UCLIBC_HAS_REGEX_OLD=y
++UCLIBC_HAS_FNMATCH=y
++UCLIBC_HAS_FNMATCH_OLD=y
++# UCLIBC_HAS_WORDEXP is not set
++# UCLIBC_HAS_FTW is not set
++UCLIBC_HAS_GLOB=y
++# UCLIBC_HAS_GNU_GLOB is not set
++
++#
++# Library Installation Options
++#
++SHARED_LIB_LOADER_PREFIX="/lib"
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr"
++
++#
++# Security options
++#
++# UCLIBC_HAS_ARC4RANDOM is not set
++# HAVE_NO_SSP is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++# UCLIBC_BUILD_NOEXECSTACK is not set
++
++#
++# uClibc development/debugging options
++#
++CROSS_COMPILER_PREFIX="bfin-elf-"
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DODEBUG_PT is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++SUPPORT_LD_DEBUG=y
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++WARNINGS="-Wall"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/bfin-unknown-linux-uclibc/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/bfin-unknown-linux-uclibc/crosstool.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,19 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_blackfin=y
++CT_KERNEL_linux=y
++CT_ARCH_BINFMT_FDPIC=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_THREADS_LT=y
++CT_CC_V_4_5_3=y
++# CT_CC_GCC_USE_GRAPHITE is not set
++# CT_CC_GCC_USE_LTO is not set
++CT_GMP_V_4_3_2=y
++CT_MPFR_V_2_4_2=y
++CT_COMP_TOOLS=y
++CT_COMP_TOOLS_autoconf=y
++CT_COMP_TOOLS_automake=y
++CT_COMP_TOOLS_libtool=y
+--- crosstool-ng-1.20.0/samples/arm-cortex_a15-linux-gnueabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-cortex_a15-linux-gnueabi/crosstool.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,24 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_CPU="cortex-a15"
++CT_ARCH_TUNE="cortex-a15"
++CT_ARCH_FPU="neon-vfpv4"
++CT_ARCH_FLOAT_HW=y
++CT_ARCH_arm=y
++CT_TARGET_VENDOR="cortex_a15"
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_GCC_SHOW_LINARO=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_GDB_NATIVE_STATIC=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/arm-unknown-linux-uclibcgnueabihf/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-unknown-linux-uclibcgnueabihf/uClibc-0.9.33.2.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,253 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Fri Sep  5 12:29:57 2014
++#
++# TARGET_alpha is not set
++TARGET_arm=y
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="arm"
++FORCE_OPTIONS_FOR_ARCH=y
++CONFIG_ARM_EABI=y
++# COMPILE_IN_THUMB_MODE is not set
++USE_BX=y
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_ANY_ENDIAN=y
++ARCH_LITTLE_ENDIAN=y
++# ARCH_WANTS_BIG_ENDIAN is not set
++ARCH_WANTS_LITTLE_ENDIAN=y
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++UCLIBC_HAS_FPU=y
++DO_C99_MATH=y
++# DO_XSI_MATH is not set
++# UCLIBC_HAS_FENV is not set
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++# LDSO_CACHE_SUPPORT is not set
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++# UCLIBC_STATIC_LDCONFIG is not set
++LDSO_RUNPATH=y
++LDSO_SEARCH_INTERP_PATH=y
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++PTHREADS_DEBUG_SUPPORT=y
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++MALLOC_GLIBC_COMPAT=y
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++UCLIBC_SUSV4_LEGACY=y
++# UCLIBC_STRICT_HEADERS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++UCLIBC_HAS_PROGRAM_INVOCATION_NAME=y
++UCLIBC_HAS___PROGNAME=y
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++UCLIBC_HAS_GETPT=y
++UCLIBC_HAS_LIBUTIL=y
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++UCLIBC_FALLBACK_TO_ETC_LOCALTIME=y
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++# UCLIBC_LINUX_MODULE_24 is not set
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++UCLIBC_BSD_SPECIFIC=y
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++# UCLIBC_HAS_RPC is not set
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++UCLIBC_HAS_RESOLVER_SUPPORT=y
++UCLIBC_HAS_LIBRESOLV_STUB=y
++UCLIBC_HAS_LIBNSL_STUB=y
++
++#
++# String and Stdio Support
++#
++# UCLIBC_HAS_STRING_GENERIC_OPT is not set
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++UCLIBC_HAS_CTYPE_CHECKED=y
++# UCLIBC_HAS_CTYPE_ENFORCED is not set
++# UCLIBC_HAS_WCHAR is not set
++# UCLIBC_HAS_LOCALE is not set
++UCLIBC_HAS_HEXADECIMAL_FLOATS=y
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++# USE_OLD_VFPRINTF is not set
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++UCLIBC_HAS_SCANF_GLIBC_A_FLAG=y
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++# UCLIBC_HAS_STDIO_GETC_MACRO is not set
++# UCLIBC_HAS_STDIO_PUTC_MACRO is not set
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE=y
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++UCLIBC_HAS_GLIBC_CUSTOM_STREAMS=y
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++# UCLIBC_HAS_GNU_GETSUBOPT is not set
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++# UCLIBC_HAS_REGEX_OLD is not set
++UCLIBC_HAS_FNMATCH=y
++# UCLIBC_HAS_FNMATCH_OLD is not set
++# UCLIBC_HAS_WORDEXP is not set
++UCLIBC_HAS_NFTW=y
++UCLIBC_HAS_FTW=y
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++UCLIBC_HAS_UTMPX=y
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++HARDWIRED_ABSPATH=y
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++UCLIBC_HAS_SSP=y
++# UCLIBC_HAS_SSP_COMPAT is not set
++# SSP_QUICK_CANARY is not set
++PROPOLICE_BLOCK_ABRT=y
++# PROPOLICE_BLOCK_SEGV is not set
++# UCLIBC_BUILD_SSP is not set
++UCLIBC_BUILD_RELRO=y
++UCLIBC_BUILD_NOW=y
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++# UCLIBC_HAS_BACKTRACE is not set
++WARNINGS="-Wall"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/arm-unknown-linux-uclibcgnueabihf/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-unknown-linux-uclibcgnueabihf/crosstool.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,27 @@
++CT_EXPERIMENTAL=y
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="armv5te"
++CT_ARCH_CPU="arm926ej-s"
++CT_ARCH_TUNE="arm926ej-s"
++CT_ARCH_FLOAT_HW=y
++CT_ARCH_arm=y
++CT_ARCH_ARM_TUPLE_USE_EABIHF=y
++CT_KERNEL_linux=y
++CT_BINUTILS_V_2_22=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_CC_LANG_CXX=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++CT_GDB_CROSS_STATIC=y
++CT_GDB_NATIVE=y
++CT_GDB_NATIVE_STATIC=y
++CT_DEBUG_ltrace=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/powerpc64-unknown-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc64-unknown-linux-gnu/crosstool.config	2022-05-26 11:27:33.377332608 -0700
+@@ -0,0 +1,12 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_64=y
++CT_ARCH_powerpc=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
+--- crosstool-ng-1.20.0/samples/powerpc-unknown-linux-uclibc/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc-unknown-linux-uclibc/crosstool.config	2022-05-26 11:27:33.377332608 -0700
+@@ -0,0 +1,24 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_powerpc=y
++CT_KERNEL_linux=y
++CT_KERNEL_V_2_6_31=y
++CT_BINUTILS_V_2_19_1a=y
++CT_BINUTILS_FOR_TARGET=y
++CT_CC_V_4_2_4=y
++CT_CC_LANG_FORTRAN=y
++CT_CC_LANG_CXX=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_V_0_9_30_1=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++CT_GDB_NATIVE=y
++CT_GDB_V_6_8a=y
++CT_DEBUG_strace=y
++CT_STRACE_V_4_5_19=y
++CT_GMP_V_4_3_2=y
++CT_MPFR_V_2_4_2=y
+--- crosstool-ng-1.20.0/samples/powerpc-unknown-linux-uclibc/uClibc-0.9.30.1.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/powerpc-unknown-linux-uclibc/uClibc-0.9.30.1.config	2022-05-26 11:27:33.377332608 -0700
+@@ -0,0 +1,248 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.30
++# Thu Nov 20 22:43:39 2008
++#
++# TARGET_alpha is not set
++# TARGET_arm is not set
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++TARGET_powerpc=y
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="powerpc"
++FORCE_OPTIONS_FOR_ARCH=y
++# CONFIG_ARM_OABI is not set
++# CONFIG_ARM_EABI is not set
++# CONFIG_GENERIC_ARM is not set
++# CONFIG_ARM610 is not set
++# CONFIG_ARM710 is not set
++# CONFIG_ARM7TDMI is not set
++# CONFIG_ARM720T is not set
++# CONFIG_ARM920T is not set
++# CONFIG_ARM922T is not set
++# CONFIG_ARM926T is not set
++# CONFIG_ARM10T is not set
++# CONFIG_ARM1136JF_S is not set
++# CONFIG_ARM1176JZ_S is not set
++# CONFIG_ARM1176JZF_S is not set
++# CONFIG_ARM_CORTEX_M3 is not set
++# CONFIG_ARM_CORTEX_M1 is not set
++# CONFIG_ARM_SA110 is not set
++# CONFIG_ARM_SA1100 is not set
++# CONFIG_ARM_XSCALE is not set
++# CONFIG_ARM_IWMMXT is not set
++CONFIG_CLASSIC=y
++# CONFIG_E500 is not set
++TARGET_SUBARCH="classic"
++
++#
++# Using ELF file format
++#
++ARCH_BIG_ENDIAN=y
++# ARCH_WANTS_BIG_ENDIAN is not set
++# ARCH_WANTS_LITTLE_ENDIAN is not set
++
++#
++# Using Big Endian
++#
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++UCLIBC_HAS_FPU=y
++DO_C99_MATH=y
++UCLIBC_HAS_FENV=y
++UCLIBC_HAS_LONG_DOUBLE_MATH=y
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++# HAVE_NO_PIC is not set
++DOPIC=y
++# ARCH_HAS_NO_SHARED is not set
++# ARCH_HAS_NO_LDSO is not set
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++LDSO_CACHE_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++LDSO_BASE_FILENAME="ld.so"
++UCLIBC_STATIC_LDCONFIG=y
++# LDSO_RUNPATH is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++UCLIBC_HAS_THREADS=y
++# PTHREADS_DEBUG_SUPPORT is not set
++LINUXTHREADS_OLD=y
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++# MALLOC_GLIBC_COMPAT is not set
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++# UCLIBC_SUSV3_LEGACY is not set
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++# UCLIBC_HAS_PROGRAM_INVOCATION_NAME is not set
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++# UCLIBC_HAS_GETPT is not set
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_24=y
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++# UCLIBC_BSD_SPECIFIC is not set
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++UCLIBC_HAS_RPC=y
++UCLIBC_HAS_FULL_RPC=y
++UCLIBC_HAS_REENTRANT_RPC=y
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++
++#
++# String and Stdio Support
++#
++UCLIBC_HAS_STRING_GENERIC_OPT=y
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++# UCLIBC_HAS_CTYPE_CHECKED is not set
++UCLIBC_HAS_CTYPE_ENFORCED=y
++# UCLIBC_HAS_WCHAR is not set
++# UCLIBC_HAS_LOCALE is not set
++# UCLIBC_HAS_HEXADECIMAL_FLOATS is not set
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++# USE_OLD_VFPRINTF is not set
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++# UCLIBC_HAS_SCANF_GLIBC_A_FLAG is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++UCLIBC_HAS_STDIO_GETC_MACRO=y
++UCLIBC_HAS_STDIO_PUTC_MACRO=y
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++# UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE is not set
++# UCLIBC_HAS_GLIBC_CUSTOM_STREAMS is not set
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_GNU_GETSUBOPT=y
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++UCLIBC_HAS_REGEX_OLD=y
++UCLIBC_HAS_FNMATCH=y
++UCLIBC_HAS_FNMATCH_OLD=y
++# UCLIBC_HAS_WORDEXP is not set
++# UCLIBC_HAS_FTW is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++
++#
++# Library Installation Options
++#
++SHARED_LIB_LOADER_PREFIX="$(RUNTIME_PREFIX)lib"
++RUNTIME_PREFIX="/usr/$(TARGET_ARCH)-linux-uclibc/"
++DEVEL_PREFIX="/usr/$(TARGET_ARCH)-linux-uclibc/usr/"
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++# HAVE_NO_SSP is not set
++# UCLIBC_HAS_SSP is not set
++UCLIBC_BUILD_RELRO=y
++# UCLIBC_BUILD_NOW is not set
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# uClibc development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DODEBUG_PT is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++WARNINGS="-Wall"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/avr32-unknown-none/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/avr32-unknown-none/crosstool.config	2022-05-26 11:27:33.365333099 -0700
+@@ -0,0 +1,11 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_CONFIG_SHELL_SH=y
++CT_LOG_EXTRA=y
++CT_ARCH_avr32=y
++CT_BINUTILS_V_2_18a=y
++CT_CC_V_4_2_2=y
++CT_LIBC_NEWLIB_V_1_17_0=y
++CT_LIBC_NEWLIB_IO_LL=y
++CT_LIBC_NEWLIB_IO_FLOAT=y
++CT_LIBC_NEWLIB_DISABLE_SUPPLIED_SYSCALLS=y
+--- crosstool-ng-1.20.0/samples/arm-unknown-linux-uclibcgnueabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-unknown-linux-uclibcgnueabi/crosstool.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,24 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="armv5te"
++CT_ARCH_CPU="arm926ej-s"
++CT_ARCH_TUNE="arm926ej-s"
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_arm=y
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_uClibc=y
++CT_LIBC_UCLIBC_CONFIG_FILE="${CT_LIB_DIR}/samples/${CT_TARGET}/${CT_LIBC}-${CT_LIBC_VERSION}.config"
++CT_CC_LANG_CXX=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++CT_GDB_CROSS_STATIC=y
++CT_GDB_NATIVE=y
++CT_GDB_NATIVE_STATIC=y
++CT_DEBUG_ltrace=y
++CT_DEBUG_strace=y
+--- crosstool-ng-1.20.0/samples/arm-unknown-linux-uclibcgnueabi/uClibc-0.9.33.2.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-unknown-linux-uclibcgnueabi/uClibc-0.9.33.2.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,254 @@
++#
++# Automatically generated make config: don't edit
++# Version: 0.9.33.2
++# Wed Sep  3 12:55:06 2014
++#
++# TARGET_alpha is not set
++TARGET_arm=y
++# TARGET_avr32 is not set
++# TARGET_bfin is not set
++# TARGET_c6x is not set
++# TARGET_cris is not set
++# TARGET_e1 is not set
++# TARGET_frv is not set
++# TARGET_h8300 is not set
++# TARGET_hppa is not set
++# TARGET_i386 is not set
++# TARGET_i960 is not set
++# TARGET_ia64 is not set
++# TARGET_m68k is not set
++# TARGET_microblaze is not set
++# TARGET_mips is not set
++# TARGET_nios is not set
++# TARGET_nios2 is not set
++# TARGET_powerpc is not set
++# TARGET_sh is not set
++# TARGET_sh64 is not set
++# TARGET_sparc is not set
++# TARGET_v850 is not set
++# TARGET_vax is not set
++# TARGET_x86_64 is not set
++# TARGET_xtensa is not set
++
++#
++# Target Architecture Features and Options
++#
++TARGET_ARCH="arm"
++FORCE_OPTIONS_FOR_ARCH=y
++CONFIG_ARM_EABI=y
++# COMPILE_IN_THUMB_MODE is not set
++USE_BX=y
++TARGET_SUBARCH=""
++
++#
++# Using ELF file format
++#
++ARCH_ANY_ENDIAN=y
++ARCH_LITTLE_ENDIAN=y
++# ARCH_WANTS_BIG_ENDIAN is not set
++ARCH_WANTS_LITTLE_ENDIAN=y
++ARCH_HAS_MMU=y
++ARCH_USE_MMU=y
++UCLIBC_HAS_FLOATS=y
++# UCLIBC_HAS_FPU is not set
++UCLIBC_HAS_SOFT_FLOAT=y
++DO_C99_MATH=y
++# DO_XSI_MATH is not set
++# UCLIBC_HAS_FENV is not set
++KERNEL_HEADERS="/usr/include"
++HAVE_DOT_CONFIG=y
++
++#
++# General Library Settings
++#
++DOPIC=y
++HAVE_SHARED=y
++# FORCE_SHAREABLE_TEXT_SEGMENTS is not set
++LDSO_LDD_SUPPORT=y
++# LDSO_CACHE_SUPPORT is not set
++LDSO_PRELOAD_ENV_SUPPORT=y
++# LDSO_PRELOAD_FILE_SUPPORT is not set
++# LDSO_STANDALONE_SUPPORT is not set
++# LDSO_PRELINK_SUPPORT is not set
++# UCLIBC_STATIC_LDCONFIG is not set
++LDSO_RUNPATH=y
++LDSO_SEARCH_INTERP_PATH=y
++LDSO_LD_LIBRARY_PATH=y
++# LDSO_NO_CLEANUP is not set
++UCLIBC_CTOR_DTOR=y
++# LDSO_GNU_HASH_SUPPORT is not set
++# HAS_NO_THREADS is not set
++# LINUXTHREADS_OLD is not set
++# LINUXTHREADS_NEW is not set
++UCLIBC_HAS_THREADS_NATIVE=y
++UCLIBC_HAS_THREADS=y
++UCLIBC_HAS_TLS=y
++PTHREADS_DEBUG_SUPPORT=y
++UCLIBC_HAS_SYSLOG=y
++UCLIBC_HAS_LFS=y
++# MALLOC is not set
++# MALLOC_SIMPLE is not set
++MALLOC_STANDARD=y
++MALLOC_GLIBC_COMPAT=y
++UCLIBC_DYNAMIC_ATEXIT=y
++# COMPAT_ATEXIT is not set
++UCLIBC_SUSV3_LEGACY=y
++# UCLIBC_SUSV3_LEGACY_MACROS is not set
++UCLIBC_SUSV4_LEGACY=y
++# UCLIBC_STRICT_HEADERS is not set
++# UCLIBC_HAS_STUBS is not set
++UCLIBC_HAS_SHADOW=y
++UCLIBC_HAS_PROGRAM_INVOCATION_NAME=y
++UCLIBC_HAS___PROGNAME=y
++UCLIBC_HAS_PTY=y
++ASSUME_DEVPTS=y
++UNIX98PTY_ONLY=y
++UCLIBC_HAS_GETPT=y
++UCLIBC_HAS_LIBUTIL=y
++UCLIBC_HAS_TM_EXTENSIONS=y
++UCLIBC_HAS_TZ_CACHING=y
++UCLIBC_HAS_TZ_FILE=y
++UCLIBC_HAS_TZ_FILE_READ_MANY=y
++UCLIBC_TZ_FILE_PATH="/etc/TZ"
++UCLIBC_FALLBACK_TO_ETC_LOCALTIME=y
++
++#
++# Advanced Library Settings
++#
++UCLIBC_PWD_BUFFER_SIZE=256
++UCLIBC_GRP_BUFFER_SIZE=256
++
++#
++# Support various families of functions
++#
++UCLIBC_LINUX_MODULE_26=y
++# UCLIBC_LINUX_MODULE_24 is not set
++UCLIBC_LINUX_SPECIFIC=y
++UCLIBC_HAS_GNU_ERROR=y
++UCLIBC_BSD_SPECIFIC=y
++UCLIBC_HAS_BSD_ERR=y
++# UCLIBC_HAS_OBSOLETE_BSD_SIGNAL is not set
++# UCLIBC_HAS_OBSOLETE_SYSV_SIGNAL is not set
++# UCLIBC_NTP_LEGACY is not set
++# UCLIBC_SV4_DEPRECATED is not set
++UCLIBC_HAS_REALTIME=y
++UCLIBC_HAS_ADVANCED_REALTIME=y
++UCLIBC_HAS_EPOLL=y
++UCLIBC_HAS_XATTR=y
++UCLIBC_HAS_PROFILING=y
++UCLIBC_HAS_CRYPT_IMPL=y
++# UCLIBC_HAS_SHA256_CRYPT_IMPL is not set
++# UCLIBC_HAS_SHA512_CRYPT_IMPL is not set
++UCLIBC_HAS_CRYPT=y
++UCLIBC_HAS_NETWORK_SUPPORT=y
++UCLIBC_HAS_SOCKET=y
++UCLIBC_HAS_IPV4=y
++# UCLIBC_HAS_IPV6 is not set
++# UCLIBC_HAS_RPC is not set
++UCLIBC_USE_NETLINK=y
++UCLIBC_SUPPORT_AI_ADDRCONFIG=y
++# UCLIBC_HAS_BSD_RES_CLOSE is not set
++UCLIBC_HAS_COMPAT_RES_STATE=y
++# UCLIBC_HAS_EXTRA_COMPAT_RES_STATE is not set
++UCLIBC_HAS_RESOLVER_SUPPORT=y
++UCLIBC_HAS_LIBRESOLV_STUB=y
++UCLIBC_HAS_LIBNSL_STUB=y
++
++#
++# String and Stdio Support
++#
++# UCLIBC_HAS_STRING_GENERIC_OPT is not set
++UCLIBC_HAS_STRING_ARCH_OPT=y
++UCLIBC_HAS_CTYPE_TABLES=y
++UCLIBC_HAS_CTYPE_SIGNED=y
++# UCLIBC_HAS_CTYPE_UNSAFE is not set
++UCLIBC_HAS_CTYPE_CHECKED=y
++# UCLIBC_HAS_CTYPE_ENFORCED is not set
++# UCLIBC_HAS_WCHAR is not set
++# UCLIBC_HAS_LOCALE is not set
++UCLIBC_HAS_HEXADECIMAL_FLOATS=y
++UCLIBC_HAS_GLIBC_CUSTOM_PRINTF=y
++# USE_OLD_VFPRINTF is not set
++UCLIBC_PRINTF_SCANF_POSITIONAL_ARGS=9
++UCLIBC_HAS_SCANF_GLIBC_A_FLAG=y
++# UCLIBC_HAS_STDIO_BUFSIZ_NONE is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_256 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_512 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_1024 is not set
++# UCLIBC_HAS_STDIO_BUFSIZ_2048 is not set
++UCLIBC_HAS_STDIO_BUFSIZ_4096=y
++# UCLIBC_HAS_STDIO_BUFSIZ_8192 is not set
++UCLIBC_HAS_STDIO_BUILTIN_BUFFER_NONE=y
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_4 is not set
++# UCLIBC_HAS_STDIO_BUILTIN_BUFFER_8 is not set
++# UCLIBC_HAS_STDIO_SHUTDOWN_ON_ABORT is not set
++# UCLIBC_HAS_STDIO_GETC_MACRO is not set
++# UCLIBC_HAS_STDIO_PUTC_MACRO is not set
++UCLIBC_HAS_STDIO_AUTO_RW_TRANSITION=y
++# UCLIBC_HAS_FOPEN_LARGEFILE_MODE is not set
++UCLIBC_HAS_FOPEN_EXCLUSIVE_MODE=y
++# UCLIBC_HAS_FOPEN_CLOSEEXEC_MODE is not set
++UCLIBC_HAS_GLIBC_CUSTOM_STREAMS=y
++UCLIBC_HAS_PRINTF_M_SPEC=y
++UCLIBC_HAS_ERRNO_MESSAGES=y
++# UCLIBC_HAS_SYS_ERRLIST is not set
++UCLIBC_HAS_SIGNUM_MESSAGES=y
++# UCLIBC_HAS_SYS_SIGLIST is not set
++UCLIBC_HAS_GNU_GETOPT=y
++UCLIBC_HAS_STDIO_FUTEXES=y
++# UCLIBC_HAS_GNU_GETSUBOPT is not set
++
++#
++# Big and Tall
++#
++UCLIBC_HAS_REGEX=y
++# UCLIBC_HAS_REGEX_OLD is not set
++UCLIBC_HAS_FNMATCH=y
++# UCLIBC_HAS_FNMATCH_OLD is not set
++# UCLIBC_HAS_WORDEXP is not set
++UCLIBC_HAS_NFTW=y
++UCLIBC_HAS_FTW=y
++# UCLIBC_HAS_FTS is not set
++UCLIBC_HAS_GLOB=y
++UCLIBC_HAS_GNU_GLOB=y
++UCLIBC_HAS_UTMPX=y
++
++#
++# Library Installation Options
++#
++RUNTIME_PREFIX="/"
++DEVEL_PREFIX="/usr/"
++MULTILIB_DIR="lib"
++HARDWIRED_ABSPATH=y
++
++#
++# Security options
++#
++# UCLIBC_BUILD_PIE is not set
++# UCLIBC_HAS_ARC4RANDOM is not set
++UCLIBC_HAS_SSP=y
++# UCLIBC_HAS_SSP_COMPAT is not set
++# SSP_QUICK_CANARY is not set
++PROPOLICE_BLOCK_ABRT=y
++# PROPOLICE_BLOCK_SEGV is not set
++# UCLIBC_BUILD_SSP is not set
++UCLIBC_BUILD_RELRO=y
++UCLIBC_BUILD_NOW=y
++UCLIBC_BUILD_NOEXECSTACK=y
++
++#
++# Development/debugging options
++#
++CROSS_COMPILER_PREFIX=""
++UCLIBC_EXTRA_CFLAGS=""
++# DODEBUG is not set
++# DOSTRIP is not set
++# DOASSERTS is not set
++# SUPPORT_LD_DEBUG is not set
++# SUPPORT_LD_DEBUG_EARLY is not set
++# UCLIBC_MALLOC_DEBUGGING is not set
++# UCLIBC_HAS_BACKTRACE is not set
++WARNINGS="-Wall -pipe"
++# EXTRA_WARNINGS is not set
++# DOMULTI is not set
++# UCLIBC_MJN3_ONLY is not set
+--- crosstool-ng-1.20.0/samples/s390x-ibm-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/s390x-ibm-linux-gnu/crosstool.config	2022-05-26 11:27:33.381332445 -0700
+@@ -0,0 +1,10 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_PATCH_NONE=y
++CT_LOG_EXTRA=y
++CT_ARCH_64=y
++CT_ARCH_s390=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
+--- crosstool-ng-1.20.0/samples/s390-ibm-linux-gnu/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/s390-ibm-linux-gnu/crosstool.config	2022-05-26 11:27:33.377332608 -0700
+@@ -0,0 +1,9 @@
++CT_EXPERIMENTAL=y
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_s390=y
++CT_KERNEL_linux=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
+--- crosstool-ng-1.20.0/samples/arm-cortex_a8-linux-gnueabi/crosstool.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ crosstool-ng-1.20.0/samples/arm-cortex_a8-linux-gnueabi/crosstool.config	2022-05-26 11:27:33.361333262 -0700
+@@ -0,0 +1,24 @@
++CT_LOCAL_TARBALLS_DIR="${HOME}/src"
++CT_SAVE_TARBALLS=y
++CT_LOG_EXTRA=y
++CT_ARCH_ARCH="armv7-a"
++CT_ARCH_CPU="cortex-a8"
++CT_ARCH_TUNE="cortex-a8"
++CT_ARCH_FLOAT_SW=y
++CT_ARCH_arm=y
++CT_TARGET_VENDOR="cortex_a8"
++CT_KERNEL_linux=y
++CT_BINUTILS_LINKER_LD_GOLD=y
++CT_BINUTILS_GOLD_THREADS=y
++CT_BINUTILS_LD_WRAPPER=y
++CT_BINUTILS_PLUGINS=y
++CT_LIBC_glibc=y
++CT_CC_LANG_CXX=y
++CT_DEBUG_dmalloc=y
++CT_DEBUG_duma=y
++CT_DEBUG_gdb=y
++# CT_GDB_CROSS_PYTHON is not set
++CT_GDB_NATIVE=y
++CT_GDB_NATIVE_STATIC=y
++CT_DEBUG_ltrace=y
++CT_DEBUG_strace=y

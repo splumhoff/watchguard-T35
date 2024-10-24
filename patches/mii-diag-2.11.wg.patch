@@ -1,0 +1,42 @@
+WatchGuard patches to sources for mii-diag-2.11 as of
+Thu May 26 11:36:33 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- mii-diag-2.11/mii-diag.c.orig	2022-05-26 11:36:32.635258309 -0700
++++ mii-diag-2.11/mii-diag.c	2022-05-26 11:36:32.663257161 -0700
+@@ -506,7 +506,7 @@
+ 	lkpar = mii_val[5];
+ 
+ 	if (lkpar & 0x4000) {
+-		int negotiated = nway_advert & lkpar & 0x3e0;
++		int negotiated = nway_advert & lkpar & 0xfe0;
+ 		int max_capability = 0;
+ 		/* Scan for the highest negotiated capability, highest priority
+ 		   (100baseTx-FDX) to lowest (10baseT-HDX). */
+--- mii-diag-2.11/Makefile.orig	1969-12-31 16:00:00.000000000 -0800
++++ mii-diag-2.11/Makefile	2022-05-26 11:36:32.663257161 -0700
+@@ -0,0 +1,22 @@
++CFLAGS= -O -Wall
++CC=gcc
++INSTALL=install
++
++LIBS=libmii.o
++
++all: mii-diag
++
++mii-diag:
++	$(CC) $(CFLAGS) -Wstrict-prototypes -O mii-diag.c -DLIBMII \
++				libmii.c -o mii-diag
++
++install-mii-diag:
++	mkdir -p $(DESTDIR)/sbin
++	mkdir -p $(DESTDIR)/man/man8
++	$(INSTALL) mii-diag $(DESTDIR)/sbin/
++	$(INSTALL) mii-diag.8 $(DESTDIR)/man/man8/
++
++install: all install-mii-diag
++
++clean:
++	rm -f *.o mii-diag

@@ -1,0 +1,75 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+ * =========================================================================
+ *
+ *  Copyright 2009-2012, Freescale Semiconductor, Inc., All Rights Reserved.
+ *
+ *  This file contains copyrighted material. Use of this file is restricted
+ *  by the provisions of a Freescale Software License Agreement, which has
+ *  either accompanied the delivery of this software in shrink wrap
+ *  form or been expressly executed between the parties.
+ *
+ *  File Name : cfgdata.xsd
+ *  Author    : Serge Lamikhov-Center
+ *
+ * =========================================================================
+-->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <xs:element name="cfgdata">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="config">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="engine" type="engine" minOccurs="1" maxOccurs="2" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="description" type="xs:string" use="optional" />
+      <xs:attribute name="comment"     type="xs:string" use="optional" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="engine">
+    <xs:sequence>
+      <xs:element name="port" type="port" maxOccurs="unbounded" />
+    </xs:sequence>
+    <xs:attribute name="name" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="fm0"/>
+          <xs:enumeration value="fm1"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+
+  <xs:complexType name="port">
+    <xs:attribute name="type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="1G"/>
+          <xs:enumeration value="10G"/>
+          <xs:enumeration value="OFFLINE"/>
+          <xs:enumeration value="HOST_CMD"/>
+          <xs:enumeration value="TX_1G"/>
+          <xs:enumeration value="TX_10G"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="number" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="policy" type="xs:string"       use="required" />
+    <xs:attribute name="portid"                        use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:pattern value="0x[0-9a-fA-F]{1,2}|[0-9]{1,3}"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+
+</xs:schema>

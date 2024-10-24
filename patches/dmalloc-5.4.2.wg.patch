@@ -1,0 +1,317 @@
+WatchGuard patches to sources for dmalloc-5.4.2 as of
+Thu May 26 11:27:58 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- dmalloc-5.4.2/configure.ac.orig	2022-05-26 11:27:58.404309504 -0700
++++ dmalloc-5.4.2/configure.ac	2022-05-26 11:27:58.508305251 -0700
+@@ -128,11 +128,11 @@
+ 	(ar cr conftest.a conftest.o) 2>&5
+ 	# see which shared-library ld commands work
+ 	if (ld -shared --whole-archive -soname conftest.so -o conftest.so.t conftest.a) 2>&5; then
+-		ac_cv_shared_link_args='ld -shared --whole-archive -soname $@ -o $@.t'
++		ac_cv_shared_link_args='-shared --whole-archive -soname $@ -o $@.t'
+ 	elif (ld -shared -o conftest.so.t -all -soname conftest.so.t -none -lc -all conftest.a) 2>&5; then
+-		ac_cv_shared_link_args='ld -shared -o $@.t -all -soname $@ -none -lc -all'
++		ac_cv_shared_link_args='-shared -o $@.t -all -soname $@ -none -lc -all'
+ 	elif (ld -G -o conftest.so.t conftest.a) 2>&5; then
+-		ac_cv_shared_link_args='ld -G -o $@.t'
++		ac_cv_shared_link_args='-G -o $@.t'
+ 	else
+ 		# oh well, toss an error
+ 		ac_cv_shared_link_args='# Could not configure shlib linking'
+@@ -216,6 +216,8 @@
+ # check for strdup macro (linux)
+ #
+ AC_MSG_CHECKING([strdup macro])
++if test "x$ac_cv_strdup_macro" = "x"; then
++  # then run the test below
+ AC_RUN_IFELSE([AC_LANG_SOURCE([[
+ #if HAVE_STDLIB_H
+ #  include <string.h>
+@@ -231,6 +233,7 @@
+ [ac_cv_strdup_macro=no],
+ [ac_cv_strdup_macro=no]
+ )
++fi # if ac_cv_srtdup_macro is not set
+ AC_MSG_RESULT([$ac_cv_strdup_macro])
+ 
+ #
+@@ -293,7 +296,9 @@
+ #
+ AC_CHECK_FUNCS(getpagesize)
+ AC_MSG_CHECKING([basic-block size])
+-ac_cv_page_size=0
++if test "x$ac_cv_page_size" = "x"; then
++   ac_cv_page_size=0
++fi
+ if test $ac_cv_page_size = 0; then
+    AC_RUN_IFELSE([main() { if (getpagesize()<=2048) exit(0); else exit(1); }],
+ 	[ ac_cv_page_size=11 ] )
+--- dmalloc-5.4.2/Makefile.in.orig	2022-05-26 11:27:58.400309667 -0700
++++ dmalloc-5.4.2/Makefile.in	2022-05-26 11:27:58.488306069 -0700
+@@ -1,4 +1,4 @@
+-###############################################################################
++##############################################################################
+ # @configure_input@
+ # Makefile for the DMalloc library.
+ # $Id$
+@@ -21,6 +21,9 @@
+ # default c-compiler
+ CC = @CC@
+ CXX = @CXX@
++AR = @AR@
++LD = @LD@
++RANLIB = @RANLIB@
+ 
+ DEFS = -DHAVE_STDARG_H=@HAVE_STDARG_H@ \
+ 	-DHAVE_STDLIB_H=@HAVE_STDLIB_H@ \
+@@ -133,6 +136,7 @@
+ 
+ CCFLAGS = @CFLAGS@
+ LDFLAGS = @LDFLAGS@
++LINKER_FLAGS = @LINKER_FLAGS@
+ 
+ INSTALL = @INSTALL@
+ INSTALL_PROGRAM = @INSTALL_PROGRAM@
+@@ -218,7 +222,7 @@
+ installlib : $(INSTALL_LIB)
+ 	$(srcdir)/mkinstalldirs $(libdir)
+ 	$(INSTALL_DATA) $(LIBRARY) $(libdir)
+-	@RANLIB@ $(libdir)/$(LIBRARY)
++	$(RANLIB) $(libdir)/$(LIBRARY)
+ @SL_OFF@	@echo "Enter 'make installsl' to install $(LIB_SL) in $(shlibdir)"
+ @CXX_OFF@	@echo "Enter 'make installcxx' to install the C++ library"
+ @TH_OFF@	@echo "Enter 'make installth' to install thread library"
+@@ -258,38 +262,38 @@
+ # via: http://256.com/gray/email.html
+ $(LIB_SL) : $(LIBRARY)
+ 	rm -f $@ $@.t
+-	@shlinkargs@ $(LIBRARY)
++	$(LD) $(LINKER_FLAGS) $(LIBRARY)
+ 	mv $@.t $@
+ 
+ $(LIBRARY) : $(OBJS) $(NORMAL_OBJS)
+-	ar cr $@ $?
+-	@RANLIB@ $@
++	$(AR) cr $@ $?
++	$(RANLIB) $@
+ 
+ $(LIB_TH) : $(OBJS) $(THREAD_OBJS)
+-	ar cr $@ $?
+-	@RANLIB@ $@
++	$(AR) cr $@ $?
++	$(RANLIB) $@
+ 
+ $(LIB_TH_SL) : $(LIB_TH)
+ 	rm -f $@ $@.t
+-	@shlinkargs@ $(LIB_TH)
++	$(LD) $(LINKER_FLAGS) $(LIB_TH)
+ 	mv $@.t $@
+ 
+ $(LIB_CXX) : $(OBJS) $(NORMAL_OBJS) $(CXX_OBJS)
+-	ar cr $@ $?
+-	@RANLIB@ $@
++	$(AR) cr $@ $?
++	$(RANLIB) $@
+ 
+ $(LIB_CXX_SL) : $(LIB_CXX)
+ 	rm -f $@ $@.t
+-	@shlinkargs@ $(LIB_CXX)
++	$(LD) $(LINKER_FLAGS) $(LIB_CXX)
+ 	mv $@.t $@
+ 
+ $(LIB_TH_CXX) : $(OBJS) $(THREAD_OBJS) $(CXX_OBJS)
+-	ar cr $@ $?
+-	@RANLIB@ $@
++	$(AR) cr $@ $?
++	$(RANLIB) $@
+ 
+ $(LIB_TH_CXX_SL) : $(LIB_TH_CXX)
+ 	rm -f $@ $@.t
+-	@shlinkargs@ $(LIB_TH_CXX)
++	$(LD) $(LINKER_FLAGS) $(LIB_TH_CXX)
+ 	mv $@.t $@
+ 
+ threadssl : $(LIB_TH_SL)
+--- dmalloc-5.4.2/chunk.c.orig	2022-05-26 11:27:58.420308849 -0700
++++ dmalloc-5.4.2/chunk.c	2022-05-26 11:27:58.520304761 -0700
+@@ -27,6 +27,7 @@
+  */
+ 
+ #include <ctype.h>
++#include <execinfo.h>
+ 
+ #if HAVE_STRING_H
+ # include <string.h>
+@@ -85,6 +86,7 @@
+ #endif
+ #endif
+ 
++
+ /*
+  * exported variables
+  */
+@@ -2395,6 +2397,10 @@
+   slot_p->sa_file = file;
+   slot_p->sa_line = line;
+   slot_p->sa_use_iter = _dmalloc_iter_c;
++  
++  /* Obtain the backtrace using the libc function */
++  slot_p->call_count = backtrace((void*)slot_p->call_trace, sizeof(slot_p->call_trace)-1);
++
+ #if LOG_PNT_SEEN_COUNT
+   slot_p->sa_seen_c++;
+ #endif
+@@ -2578,6 +2584,9 @@
+   /* update the file/line -- must be after _dmalloc_table_delete */
+   slot_p->sa_file = file;
+   slot_p->sa_line = line;
++
++  /* Obtain the backtrace using the libc function */
++  slot_p->call_count = backtrace((void*)slot_p->call_trace, sizeof(slot_p->call_trace)-1);
+   
+   /* monitor current allocation level */
+   alloc_current -= slot_p->sa_user_size;
+@@ -2777,6 +2786,9 @@
+      */
+     slot_p->sa_file = file;
+     slot_p->sa_line = line;
++
++    /* Obtain the backtrace using the libc function */
++    slot_p->call_count = backtrace((void*)slot_p->call_trace, sizeof(slot_p->call_trace)-1);
+   }
+   
+   if (BIT_IS_SET(_dmalloc_flags, DEBUG_LOG_TRANS)) {
+@@ -3005,6 +3017,15 @@
+     
+     if (known_b || (! BIT_IS_SET(_dmalloc_flags, DEBUG_LOG_KNOWN))) {
+       if (details_b) {
++        int i = slot_p->call_count;
++        dmalloc_message(" Call stack for %s --------",
++            display_pnt(pnt_info.pi_user_start, slot_p, 
++                disp_buf, sizeof(disp_buf)));
++ 
++        while (i-- > 2) {
++            dmalloc_message("0x%lx", slot_p->call_trace[i]);
++        }
++          
+ 	dmalloc_message(" %s freed: '%s' (%u bytes) from '%s'",
+ 			(freed_b ? "   " : "not"),
+ 			display_pnt(pnt_info.pi_user_start, slot_p, disp_buf,
+@@ -3132,3 +3153,4 @@
+   
+   return mem_count;
+ }
++
+--- dmalloc-5.4.2/chunk_loc.h.orig	2022-05-26 11:27:58.396309831 -0700
++++ dmalloc-5.4.2/chunk_loc.h	2022-05-26 11:27:58.504305415 -0700
+@@ -83,6 +83,7 @@
+  * basic-blocks.  It stores some optional fields for recording
+  * information about the pointer.
+  */
++#define NFRAMES 50
+ typedef struct skip_alloc_st {
+   
+   unsigned char		sa_flags;	/* what it is */
+@@ -94,10 +95,18 @@
+   unsigned int		sa_user_size;	/* size requested by user (wo fence) */
+   unsigned int		sa_total_size;	/* total size of the block */
+   
+-  void			*sa_mem;	/* pointer to the memory in question */
++  void			    *sa_mem;	/* pointer to the memory in question */
+   const char		*sa_file;	/* .c filename where allocated */
+   unsigned long		sa_use_iter;	/* when last ``used'' */
+   
++  /* 
++   * I wanted to initially use a tree structure where each skip_alloc_st structure 
++   * had a pointer to the last element in the tree (leaf) and then it could use this 
++   * to climb to it's root (libc_start).
++   */
++  unsigned long     call_trace[NFRAMES];
++  unsigned long     call_count;
++
+ #if LOG_PNT_SEEN_COUNT
+   unsigned long		sa_seen_c;	/* times pointer was seen */
+ #endif
+--- dmalloc-5.4.2/return.h.orig	2022-05-26 11:27:58.316313101 -0700
++++ dmalloc-5.4.2/return.h	2022-05-26 11:27:58.600301491 -0700
+@@ -300,7 +300,7 @@
+ /*
+  * For ARM based machines with gcc/gas 3.3.3 -- Silvester Erdeg.
+  */
+-#ifdef __arm__
++#if defined(__arm__) || defined(__ARMEB__)
+ #define GET_RET_ADDR(file)  asm("str lr, %0" : "=g" (file) : /* no inputs */ )
+ #endif
+ 
+--- dmalloc-5.4.2/configure.orig	2022-05-26 11:27:58.352311629 -0700
++++ dmalloc-5.4.2/configure	2022-05-26 11:27:58.548303616 -0700
+@@ -3871,14 +3871,14 @@
+   (exit $ac_status); }; }; then
+ 
+ 	# so now we try to create an archive from the compiled .o file
+-	(ar cr conftest.a conftest.o) 2>&5
++	(${AR} cr conftest.a conftest.o) 2>&5
+ 	# see which shared-library ld commands work
+-	if (ld -shared --whole-archive -soname conftest.so -o conftest.so.t conftest.a) 2>&5; then
+-		ac_cv_shared_link_args='ld -shared --whole-archive -soname $@ -o $@.t'
+-	elif (ld -shared -o conftest.so.t -all -soname conftest.so.t -none -lc -all conftest.a) 2>&5; then
+-		ac_cv_shared_link_args='ld -shared -o $@.t -all -soname $@ -none -lc -all'
+-	elif (ld -G -o conftest.so.t conftest.a) 2>&5; then
+-		ac_cv_shared_link_args='ld -G -o $@.t'
++	if (${LD} -shared --whole-archive -soname conftest.so -o conftest.so.t conftest.a) 2>&5; then
++		ac_cv_shared_link_args='-shared --whole-archive -soname $@ -o $@.t'
++	elif (${LD} -shared -o conftest.so.t -all -soname conftest.so.t -none -lc -all conftest.a) 2>&5; then
++		ac_cv_shared_link_args='-shared -o $@.t -all -soname $@ -none -lc -all'
++	elif (${LD} -G -o conftest.so.t conftest.a) 2>&5; then
++		ac_cv_shared_link_args='-G -o $@.t'
+ 	else
+ 		# oh well, toss an error
+ 		ac_cv_shared_link_args='# Could not configure shlib linking'
+@@ -4086,6 +4086,8 @@
+ #
+ echo "$as_me:$LINENO: checking strdup macro" >&5
+ echo $ECHO_N "checking strdup macro... $ECHO_C" >&6
++if test "x$ac_cv_strdup_macro" = "x"; then
++  # then run the test below
+ if test "$cross_compiling" = yes; then
+   ac_cv_strdup_macro=no
+ 
+@@ -4126,6 +4128,7 @@
+ fi
+ rm -f core core.* *.core conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+ fi
++fi # if ac_cv_srtdup_macro is not set
+ echo "$as_me:$LINENO: result: $ac_cv_strdup_macro" >&5
+ echo "${ECHO_T}$ac_cv_strdup_macro" >&6
+ 
+@@ -4573,7 +4576,9 @@
+ 
+ echo "$as_me:$LINENO: checking basic-block size" >&5
+ echo $ECHO_N "checking basic-block size... $ECHO_C" >&6
+-ac_cv_page_size=0
++if test "x$ac_cv_page_size" = "x"; then
++   ac_cv_page_size=0
++fi
+ if test $ac_cv_page_size = 0; then
+    if test "$cross_compiling" = yes; then
+   { { echo "$as_me:$LINENO: error: cannot run test program while cross compiling" >&5
+@@ -8718,6 +8723,7 @@
+ s,@CC@,$CC,;t t
+ s,@CFLAGS@,$CFLAGS,;t t
+ s,@LDFLAGS@,$LDFLAGS,;t t
++s,@LINKER_FLAGS@,$ac_cv_shared_link_args,;t t
+ s,@CPPFLAGS@,$CPPFLAGS,;t t
+ s,@ac_ct_CC@,$ac_ct_CC,;t t
+ s,@EXEEXT@,$EXEEXT,;t t
+@@ -8729,6 +8735,8 @@
+ s,@INSTALL_SCRIPT@,$INSTALL_SCRIPT,;t t
+ s,@INSTALL_DATA@,$INSTALL_DATA,;t t
+ s,@RANLIB@,$RANLIB,;t t
++s,@AR@,$AR,;t t
++s,@LD@,$LD,;t t
+ s,@ac_ct_RANLIB@,$ac_ct_RANLIB,;t t
+ s,@CPP@,$CPP,;t t
+ s,@HAVE_STDARG_H@,$HAVE_STDARG_H,;t t

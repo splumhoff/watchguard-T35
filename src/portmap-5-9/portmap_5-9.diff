@@ -1,0 +1,1106 @@
+--- portmap-5.orig/Makefile
++++ portmap-5/Makefile
+@@ -8,7 +8,7 @@
+ # if you disagree. See `man 3 syslog' for examples. Some syslog versions
+ # do not provide this flexibility.
+ #
+-FACILITY=LOG_MAIL
++FACILITY=LOG_DAEMON
+ 
+ # To disable tcp-wrapper style access control, comment out the following
+ # macro definitions.  Access control can also be turned off by providing
+@@ -16,7 +16,8 @@
+ # daemon, is always treated as an authorized host.
+ 
+ HOSTS_ACCESS= -DHOSTS_ACCESS
+-WRAP_LIB = $(WRAP_DIR)/libwrap.a
++#WRAP_LIB = $(WRAP_DIR)/libwrap.a
++WRAP_LIB = -lwrap
+ 
+ # Comment out if your RPC library does not allocate privileged ports for
+ # requests from processes with root privilege, or the new portmap will
+@@ -71,7 +72,7 @@
+ # With verbose logging on, HP-UX 9.x and AIX 4.1 leave zombies behind when
+ # SIGCHLD is not ignored. Enable next macro for a fix.
+ #
+-# ZOMBIES = -DIGNORE_SIGCHLD	# AIX 4.x, HP-UX 9.x
++ZOMBIES = -DIGNORE_SIGCHLD	# AIX 4.x, HP-UX 9.x
+ 
+ # Uncomment the following macro if your system does not have u_long.
+ #
+@@ -81,11 +82,14 @@
+ # libwrap.a object library. WRAP_DIR should specify the directory with
+ # that library.
+ 
+-WRAP_DIR= ../tcp_wrappers
++WRAP_DIR= $(TCPD_DIR)
+ 
+ # Auxiliary object files that may be missing from your C library.
+ #
+-AUX	= daemon.o strerror.o
++#AUX	= daemon.o strerror.o
++
++# glibc has strerror() (it's POSIX) and daemon() (when compiling -D_BSD_SOURCE)
++AUX	= 
+ 
+ # NEXTSTEP is a little different. The following seems to work with NS 3.2
+ #
+@@ -99,22 +103,31 @@
+ 
+ # Comment out if your compiler talks ANSI and understands const
+ #
+-CONST   = -Dconst=
++#CONST   = -Dconst=
+ 
+ ### End of configurable stuff.
+ ##############################
+ 
++GLIBC=$(shell grep -s -c __GLIBC__ /usr/include/features.h)
++
++ifeq ($(GLIBC),0)
++LIBS   += # -lbsd
++else
++LIBS   += -lnsl
++endif
++
++
+ SHELL	= /bin/sh
+ 
+-COPT	= $(CONST) -Dperror=xperror $(HOSTS_ACCESS) $(CHECK_PORT) \
++COPT	= $(CONST) $(HOSTS_ACCESS) $(CHECK_PORT) \
+ 	$(SYS) -DFACILITY=$(FACILITY) $(ULONG) $(ZOMBIES) $(SA_LEN) \
+ 	$(LOOPBACK) $(SETPGRP)
+-CFLAGS	= $(COPT) -O $(NSARCHS)
++CFLAGS	= -Wall $(COPT) -O2 $(NSARCHS)
+ OBJECTS	= portmap.o pmap_check.o from_local.o $(AUX)
+ 
+ all:	portmap pmap_dump pmap_set
+ 
+-portmap: $(OBJECTS) $(WRAP_DIR)/libwrap.a
++portmap: $(OBJECTS) # $(WRAP_DIR)/libwrap.a
+ 	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(WRAP_LIB) $(LIBS)
+ 
+ pmap_dump: pmap_dump.c
+@@ -129,6 +142,17 @@
+ get_myaddress: get_myaddress.c
+ 	cc $(CFLAGS) -DTEST -o $@ get_myaddress.c $(LIBS)
+ 
++install: all
++	install -o root -g root -m 0755 -s portmap ${BASEDIR}/sbin
++	install -o root -g root -m 0755 -s pmap_dump ${BASEDIR}/sbin
++	install -o root -g root -m 0755 -s pmap_set ${BASEDIR}/sbin
++	install -o root -g root -m 0644 portmap.8 ${BASEDIR}/usr/share/man/man8
++	install -o root -g root -m 0644 pmap_dump.8 ${BASEDIR}/usr/share/man/man8
++	install -o root -g root -m 0644 pmap_set.8 ${BASEDIR}/usr/share/man/man8
++	cat BLURB >${BASEDIR}/usr/share/doc/portmap/portmapper.txt
++	gzip -9f ${BASEDIR}/usr/share/doc/portmap/portmapper.txt
++
++
+ lint:	
+ 	lint $(COPT) $(OBJECTS:%.o=%.c)
+ 
+--- portmap-5.orig/daemon.c
++++ portmap-5/daemon.c
+@@ -36,11 +36,8 @@
+ #endif /* LIBC_SCCS and not lint */
+ 
+ #include <fcntl.h>
+-
+-/* From unistd.h */
+-#define STDIN_FILENO	0
+-#define STDOUT_FILENO	1
+-#define STDERR_FILENO	2
++#include <unistd.h>
++#include <sys/types.h>
+ 
+ /* From paths.h */
+ #define _PATH_DEVNULL	"/dev/null"
+--- portmap-5.orig/pmap_check.c
++++ portmap-5/pmap_check.c
+@@ -41,10 +41,14 @@
+ #include <syslog.h>
+ #include <netdb.h>
+ #include <sys/signal.h>
++#include <grp.h>
+ #ifdef SYSV40
+ #include <netinet/in.h>
+ #include <rpc/rpcent.h>
+ #endif
++#include <sys/types.h>
++#include <unistd.h>
++#include <tcpd.h>
+ 
+ extern char *inet_ntoa();
+ 
+@@ -101,15 +105,25 @@
+      * Give up root privileges so that we can never allocate a privileged
+      * port when forwarding an rpc request.
+      */
++    if (setgid(1) == -1) {
++	syslog(LOG_ERR, "setgid(1) failed: %m");
++	exit(1);
++    }
++    if (setgroups(0, 0) == -1) {
++	syslog(LOG_ERR, "setgroups(0, 0) failed: %m");
++	exit(1);
++    }
+     if (setuid(1) == -1) {
+ 	syslog(LOG_ERR, "setuid(1) failed: %m");
+ 	exit(1);
+     }
++
+     (void) signal(SIGINT, toggle_verboselog);
+ }
+ 
+ /* check_default - additional checks for NULL, DUMP, GETPORT and unknown */
+ 
++int
+ check_default(addr, proc, prog)
+ struct sockaddr_in *addr;
+ u_long  proc;
+@@ -128,6 +142,7 @@
+ 
+ /* check_privileged_port - additional checks for privileged-port updates */
+ 
++int
+ check_privileged_port(addr, proc, prog, port)
+ struct sockaddr_in *addr;
+ u_long  proc;
+@@ -173,6 +188,7 @@
+ 
+ #else
+ 
++int
+ check_setunset(addr, proc, prog, port)
+ struct sockaddr_in *addr;
+ u_long  proc;
+@@ -197,6 +213,7 @@
+ 
+ /* check_callit - additional checks for forwarded requests */
+ 
++int
+ check_callit(addr, proc, prog, aproc)
+ struct sockaddr_in *addr;
+ u_long  proc;
+@@ -249,13 +266,13 @@
+     };
+     struct proc_map *procp;
+     static struct proc_map procmap[] = {
+-	PMAPPROC_CALLIT, "callit",
+-	PMAPPROC_DUMP, "dump",
+-	PMAPPROC_GETPORT, "getport",
+-	PMAPPROC_NULL, "null",
+-	PMAPPROC_SET, "set",
+-	PMAPPROC_UNSET, "unset",
+-	0, 0,
++        {PMAPPROC_CALLIT, "callit"},
++	{PMAPPROC_DUMP, "dump"},
++	{PMAPPROC_GETPORT, "getport"},
++	{PMAPPROC_NULL, "null"},
++	{PMAPPROC_SET, "set"},
++	{PMAPPROC_UNSET, "unset"},
++	{0, 0},
+     };
+ 
+     /*
+@@ -269,7 +286,7 @@
+ 
+ 	if (prognum == 0) {
+ 	    progname = "";
+-	} else if (rpc = getrpcbynumber((int) prognum)) {
++	} else if ((rpc = getrpcbynumber((int) prognum))) {
+ 	    progname = rpc->r_name;
+ 	} else {
+ 	    sprintf(progname = progbuf, "%lu", prognum);
+--- portmap-5.orig/from_local.c
++++ portmap-5/from_local.c
+@@ -51,6 +51,9 @@
+ #include <net/if.h>
+ #include <sys/ioctl.h>
+ #include <syslog.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
+ 
+ #ifndef TRUE
+ #define	TRUE	1
+@@ -96,6 +99,7 @@
+ 
+ /* find_local - find all IP addresses for this host */
+ 
++int
+ find_local()
+ {
+     struct ifconf ifc;
+@@ -154,6 +158,7 @@
+ 
+ /* from_local - determine whether request comes from the local system */
+ 
++int
+ from_local(addr)
+ struct sockaddr_in *addr;
+ {
+--- portmap-5.orig/pmap_dump.c
++++ portmap-5/pmap_dump.c
+@@ -23,6 +23,20 @@
+ 
+ static char *protoname();
+ 
++#ifndef INADDR_LOOPBACK
++#define INADDR_LOOPBACK ntohl(inet_addr("127.0.0.1"))
++#endif
++
++static void    get_myloopaddress(addrp)
++struct sockaddr_in *addrp;
++{
++    memset((char *) addrp, 0, sizeof(*addrp));
++    addrp->sin_family = AF_INET;
++    addrp->sin_port = htons(PMAPPORT);
++    addrp->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
++}
++
++int
+ main(argc, argv)
+ int     argc;
+ char  **argv;
+@@ -31,7 +45,7 @@
+     register struct pmaplist *list;
+     register struct rpcent *rpc;
+ 
+-    get_myaddress(&addr);
++    get_myloopaddress(&addr);
+ 
+     for (list = pmap_getmaps(&addr); list; list = list->pml_next) {
+ 	rpc = getrpcbynumber((int) list->pml_map.pm_prog);
+--- portmap-5.orig/pmap_set.c
++++ portmap-5/pmap_set.c
+@@ -17,6 +17,10 @@
+ #include <rpc/rpc.h>
+ #include <rpc/pmap_clnt.h>
+ 
++int parse_line(char *buf, u_long *prog, u_long *vers, int *prot,
++	       unsigned *port);
++
++int
+ main(argc, argv)
+ int     argc;
+ char  **argv;
+@@ -40,6 +44,7 @@
+ 
+ /* parse_line - convert line to numbers */
+ 
++int
+ parse_line(buf, prog, vers, prot, port)
+ char   *buf;
+ u_long *prog;
+@@ -47,9 +52,9 @@
+ int    *prot;
+ unsigned *port;
+ {
+-    char    proto_name[BUFSIZ];
++    char    proto_name[256];
+ 
+-    if (sscanf(buf, "%lu %lu %s %u", prog, vers, proto_name, port) != 4) {
++    if (sscanf(buf, "%lu %lu %255s %u", prog, vers, proto_name, port) != 4) {
+ 	return (0);
+     }
+     if (strcmp(proto_name, "tcp") == 0) {
+@@ -65,3 +70,4 @@
+     }
+     return (0);
+ }
++
+--- portmap-5.orig/portmap.c
++++ portmap-5/portmap.c
+@@ -80,6 +80,10 @@
+  * Mountain View, California  94043
+  */
+ 
++#if defined(__GLIBC__)
++#define _BSD_SOURCE 1	/* for daemon(3) */
++#include <rpc/xdr.h>
++#endif /* __GLIBC__ */
+ #include <rpc/rpc.h>
+ #include <rpc/pmap_prot.h>
+ #include <stdio.h>
+@@ -91,11 +95,13 @@
+ #include <sys/signal.h>
+ #include <sys/time.h>
+ #include <sys/resource.h>
+-#ifdef SYSV40
+ #include <netinet/in.h>
+-#endif
++#include <sys/types.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <arpa/inet.h>
+ 
+-extern char *strerror();
+ #include <stdlib.h>
+ 
+ #ifndef LOG_PERROR
+@@ -124,7 +130,6 @@
+ static void callit();
+ struct pmaplist *pmaplist;
+ int debugging = 0;
+-extern int errno;
+ 
+ #include "pmap_check.h"
+ 
+@@ -148,6 +153,7 @@
+ #endif
+ #endif
+ 
++int
+ main(argc, argv)
+ 	int argc;
+ 	char **argv;
+@@ -157,22 +163,31 @@
+ 	struct sockaddr_in addr;
+ 	int len = sizeof(struct sockaddr_in);
+ 	register struct pmaplist *pml;
++	char *chroot_path = NULL;
++	struct in_addr bindaddr;
++	int have_bindaddr = 0;
+ 
+-	while ((c = getopt(argc, argv, "dv")) != EOF) {
++	while ((c = getopt(argc, argv, "dt:vi:")) != EOF) {
+ 		switch (c) {
+ 
+ 		case 'd':
+ 			debugging = 1;
+ 			break;
+-
++		case 't':
++			chroot_path = optarg;
++			break;
+ 		case 'v':
+ 			verboselog = 1;
+ 			break;
+-
++		case 'i':
++			have_bindaddr = inet_aton(optarg, &bindaddr);
++			break;
+ 		default:
+-			(void) fprintf(stderr, "usage: %s [-dv]\n", argv[0]);
++			(void) fprintf(stderr, "usage: %s [-dv] [-t path] [-i address]\n", argv[0]);
+ 			(void) fprintf(stderr, "-d: debugging mode\n");
++			(void) fprintf(stderr, "-t path: chroot into path\n");
+ 			(void) fprintf(stderr, "-v: verbose logging\n");
++			(void) fprintf(stderr, "-i address: bind to address\n");
+ 			exit(1);
+ 		}
+ 	}
+@@ -201,6 +216,9 @@
+ 	addr.sin_addr.s_addr = 0;
+ 	addr.sin_family = AF_INET;
+ 	addr.sin_port = htons(PMAPPORT);
++	if (have_bindaddr)
++		memcpy(&addr.sin_addr, &bindaddr, sizeof(bindaddr));
++
+ 	if (bind(sock, (struct sockaddr *)&addr, len) != 0) {
+ 		syslog(LOG_ERR, "cannot bind udp: %m");
+ 		exit(1);
+@@ -227,7 +245,7 @@
+ 	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof on);
+ #endif
+ 	if (bind(sock, (struct sockaddr *)&addr, len) != 0) {
+-		syslog(LOG_ERR, "cannot bind udp: %m");
++		syslog(LOG_ERR, "cannot bind tcp: %m");
+ 		exit(1);
+ 	}
+ 	if ((xprt = svctcp_create(sock, RPCSMALLMSGSIZE, RPCSMALLMSGSIZE))
+@@ -280,6 +298,14 @@
+ 	(void)svc_register(xprt, PMAPPROG, PMAPVERS, reg_service, FALSE);
+ 
+ 	/* additional initializations */
++	if (chroot_path)
++	{
++		if (-1 == chroot(chroot_path))
++		{
++			syslog(LOG_ERR, "couldn't do chroot");
++			exit(1);
++		}
++	}
+ 	check_startup();
+ #ifdef IGNORE_SIGCHLD			/* Lionel Cons <cons@dxcern.cern.ch> */
+ 	(void)signal(SIGCHLD, SIG_IGN);
+@@ -350,7 +376,7 @@
+ 		 */
+ 		/* remote host authorization check */
+ 		check_default(svc_getcaller(xprt), rqstp->rq_proc, (u_long) 0);
+-		if (!svc_sendreply(xprt, xdr_void, (caddr_t)0) && debugging) {
++		if (!svc_sendreply(xprt, (xdrproc_t) xdr_void, (caddr_t)0) && debugging) {
+ 			abort();
+ 		}
+ 		break;
+@@ -359,7 +385,7 @@
+ 		/*
+ 		 * Set a program,version to port mapping
+ 		 */
+-		if (!svc_getargs(xprt, xdr_pmap, &reg))
++		if (!svc_getargs(xprt, (xdrproc_t) xdr_pmap, (caddr_t) &reg))
+ 			svcerr_decode(xprt);
+ 		else {
+ 			/* reject non-local requests, protect priv. ports */
+@@ -401,7 +427,7 @@
+ 				ans = 1;
+ 			}
+ 		done:
+-			if ((!svc_sendreply(xprt, xdr_int, (caddr_t)&ans)) &&
++			if ((!svc_sendreply(xprt, (xdrproc_t) xdr_int, (caddr_t)&ans)) &&
+ 			    debugging) {
+ 				(void) fprintf(stderr, "svc_sendreply\n");
+ 				abort();
+@@ -413,7 +439,7 @@
+ 		/*
+ 		 * Remove a program,version to port mapping.
+ 		 */
+-		if (!svc_getargs(xprt, xdr_pmap, &reg))
++		if (!svc_getargs(xprt, (xdrproc_t) xdr_pmap, (caddr_t) &reg))
+ 			svcerr_decode(xprt);
+ 		else {
+ 			ans = 0;
+@@ -447,7 +473,7 @@
+ 					prevpml->pml_next = pml;
+ 				free(t);
+ 			}
+-			if ((!svc_sendreply(xprt, xdr_int, (caddr_t)&ans)) &&
++			if ((!svc_sendreply(xprt, (xdrproc_t) xdr_int, (caddr_t)&ans)) &&
+ 			    debugging) {
+ 				(void) fprintf(stderr, "svc_sendreply\n");
+ 				abort();
+@@ -459,7 +485,7 @@
+ 		/*
+ 		 * Lookup the mapping for a program,version and return its port
+ 		 */
+-		if (!svc_getargs(xprt, xdr_pmap, &reg))
++		if (!svc_getargs(xprt, (xdrproc_t) xdr_pmap, (caddr_t) &reg))
+ 			svcerr_decode(xprt);
+ 		else {
+ 			/* remote host authorization check */
+@@ -474,7 +500,7 @@
+ 				port = fnd->pml_map.pm_port;
+ 			else
+ 				port = 0;
+-			if ((!svc_sendreply(xprt, xdr_int, (caddr_t)&port)) &&
++			if ((!svc_sendreply(xprt, (xdrproc_t) xdr_int, (caddr_t)&port)) &&
+ 			    debugging) {
+ 				(void) fprintf(stderr, "svc_sendreply\n");
+ 				abort();
+@@ -486,7 +512,7 @@
+ 		/*
+ 		 * Return the current set of mapped program,version
+ 		 */
+-		if (!svc_getargs(xprt, xdr_void, NULL))
++		if (!svc_getargs(xprt, (xdrproc_t) xdr_void, (caddr_t) NULL))
+ 			svcerr_decode(xprt);
+ 		else {
+ 			/* remote host authorization check */
+@@ -497,7 +523,7 @@
+ 			} else {
+ 				p = pmaplist;
+ 			}
+-			if ((!svc_sendreply(xprt, xdr_pmaplist,
++			if ((!svc_sendreply(xprt, (xdrproc_t) xdr_pmaplist,
+ 			    (caddr_t)&p)) && debugging) {
+ 				(void) fprintf(stderr, "svc_sendreply\n");
+ 				abort();
+@@ -645,7 +671,7 @@
+ 	timeout.tv_sec = 5;
+ 	timeout.tv_usec = 0;
+ 	a.rmt_args.args = buf;
+-	if (!svc_getargs(xprt, xdr_rmtcall_args, &a))
++	if (!svc_getargs(xprt, (xdrproc_t) xdr_rmtcall_args, (caddr_t) &a))
+ 		return;
+ 	/* host and service access control */
+ 	if (!check_callit(svc_getcaller(xprt), 
+@@ -674,9 +700,9 @@
+ 			   au->aup_uid, au->aup_gid, au->aup_len, au->aup_gids);
+ 		}
+ 		a.rmt_port = (u_long)port;
+-		if (clnt_call(client, a.rmt_proc, xdr_opaque_parms, &a,
+-		    xdr_len_opaque_parms, &a, timeout) == RPC_SUCCESS) {
+-			svc_sendreply(xprt, xdr_rmtcall_result, (caddr_t)&a);
++		if (clnt_call(client, a.rmt_proc, (xdrproc_t) xdr_opaque_parms, (char*) &a,
++		    (xdrproc_t) xdr_len_opaque_parms, (char*) &a, timeout) == RPC_SUCCESS) {
++			svc_sendreply(xprt, (xdrproc_t) xdr_rmtcall_result, (caddr_t)&a);
+ 		}
+ 		AUTH_DESTROY(client->cl_auth);
+ 		clnt_destroy(client);
+--- portmap-5.orig/pmap_dump.8
++++ portmap-5/pmap_dump.8
+@@ -0,0 +1,24 @@
++.TH PMAP_DUMP 8 "21th June 1997" Linux "Linux Programmer's Manual"
++.SH NAME
++pmap_dump \- print a list of all registered RPC programs
++.SH SYNOPSIS
++.B pmap_dump
++.SH DESCRIPTION
++The
++.B pmap_dump
++command can be used to restart a running portmapper or to print
++a list of all registered RPC programs on the local host. If you
++want to use the program to restart the portmapper you have to
++redirect the output of
++.B pmap_dump
++to a file. After this you can restart the portmapper and restore
++the list of the registered RPC programs by feeding the output
++of
++.B pmap_dump
++to the
++.B pmap_set
++command.
++.SH SEE ALSO
++.BR pmap_set (8),
++.BR rpc.portmap (8)
++
+--- portmap-5.orig/pmap_set.8
++++ portmap-5/pmap_set.8
+@@ -0,0 +1,24 @@
++.TH PMAP_SET 8 "21th June 1997" Linux "Linux Programmer's Manual"
++.SH NAME
++pmap_set \- set the list of registered RPC programs
++.SH SYNOPSIS
++.B pmap_set
++.SH DESCRIPTION
++The
++.B pmap_set
++command can be used to restart a running portmapper or to set
++the list of registered RPC programs on the local host. If you
++want to use the program to restart the portmapper you have to
++redirect the output of
++.B pmap_dump
++to a file. After this you can restart the portmapper and restore
++the list of the registered RPC programs by feeding the output
++of
++.B pmap_dump
++to the
++.B pmap_set
++command.
++.SH SEE ALSO
++.BR pmap_dump (8),
++.BR rpc.portmap (8)
++
+--- portmap-5.orig/portmap.8
++++ portmap-5/portmap.8
+@@ -0,0 +1,156 @@
++.\" Copyright (c) 1987 Sun Microsystems
++.\" Copyright (c) 1990, 1991 The Regents of the University of California.
++.\" All rights reserved.
++.\"
++.\" Redistribution and use in source and binary forms, with or without
++.\" modification, are permitted provided that the following conditions
++.\" are met:
++.\" 1. Redistributions of source code must retain the above copyright
++.\"    notice, this list of conditions and the following disclaimer.
++.\" 2. Redistributions in binary form must reproduce the above copyright
++.\"    notice, this list of conditions and the following disclaimer in the
++.\"    documentation and/or other materials provided with the distribution.
++.\" 3. All advertising materials mentioning features or use of this software
++.\"    must display the following acknowledgement:
++.\"	This product includes software developed by the University of
++.\"	California, Berkeley and its contributors.
++.\" 4. Neither the name of the University nor the names of its contributors
++.\"    may be used to endorse or promote products derived from this software
++.\"    without specific prior written permission.
++.\"
++.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++.\" SUCH DAMAGE.
++.\"
++.\"     from: @(#)portmap.8	5.3 (Berkeley) 3/16/91
++.\"	$Id$
++.\"
++.Dd March 16, 1991
++.Dt PORTMAP 8
++.Os BSD 4.3
++.Sh NAME
++.Nm portmap
++.Nd
++.Tn DARPA
++port to
++.Tn RPC
++program number mapper
++.Sh SYNOPSIS
++.Nm portmap
++.Op Fl d
++.Op Fl v
++.Op Fl i Ar address
++.Sh DESCRIPTION
++.Nm Portmap
++is a server that converts
++.Tn RPC
++program numbers into
++.Tn DARPA
++protocol port numbers.
++It must be running in order to make
++.Tn RPC
++calls.
++.Pp
++When an
++.Tn RPC
++server is started, it will tell
++.Nm portmap
++what port number it is listening to, and what
++.Tn RPC
++program numbers it is prepared to serve.
++When a client wishes to make an
++.Tn RPC
++call to a given program number,
++it will first contact
++.Nm portmap
++on the server machine to determine
++the port number where
++.Tn RPC
++packets should be sent.
++.Pp
++.Nm Portmap
++must be started before any
++.Tn RPC
++servers are invoked.
++.Pp
++Normally
++.Nm portmap
++forks and dissociates itself from the terminal
++like any other daemon.
++.Nm Portmap
++then logs errors using
++.Xr syslog 3 .
++.Pp
++Options available:
++.Bl -tag -width Ds
++.It Fl d
++(debug) prevents
++.Nm portmap
++from running as a daemon,
++and causes errors and debugging information
++to be printed to the standard error output.
++.It Fl v
++(verbose) run
++.Nm portmap
++in verbose mode.
++.It Fl i Ar address
++bind
++.Nm portmap
++to address. If you specify 127.0.0.1 it will bind to the loopback interface only.
++.El
++
++This
++.Nm portmap
++version is protected by the
++.Nm tcp_wrapper
++library. You have to give the clients access to
++.Nm portmap
++if they should be allowed to use it. To allow connects from clients of
++the network 192.168. you could use the following line in /etc/hosts.allow:
++
++portmap: 192.168.
++
++You have to use the daemon name 
++.Nm portmap
++for the daemon name (even if the binary has a different name). For the
++client names you can only use the keyword ALL or IP addresses (NOT
++host or domain names).
++
++For further information please have a look at the
++.Xr tcpd 8 ,
++.Xr hosts_allow 5
++and
++.Xr hosts_access 5
++manual pages.
++
++.Sh SEE ALSO
++.Xr inetd.conf 5 ,
++.Xr rpcinfo 8 ,
++.Xr pmap_set 8 ,
++.Xr pmap_dump 8 ,
++.Xr inetd 8
++.Xr tcpd 8
++.Xr hosts_access 5
++.Xr hosts_options 5
++.Sh BUGS
++If
++.Nm portmap
++crashes, all servers must be restarted.
++.Sh HISTORY
++The
++.Nm
++command appeared in
++.Bx 4.3
++.Sh AUTHORS
++This
++manual page was changed by
++.An Anibal Monsalve Salazar
++for the Debian Project.
+--- portmap-5.orig/debian/changelog
++++ portmap-5/debian/changelog
+@@ -0,0 +1,122 @@
++portmap (5-9) unstable; urgency=high
++
++  * The following patch was applied to portmap.c:
++    -       while ((c = getopt(argc, argv, "dtvi:")) != EOF) {
++    +       while ((c = getopt(argc, argv, "dt:vi:")) != EOF) {
++    See bug #274178.
++
++ -- Anibal Monsalve Salazar <anibal@debian.org>  Sun, 20 Mar 2005 19:00:54 +1100
++
++portmap (5-8) unstable; urgency=low
++
++  * Fixed "discards port mappings on stop; start" (Closes: #293743).
++  * Compilation warnings cleanup (Closes: #266481).
++    Patch by Mark Ferlatte <ferlatte@cryptio.net>
++  * Option to chroot portmap (Closes: #274178).
++    Patch by Mark Ferlatte <ferlatte@cryptio.net>
++  * New maintainer's email address.
++
++ -- Anibal Monsalve Salazar <anibal@debian.org>  Mon, 07 Feb 2005 21:47:42 +1100
++
++portmap (5-7) unstable; urgency=high
++
++  * Fixed "Silently changes to bind to localhost only" (Closes: #280026, #280128, #280553).
++    Commented out the OPTION line in /etc/default/portmap.
++  * Removed debconf note (Closes: #280371, #280554, #280414).
++    Patches supplied (but not applied) by:
++    Andre Luis Lopes <andrelop@debian.org>
++    Kenshi Muto <kmuto@debian.org>
++    Jose Carlos Garcia Sogo <jsogo@debian.org>
++  * Fixed "Manpage is wrong" (Closes: #280421).
++    Changed portmap.8.
++
++ -- Anibal Monsalve Salazar <A.Monsalve.Salazar@IEEE.org>  Wed, 10 Nov 2004 20:34:44 +1100
++
++portmap (5-6) unstable; urgency=high
++
++  * Fixed "Silently changes to bind to localhost only" (Closes: #280026).
++    Display a medium debconf note to let users know about portmap's
++    binding to the loopback address by default.
++
++ -- Anibal Monsalve Salazar <A.Monsalve.Salazar@IEEE.org>  Mon, 08 Nov 2004 07:23:19 +1100
++
++portmap (5-5) unstable; urgency=high
++
++  * Implemented -i option to allow binding to a particular address (Closes: #246935).
++    Patch by Matt Zimmerman <mdz@canonical.com>.
++    Soeren Sonnenburg <bugreports@nn7.de> supplied the original version of the
++    patch.
++  * Bind to the loopback address by default.
++    Patch by Matt Zimmerman <mdz@canonical.com>.
++  * debian/init.d: added --oknodo to make sure portmap script returns 0
++    Patch by Matt Zimmerman <mdz@canonical.com>.
++
++ -- Anibal Monsalve Salazar <A.Monsalve.Salazar@IEEE.org>  Fri, 05 Nov 2004 06:57:29 +1100
++
++portmap (5-4) unstable; urgency=low
++
++  * New maintainer.
++
++ -- Anibal Monsalve Salazar <A.Monsalve.Salazar@IEEE.org>  Thu, 20 May 2004 09:52:29 +1000
++
++portmap (5-3) unstable; urgency=low
++
++  * New maintainer (closes: #210768, #241674).
++  * Fixed hosts.allow example in portmap(8) (closes: #29142, #229004).
++  * Moved rcS script to 43 from 41 (closes: #196150).
++
++ -- Herbert Xu <herbert@debian.org>  Sat,  3 Apr 2004 20:32:41 +1000
++
++portmap (5-2.3) unstable; urgency=low
++
++  * Non maintainer upload.
++  * Call setgroups instead of initgroup (closes: #226681).
++  * Removed emacs trailer in changelog.
++
++ -- Herbert Xu <herbert@debian.org>  Sat, 27 Mar 2004 09:47:23 +1100
++
++portmap (5-2.2) unstable; urgency=low
++
++  * NMU
++  * Update to debhelper mode 4, cleanups in debian/ (closes: #162586).
++  * Standards-version is 3.6.1.
++  * Start portmap in runlevels 2 to 5, at priority 18. Also stop it for
++    runlevel 1 before it is killed by `single'
++    (closes: #159925, #216107, #60367, #93599, #101726, #130360).
++  * Stop it at S32 in runlevels 0 and 6, after umountnfs.sh (closes: #138023).
++  * Force the symlink update for older versions so that all packages don't
++    have to start portmap before their own daemon.
++  * Don't ship README's content in portmapper.txt.
++
++ -- Josselin Mouette <joss@debian.org>  Fri, 20 Feb 2004 17:11:03 +0100
++
++portmap (5-2.1) unstable; urgency=low
++
++  * NMU
++  * [pmap_check.c] Drop group privileges as well. (Closes: #58864)
++  * [portmap.c] Corrected error message for failure to bind with tcp. 
++    (Closes: #61876)
++  * [portmap.c, Makefile] Use glibc's strerror() and daemon(). (Closes: #106380)
++  * [portmap.c] Don't declare extern int errno but #include <errno.h> so as
++    not to reference the deprecated errno@GLIBC_2.0 symbol. (Closes: #168530)
++  * New upload, built using newer binutils which should fix the prelinking
++    issue on powerpc. (Closes: #176352)
++  * [debian/copyright] Updated the upstream location. (Closes: #181807)
++  * [debian/rules] Removed obsolete dh_suidregister.
++
++ -- J.H.M. Dassen (Ray) <jdassen@debian.org>  Sat, 13 Sep 2003 17:08:22 +0200
++
++portmap (5-2) unstable; urgency=low
++
++  * Fix from_local.c to declare some functions it uses correctly. Thanks
++    to Bdale Garbee. (Closes: Bug#90090)
++  * Add -Wall to CFLAGS, and fix most of the warnings it comes up with.
++
++ -- Anthony Towns <aj@azure.humbug.org.au>  Sun, 18 Mar 2001 19:04:25 +1000
++
++portmap (5-1) unstable; urgency=low
++
++  * Initial Release.
++
++ -- Anthony Towns <ajt@debian.org>  Sat,  5 Aug 2000 22:08:49 +1000
++
+--- portmap-5.orig/debian/control
++++ portmap-5/debian/control
+@@ -0,0 +1,17 @@
++Source: portmap
++Section: net
++Priority: standard
++Maintainer: Anibal Monsalve Salazar <anibal@debian.org>
++Standards-Version: 3.6.1
++Build-Depends: libwrap-dev, debhelper (>= 4.1.16)
++
++Package: portmap
++Architecture: any
++Depends: ${shlibs:Depends}, ${misc:Depends}
++Replaces: netbase (<< 4.00)
++Description: The RPC portmapper
++ Portmap is a server that converts RPC (Remote Procedure Call) program
++ numbers into DARPA protocol port numbers.  It must be running in order
++ to make RPC calls.
++ .
++ Services that use RPC include NFS and NIS.
+--- portmap-5.orig/debian/rules
++++ portmap-5/debian/rules
+@@ -0,0 +1,58 @@
++#!/usr/bin/make -f
++# Sample debian/rules that uses debhelper.
++# GNU copyright 1997 to 1999 by Joey Hess.
++# Copyright (C) 2004-2005 by Anibal Monsalve Salazar <anibal@debian.org>
++
++# Uncomment this to turn on verbose mode.
++export DH_VERBOSE=1
++
++# This is the debhelper compatability version to use.
++export DH_COMPAT=4
++
++build: build-stamp
++build-stamp:
++	dh_testdir
++	$(MAKE)
++	touch build-stamp
++
++clean:
++	dh_testdir
++	dh_testroot
++	-$(MAKE) clean
++	dh_clean build-stamp
++
++install: build
++	dh_testdir
++	dh_testroot
++	dh_clean -k
++	dh_installdirs
++	$(MAKE) install BASEDIR=`pwd`/debian/portmap
++
++# Build architecture-independent files here.
++binary-indep: build install
++# We have nothing to do by default.
++
++# Build architecture-dependent files here.
++binary-arch: build install
++	dh_testdir
++	dh_testroot
++	dh_installdebconf
++	dh_installdocs
++	dh_installexamples
++	dh_installinit -- start 43 S . start 32 0 6 . start 18 2 3 4 5 . stop 81 1 .
++	dh_installcron
++	dh_installman
++	dh_installinfo
++	dh_installchangelogs CHANGES
++	dh_link
++	dh_strip
++	dh_compress
++	dh_fixperms
++	dh_installdeb
++	dh_shlibdeps
++	dh_gencontrol
++	dh_md5sums
++	dh_builddeb
++
++binary: binary-indep binary-arch
++.PHONY: build clean binary-indep binary-arch binary install
+--- portmap-5.orig/debian/copyright
++++ portmap-5/debian/copyright
+@@ -0,0 +1,51 @@
++This package was debianized by Anthony Towns <ajt@debian.org> on
++Sat,  5 Aug 2000 22:08:49 +1000.
++
++It was then worked on by Herbert Xu <herbert@debian.org> after
++Sat,  3 Apr 2004 16:54:01 +1000.
++
++It is now maintained by Anibal Monsalve Salazar <anibal@debian.org>
++
++Upstream location: ftp://ftp.porcupine.org/pub/security/
++
++Upstream Author: Wietse Venema
++
++Copyright:
++
++Most of the files, fall under the following copyright, and are distributable
++under the terms of the BSD license (/usr/share/common-licenses/BSD):
++
++ * Copyright (c) 1983,1991 The Regents of the University of California.
++ * All rights reserved.
++
++Some of the RPC code, is copyrighted by Sun Microsystems, and is provided
++under the following terms:
++
++ * Sun RPC is a product of Sun Microsystems, Inc. and is provided for
++ * unrestricted use provided that this legend is included on all tape
++ * media and as a part of the software program in whole or part.  Users
++ * may copy or modify Sun RPC without charge, but are not authorized
++ * to license or distribute it to anyone else except as part of a product or
++ * program developed by the user or with the express written consent of
++ * Sun Microsystems, Inc.
++ *
++ * SUN RPC IS PROVIDED AS IS WITH NO WARRANTIES OF ANY KIND INCLUDING THE
++ * WARRANTIES OF DESIGN, MERCHANTIBILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE, OR ARISING FROM A COURSE OF DEALING, USAGE OR TRADE PRACTICE.
++ *
++ * Sun RPC is provided with no support and without any obligation on the
++ * part of Sun Microsystems, Inc. to assist in its use, correction,
++ * modification or enhancement.
++ *
++ * SUN MICROSYSTEMS, INC. SHALL HAVE NO LIABILITY WITH RESPECT TO THE
++ * INFRINGEMENT OF COPYRIGHTS, TRADE SECRETS OR ANY PATENTS BY SUN RPC
++ * OR ANY PART THEREOF.
++ *
++ * In no event will Sun Microsystems, Inc. be liable for any lost revenue
++ * or profits or other special, indirect and consequential damages, even if
++ * Sun has been advised of the possibility of such damages.
++ *
++ * Sun Microsystems, Inc.
++ * 2550 Garcia Avenue
++ * Mountain View, California  94043
++
+--- portmap-5.orig/debian/default
++++ portmap-5/debian/default
+@@ -0,0 +1,2 @@
++# By default listen on all interfaces
++#OPTIONS="-i 127.0.0.1"
+--- portmap-5.orig/debian/init.d
++++ portmap-5/debian/init.d
+@@ -0,0 +1,56 @@
++#!/bin/sh
++#
++# start/stop portmap daemon.
++
++test -f /sbin/portmap || exit 0
++
++OPTIONS=""
++if [ -f /etc/default/portmap ]; then
++  . /etc/default/portmap
++fi
++
++case "$1" in
++    start)
++	echo -n "Starting portmap daemon:"
++	echo -n " portmap"
++	start-stop-daemon --start --quiet --oknodo --exec /sbin/portmap -- $OPTIONS
++	echo "."
++
++	sleep 1 # needs a short pause or pmap_set won't work. :(
++	if [ -f /var/run/portmap.upgrade-state ]; then
++	  echo -n "Restoring old RPC service information..."
++	  pmap_set </var/run/portmap.upgrade-state
++	  rm -f /var/run/portmap.upgrade-state
++	  echo "done."
++	else
++	  if [ -f /var/run/portmap.state ]; then
++	    pmap_set </var/run/portmap.state
++	    rm -f /var/run/portmap.state
++	  fi
++	fi
++
++	;;
++    stop)
++	echo -n "Stopping portmap daemon:"
++	echo -n " portmap"
++	pmap_dump >/var/run/portmap.state
++	start-stop-daemon --stop --quiet --oknodo --exec /sbin/portmap
++	echo "."
++	;;
++    reload)
++	;;
++    force-reload)
++	$0 restart
++	;;
++    restart)
++	$0 stop
++	$0 start
++	;;
++    *)
++	echo "Usage: /etc/init.d/portmap {start|stop|reload|restart}"
++	exit 1
++	;;
++esac
++
++exit 0
++
+--- portmap-5.orig/debian/dirs
++++ portmap-5/debian/dirs
+@@ -0,0 +1,3 @@
++sbin
++usr/share/man/man8
++usr/share/doc/portmap
+--- portmap-5.orig/debian/docs
++++ portmap-5/debian/docs
+@@ -0,0 +1 @@
++README
+--- portmap-5.orig/debian/postinst
++++ portmap-5/debian/postinst
+@@ -0,0 +1,13 @@
++#!/bin/sh
++
++set -e
++
++if [ "$1" = "configure" ] && [ -n "$2" ] &&
++  dpkg --compare-versions "$2" lt 5-3; then
++	err=$(update-rc.d -f portmap remove 2>&1 > /dev/null) || {
++		echo "$err" >&2
++		exit 1
++	}
++fi
++
++#DEBHELPER#
+--- portmap-5.orig/debian/prerm
++++ portmap-5/debian/prerm
+@@ -0,0 +1,9 @@
++#! /bin/sh
++set -e
++
++if [ "$1" = "upgrade" ]; then
++	# save portmap state; will be reread when portmap start is run
++	pmap_dump >/var/run/portmap.upgrade-state
++fi
++
++#DEBHELPER#

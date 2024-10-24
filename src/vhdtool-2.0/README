@@ -1,0 +1,49 @@
+test.sh and footercheck.py used to check two conversions of the 
+same file, one by the original VhdTool.exe on Windows, one here.
+
+FILES:
+
+Makefile       toplevel Makefile
+VhdTool.c      Linux port of VhdTool.cpp
+wg_vhdtool.h   Macros used in Linux port
+LICENSE        Excerpt from VhdTool.cpp
+VhdTool.cpp    Original VhdTool.cpp from upstream
+VhdTool.exe    Original VhdTool.exe from upstream
+footercheck.py Check ref.footer against test footer
+ref/           Reference results for "make test"
+
+The footer is the last 512 bytes of a .vhd file.  Layout, with
+typical values shown as hex or as ASCII:
+
+typedef struct
+{
+/* 00 */ UCHAR   Cookie[8];                 conectix
+/* 08 */ ULONG   Features;                  00 00 00 02
+/* 0c */ ULONG   FileFormatVersion;         00 01 00 00   
+/* 10 */ ULONG64 DataOffset;                ff ff ff ff ff ff ff ff
+/* 18 */ ULONG   TimeStamp;                 18 ca 89 39
+/* 1c */ UCHAR   CreatorApplication[4];     hack
+/* 20 */ ULONG   CreatorVersion;            00 02 00 00
+/* 24 */ ULONG   CreatorHostOS;             Wi2k
+/* 28 */ ULONG64 OriginalSize;              00 00 00 00 b7 60 00 00
+/* 30 */ ULONG64 CurrentSize;               00 00 00 00 b7 60 00 00
+
+    struct
+    {
+/* 38 */ USHORT Cylinders;                  17 49
+/* 3a */ UCHAR  Heads;                      10
+/* 3b */ UCHAR  SectorsPerTrack;            3f
+    } Geometry;
+
+/* 3c */ ULONG   DiskType;                  00 00 00 02
+/* 40 */ ULONG   Checksum;                  ff ff e5 05
+/* 44 */ UCHAR   UniqueId[16];              a9 dd 2d c6 d7 79 4e 9c 
+                                            ab e6 8b 1c 0c d2 03 5d
+/* 54 */ UCHAR   SavedState;                00
+/* 55 */ UCHAR   Reserved[427];
+} VHD_DISK_FOOTER;
+
+Geometry apparently matters only to HyperV, or maybe matters not at all.  
+We've left VhdTool.cpp geometry tinkering alone, except we force it to 
+extend the image by 1024 bytes which is enough to force it to give us all
+the cylinders everybody else gives us.

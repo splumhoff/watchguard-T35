@@ -1,0 +1,322 @@
+/*
+ * T1042RDB_PI Device Tree Source
+ *
+ * Copyright 2014 Freescale Semiconductor Inc.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *	 notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *	 notice, this list of conditions and the following disclaimer in the
+ *	 documentation and/or other materials provided with the distribution.
+ *     * Neither the name of Freescale Semiconductor nor the
+ *	 names of its contributors may be used to endorse or promote products
+ *	 derived from this software without specific prior written permission.
+ *
+ *
+ * ALTERNATIVELY, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") as published by the Free Software
+ * Foundation, either version 2 of that License or (at your option) any
+ * later version.
+ *
+ * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor "AS IS" AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/include/ "fsl/t104xsi-pre.dtsi"
+
+/ {
+	model = "fsl,T1042RDB_PI";
+	compatible = "fsl,T1042RDB_PI";
+	#address-cells = <2>;
+	#size-cells = <2>;
+	interrupt-parent = <&mpic>;
+
+	aliases {
+		phy_sgmii_0 = &phy_sgmii_0;
+		phy_sgmii_1 = &phy_sgmii_1;
+		phy_sgmii_2 = &phy_sgmii_2;
+	};
+
+	ifc: localbus@ffe124000 {
+		reg = <0xf 0xfe124000 0 0x2000>;
+		ranges = <0 0 0xf 0xefc00000 0x00400000>;
+
+		nor@0,0 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "cfi-flash";
+			reg = <0x0 0x0 0x400000>;
+			bank-width = <2>;
+			device-width = <1>;
+			partition@00000000 {
+				/*64KB*/
+				reg = <0x00000000 0x00010000>;
+				label = "NOR (RW) LANNER RCW Code";
+			};
+
+			partition@00010000 {
+				/*128KB*/
+				reg = <0x00010000 0x00020000>;
+				label = "NOR (RW) WG CFG0";
+			};
+
+			partition@00030000 {
+				/*64KB*/
+				reg = <0x00030000 0x00010000>;
+				label = "NOR (RW) WG CFG1";
+			};
+
+			partition@00040000 {
+				/*64KB*/
+				reg = <0x00040000 0x00010000>;
+				label = "NOR (RW) WG MFG DATA";
+			};
+
+			partition@00050000 {
+				/*704KB*/
+				reg = <0x00050000 0x000B0000>;
+				label = "NOR (RW) WG bootOpt Data & reserved";
+			};
+
+			partition@00100000 {
+				/*704KB*/
+				reg = <0x00100000 0x000B0000>;
+				label = "NOR (RW) WG extra reserved 1";
+			};
+
+			partition@001B0000 {
+				/*64KB*/
+				reg = <0x001B0000 0x000B0000>;
+				label = "NOR (RW) WG extra reserved 2";
+			};
+
+			partition@00260000 {
+				/*768KB*/
+				reg = <0x00260000 0x000C0000>;
+				label = "NOR (RW) WG U-Boot FAILSAFE";
+			};
+
+			partition@00320000 {
+				/*64KB*/
+				reg = <0x00320000 0x00010000>;
+				label = "NOR (RW) FMAN";
+			};
+
+			partition@00330000 {
+				/*64KB*/
+				reg = <0x00330000 0x00010000>;
+				label = "NOR (RW) WG U-Boot ENV";
+			};
+
+			partition@00340000 {
+				/*768KB*/
+				reg = <0x00340000 0x000C0000>;
+				label = "NOR (RW) WG U-Boot Image";
+			};
+
+		};
+
+	};
+
+	memory {
+		device_type = "memory";
+	};
+
+	dcsr: dcsr@f00000000 {
+		ranges = <0x00000000 0xf 0x00000000 0x01072000>;
+	};
+
+	bportals: bman-portals@ff4000000 {
+		ranges = <0x0 0xf 0xf4000000 0x2000000>;
+	};
+
+	qportals: qman-portals@ff6000000 {
+		ranges = <0x0 0xf 0xf6000000 0x2000000>;
+	};
+
+	soc: soc@ffe000000 {
+		ranges = <0x00000000 0xf 0xfe000000 0x1000000>;
+		reg = <0xf 0xfe000000 0 0x00001000>;
+
+		i2c@118000 {
+			rtc@32 {
+				compatible = "ricoh,rs5c372a";
+				reg = <0x32>;
+			};
+			hwmon@2d {
+				compatible = "winbond,w83793";
+				reg = <0x2d>;
+			};
+			hwmon@2c {
+				compatible = "winbond,w83793";
+				reg = <0x2c>;
+			};
+			tpm@29 {
+                                compatible = "tpm,tpm_i2c_atmel";
+                                reg = <0x29>;
+			};
+		};
+
+		i2c@118100 {
+		};
+
+		spi@110000 {
+			flash@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "winbond,gd25q64";
+				reg = <0>;
+				spi-max-frequency = <10000000>; /* input clock */
+			};
+		};
+
+		fman0: fman@400000 {
+			sleep = <&rcpm 0x00000008>;
+
+			enet0: ethernet@e4000 {
+                                phy-handle = <&phy_sgmii_2>;
+                                phy-connection-type = "sgmii";
+				sleep = <&rcpm 0x20000000>;
+			};
+
+			enet1: ethernet@e0000 {
+                                phy-handle = <&phy_sgmii_0>;
+                                phy-connection-type = "sgmii";
+				sleep = <&rcpm 0x80000000>;
+			};
+
+			enet2: ethernet@e2000 {
+                                phy-handle = <&phy_sgmii_1>;
+                                phy-connection-type = "sgmii";
+				sleep = <&rcpm 0x40000000>;
+			};
+
+			enet3: ethernet@e6000 {
+				fixed-link = <0x10 1 1000 0 0>;
+				phy-connection-type = "rgmii";
+				sleep = <&rcpm 0x10000000>;
+			};
+
+			enet4: ethernet@e8000 {
+				fixed-link = <4 1 1000 0 0>;
+				phy-connection-type = "rgmii";
+				sleep = <&rcpm 0x08000000>;
+			};
+
+			mdio0: mdio@fc000 {
+                                phy_sgmii_0: ethernet-phy@01 {
+                                        reg = <0x01>;
+                                };
+                                phy_sgmii_1: ethernet-phy@02 {
+                                        reg = <0x02>;
+                                };
+                                phy_sgmii_2: ethernet-phy@03 {
+                                        reg = <0x00>;
+                                };
+			};
+		};
+	};
+
+	qe: qe@ffe140000 {
+		ranges = <0x0 0xf 0xfe140000 0x40000>;
+		reg = <0xf 0xfe140000 0 0x480>;
+		brg-frequency = <0>;
+		bus-frequency = <0>;
+	};
+
+	pci0: pcie@ffe240000 {
+		reg = <0xf 0xfe240000 0 0x10000>;
+		ranges = <0x02000000 0 0xe0000000 0xc 0x00000000 0x0 0x10000000
+			  0x01000000 0 0x00000000 0xf 0xf8000000 0x0 0x00010000>;
+		pcie@0 {
+			ranges = <0x02000000 0 0xe0000000
+				  0x02000000 0 0xe0000000
+				  0 0x10000000
+
+				  0x01000000 0 0x00000000
+				  0x01000000 0 0x00000000
+				  0 0x00010000>;
+		};
+	};
+
+	pci1: pcie@ffe250000 {
+		reg = <0xf 0xfe250000 0 0x10000>;
+		ranges = <0x02000000 0x0 0xe0000000 0xc 0x10000000 0x0 0x10000000
+			  0x01000000 0x0 0x00000000 0xf 0xf8010000 0x0 0x00010000>;
+		pcie@0 {
+			ranges = <0x02000000 0 0xe0000000
+				  0x02000000 0 0xe0000000
+				  0 0x10000000
+
+				  0x01000000 0 0x00000000
+				  0x01000000 0 0x00000000
+				  0 0x00010000>;
+		};
+	};
+
+	pci2: pcie@ffe260000 {
+		reg = <0xf 0xfe260000 0 0x10000>;
+		ranges = <0x02000000 0 0xe0000000 0xc 0x20000000 0 0x10000000
+			  0x01000000 0 0x00000000 0xf 0xf8020000 0 0x00010000>;
+		pcie@0 {
+			ranges = <0x02000000 0 0xe0000000
+				  0x02000000 0 0xe0000000
+				  0 0x10000000
+
+				  0x01000000 0 0x00000000
+				  0x01000000 0 0x00000000
+				  0 0x00010000>;
+		};
+	};
+
+	pci3: pcie@ffe270000 {
+		reg = <0xf 0xfe270000 0 0x10000>;
+		ranges = <0x02000000 0 0xe0000000 0xc 0x30000000 0 0x10000000
+			  0x01000000 0 0x00000000 0xf 0xf8030000 0 0x00010000>;
+		pcie@0 {
+			ranges = <0x02000000 0 0xe0000000
+				  0x02000000 0 0xe0000000
+				  0 0x10000000
+
+				  0x01000000 0 0x00000000
+				  0x01000000 0 0x00000000
+				  0 0x00010000>;
+		};
+	};
+
+	fsl,dpaa {
+		compatible = "fsl,t1042-dpaa", "fsl,dpaa";
+                ethernet@0 {
+                        compatible = "fsl,t1040-dpa-ethernet", "fsl,dpa-ethernet";
+                        fsl,fman-mac = <&enet0>;
+                };
+                ethernet@1 {
+                        compatible = "fsl,t1040-dpa-ethernet", "fsl,dpa-ethernet";
+                        fsl,fman-mac = <&enet1>;
+                };
+                ethernet@2 {
+                        compatible = "fsl,t1040-dpa-ethernet", "fsl,dpa-ethernet";
+                        fsl,fman-mac = <&enet2>;
+                };
+		ethernet@3 {
+			compatible = "fsl,t1042-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,fman-mac = <&enet3>;
+		};
+		ethernet@4 {
+			compatible = "fsl,t1042-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,fman-mac = <&enet4>;
+		};
+	};
+};
+/include/ "fsl/m200-post.dtsi"
+/include/ "fsl/qoriq-dpaa-res3.dtsi"

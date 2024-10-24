@@ -1,0 +1,261 @@
+WatchGuard patches to sources for python-2.7.14 as of
+Thu May 26 11:39:02 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- python-2.7.14/Makefile.pre.in.orig	2022-05-26 11:38:34.622259103 -0700
++++ python-2.7.14/Makefile.pre.in	2022-05-26 11:38:36.046200741 -0700
+@@ -196,12 +196,14 @@
+ LIBOBJS=	@LIBOBJS@
+ UNICODE_OBJS=   @UNICODE_OBJS@
+ 
+-PYTHON=		python$(EXE)
+-BUILDPYTHON=	python$(BUILDEXE)
++# WG tweak -- export some variables
++export PYTHON=		python$(EXE)
++export BUILDPYTHON=	python$(BUILDEXE)
+ 
+-PYTHON_FOR_REGEN=@PYTHON_FOR_REGEN@
+-PYTHON_FOR_BUILD=@PYTHON_FOR_BUILD@
+-_PYTHON_HOST_PLATFORM=@_PYTHON_HOST_PLATFORM@
++export PYTHON_FOR_REGEN=@PYTHON_FOR_REGEN@
++export PYTHON_FOR_BUILD=@PYTHON_FOR_BUILD@
++export _PYTHON_HOST_PLATFORM=@_PYTHON_HOST_PLATFORM@
++# End WG tweak
+ HOST_GNU_TYPE=  @host@
+ 
+ # Tcl and Tk config info from --with-tcltk-includes and -libs options
+--- python-2.7.14/Modules/socketmodule.c.orig	2022-05-26 11:38:34.934246316 -0700
++++ python-2.7.14/Modules/socketmodule.c	2022-05-26 11:38:36.230193199 -0700
+@@ -3295,6 +3295,36 @@
+ \n\
+ Return the current host name.");
+ 
++#ifdef HAVE_SETHOSTNAME
++PyDoc_STRVAR(sethostname_doc,
++"sethostname(name)\n\n\
++Sets the hostname to name.");
++
++static PyObject *
++socket_sethostname(PyObject *self, PyObject *args)
++{
++    PyObject *hnobj;
++    Py_buffer buf;
++    int res, flag = 0;
++
++    if (!PyArg_ParseTuple(args, "S:sethostname", &hnobj)) {
++        PyErr_Clear();
++        if (!PyArg_ParseTuple(args, "O:sethostname", &hnobj))
++            return NULL;
++        flag = 1;
++    }
++    res = PyObject_GetBuffer(hnobj, &buf, PyBUF_SIMPLE);
++    if (!res) {
++        res = sethostname(buf.buf, buf.len);
++        PyBuffer_Release(&buf);
++    }
++    if (flag)
++        Py_DECREF(hnobj);
++    if (res)
++        return set_error();
++    Py_RETURN_NONE;
++}
++#endif
+ 
+ /* Python interface to gethostbyname(name). */
+ 
+@@ -4425,6 +4455,10 @@
+      METH_VARARGS, gethostbyaddr_doc},
+     {"gethostname",             socket_gethostname,
+      METH_NOARGS,  gethostname_doc},
++#ifdef HAVE_SETHOSTNAME
++    {"sethostname",             socket_sethostname,
++     METH_VARARGS,  sethostname_doc},
++#endif
+     {"getservbyname",           socket_getservbyname,
+      METH_VARARGS, getservbyname_doc},
+     {"getservbyport",           socket_getservbyport,
+--- python-2.7.14/Modules/Setup.dist.orig	2022-05-26 11:38:34.650257956 -0700
++++ python-2.7.14/Modules/Setup.dist	2022-05-26 11:38:36.066199921 -0700
+@@ -225,7 +225,7 @@
+ #
+ # First, look at Setup.config; configure may have set this for you.
+ 
+-#crypt cryptmodule.c # -lcrypt	# crypt(3); needs -lcrypt on some systems
++crypt cryptmodule.c  -lcrypt	# crypt(3); needs -lcrypt on some systems
+ 
+ 
+ # Some more UNIX dependent modules -- off by default, since these
+--- python-2.7.14/Doc/library/socket.rst.orig	2022-05-26 11:38:33.962286154 -0700
++++ python-2.7.14/Doc/library/socket.rst	2022-05-26 11:38:35.386227791 -0700
+@@ -513,6 +513,15 @@
+    .. versionadded:: 2.3
+ 
+ 
++.. function:: sethostname(name)
++
++   Sets the machine's hostname to *name*.
++
++   Availability: Unix.
++
++   .. versionadded:: 2.7
++
++
+ .. data:: SocketType
+ 
+    This is a Python type object that represents the socket object type. It is the
+--- python-2.7.14/configure.ac.orig	2022-05-26 11:38:35.166236808 -0700
++++ python-2.7.14/configure.ac	2022-05-26 11:38:36.414185658 -0700
+@@ -3093,7 +3093,7 @@
+  mremap nice pathconf pause plock poll pthread_init \
+  putenv readlink realpath \
+  select sem_open sem_timedwait sem_getvalue sem_unlink setegid seteuid \
+- setgid \
++ setgid sethostname \
+  setlocale setregid setreuid setsid setpgid setpgrp setuid setvbuf snprintf \
+  setlocale setregid setreuid setresuid setresgid \
+  setsid setpgid setpgrp setuid setvbuf snprintf \
+--- python-2.7.14/pyconfig.h.in.orig	2022-05-26 11:38:35.166236808 -0700
++++ python-2.7.14/pyconfig.h.in	2022-05-26 11:38:36.414185658 -0700
+@@ -610,6 +610,9 @@
+ /* Define if you have the 'setgroups' function. */
+ #undef HAVE_SETGROUPS
+ 
++/* Define to 1 if you have the `sethostname' function. */
++#undef HAVE_SETHOSTNAME
++
+ /* Define to 1 if you have the `setitimer' function. */
+ #undef HAVE_SETITIMER
+ 
+--- python-2.7.14/setup.py.orig	2022-05-26 11:38:35.174236480 -0700
++++ python-2.7.14/setup.py	2022-05-26 11:38:36.454184019 -0700
+@@ -39,8 +39,20 @@
+     """Add the directory 'dir' to the list 'dirlist' (at the front) if
+     1) 'dir' is not already in 'dirlist'
+     2) 'dir' actually exists, and is a directory."""
+-    if dir is not None and os.path.isdir(dir) and dir not in dirlist:
++    # WG tweak -- prevent adding anything at
++    # all under /usr, /lib or /include if we are cross
++    # compiling.  We can get away with this because we _never_ 
++    # cross compile under, for example, /usr/local/src.
++    # Required to avoid host pollution
++    if dir is None:
++        return
++    if cross_compiling and (dir.startswith("/usr") or 
++        dir.startswith("/lib") or
++        dir.startswith("/include")):
++            return
++    if os.path.isdir(dir) and dir not in dirlist:
+         dirlist.insert(0, dir)
++    # End WG tweak
+ 
+ def macosx_sdk_root():
+     """
+@@ -507,6 +519,20 @@
+             add_dir_to_list(self.compiler.include_dirs,
+                             sysconfig.get_config_var("INCLUDEDIR"))
+ 
++        # WG tweak mentioned in cmbuild.sh.
++        # Add Watchguard Specific Directory. by Jeongil Park
++        try:
++            dirs = os.getenv("WGLIBDIR").split()
++            for dir in dirs:
++                add_dir_to_list(self.compiler.library_dirs, dir)
++            dirs = os.getenv("WGINCLUDEDIR").split()
++            for dir in dirs:
++                add_dir_to_list(self.compiler.include_dirs, dir)
++        except AttributeError:
++            # Variable is not Defined..
++            pass
++        # end WG tweak
++
+         try:
+             have_unicode = unicode
+         except NameError:
+@@ -579,6 +605,18 @@
+         # on pretty much any POSIXish platform.
+         #
+ 
++        # WG tweak -- display list of dirs we will search
++        # for module prerequisites
++        print "==== Directories searched for module prerequisites:"
++        print "== lib_dirs =="
++        for lib in lib_dirs:
++            print lib
++        print "== inc_dirs =="
++        for inc in inc_dirs:
++            print inc
++        print "==== End of module prerequisite directories"
++        # End WG tweak
++
+         # Some modules that are normally always on:
+         #exts.append( Extension('_weakref', ['_weakref.c']) )
+ 
+@@ -776,17 +814,24 @@
+             else:
+                 readline_extra_link_args = ()
+ 
++            # WG Tweak -- avoid polluting result with -L/usr/lib/termcap when cross compiling.
++            if cross_compiling:
++                termcap_libs = []
++            else:
++                termcap_libs = ['/usr/lib/termcap']
++
+             readline_libs = ['readline']
+             if readline_termcap_library:
+                 pass # Issue 7384: Already linked against curses or tinfo.
+             elif curses_library:
+                 readline_libs.append(curses_library)
+             elif self.compiler.find_library_file(lib_dirs +
+-                                                     ['/usr/lib/termcap'],
++                                                     termcap_libs,
+                                                      'termcap'):
+                 readline_libs.append('termcap')
++            # End WG Tweak
+             exts.append( Extension('readline', ['readline.c'],
+-                                   library_dirs=['/usr/lib/termcap'],
++                                   library_dirs=termcap_libs,
+                                    extra_link_args=readline_extra_link_args,
+                                    libraries=readline_libs) )
+         else:
+--- python-2.7.14/Lib/test/test_socket.py.orig	2022-05-26 11:38:34.514263529 -0700
++++ python-2.7.14/Lib/test/test_socket.py	2022-05-26 11:38:35.886207297 -0700
+@@ -367,6 +367,26 @@
+         if not fqhn in all_host_names:
+             self.fail("Error testing host resolution mechanisms. (fqdn: %s, all: %s)" % (fqhn, repr(all_host_names)))
+ 
++    @unittest.skipUnless(hasattr(socket, 'sethostname'), "test needs socket.sethostname()")
++    @unittest.skipUnless(hasattr(socket, 'gethostname'), "test needs socket.gethostname()")
++    def test_sethostname(self):
++        oldhn = socket.gethostname()
++        try:
++            socket.sethostname('new')
++        except socket.error as e:
++            if e.errno == errno.EPERM:
++                self.skipTest("test should be run as root")
++            else:
++                raise
++        try:
++            # running test as root!
++            self.assertEqual(socket.gethostname(), 'new')
++            # Should work with bytes objects too
++            socket.sethostname(b'bar')
++            self.assertEqual(socket.gethostname(), 'bar')
++        finally:
++            socket.sethostname(oldhn)
++
+     @unittest.skipUnless(hasattr(sys, 'getrefcount'),
+                          'test needs sys.getrefcount()')
+     def testRefCountGetNameInfo(self):
+--- python-2.7.14/configure.orig	2022-05-26 11:38:35.166236808 -0700
++++ python-2.7.14/configure	2022-05-26 11:38:36.410185822 -0700
+@@ -10562,7 +10562,7 @@
+  mremap nice pathconf pause plock poll pthread_init \
+  putenv readlink realpath \
+  select sem_open sem_timedwait sem_getvalue sem_unlink setegid seteuid \
+- setgid \
++ setgid sethostname \
+  setlocale setregid setreuid setsid setpgid setpgrp setuid setvbuf snprintf \
+  setlocale setregid setreuid setresuid setresgid \
+  setsid setpgid setpgrp setuid setvbuf snprintf \

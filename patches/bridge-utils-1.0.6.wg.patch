@@ -1,0 +1,16 @@
+WatchGuard patches to sources for bridge-utils-1.0.6 as of
+Thu May 26 11:25:25 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- bridge-utils-1.0.6/libbridge/libbridge.h.orig	2022-05-26 11:25:25.182570093 -0700
++++ bridge-utils-1.0.6/libbridge/libbridge.h	2022-05-26 11:25:25.262566826 -0700
+@@ -20,6 +20,7 @@
+ #define _LIBBRIDGE_H
+ 
+ #include <net/if.h>
++#include <linux/in6.h>
+ #include <linux/if_bridge.h>
+ 
+ struct bridge_id

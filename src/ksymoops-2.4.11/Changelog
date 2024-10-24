@@ -1,0 +1,298 @@
+2005-01-09  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.11
+
+	* Tweak nm command when target is NULL.  Marty Leisner.
+
+2004-11-21  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.10
+
+	* Fix typo in man page.
+	* Unlike syslogd, syslog-ng does not prefix lines with ' kernel:'.
+	  Handle both formats.  Reported by gentoo.
+	* Explictly pass --target on calls to nm and objdump.  Resolves
+	  cases where objdump/nm complain 'File format is ambiguous'.
+	  Robin Johnson.
+
+2003-03-20  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.9
+
+	* For code lines that dump before EIP and have variable length
+	  instructions, decode in two chunks with suitable headings.
+	* Fix broken mips64 address mapping.  Maciej W. Rozycki.
+	* Pass more mips registers.  Maciej W. Rozycki.
+	* Add INSTALL note about broken distributions.  Reported by
+	  James W. Laferriere.
+
+2002-11-25  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.8
+
+	* Fix regex for ia64 'Bank nn' message.
+	* Strip leading '+' from lines.
+
+2002-10-13  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.7
+
+	* Add BFD_PREFIX, DEF_TARGET, DEF_ARCH, CROSS options to Makefile to
+	  support building ksymoops for cross compilation and debugging.
+	  Greg Banks, modified by Keith Owens.
+	* Add cross compile documentation to INSTALL and man page.  Keith Owens.
+	* Add DEF_TARGET, DEF_ARCH to ksymoops.c to build ksymoops for cross
+	  compile.  Attempt to set the default value for the -e flag if build
+	  and cross environments have different endianess.  Greg Banks.
+	* Extends Oops_truncate_address() to deal with the ckseg0/ kseg0/xkphys
+	  physical address alias confusion on mips64 (addresses appear in the
+	  oops text as 0xffffffff8xxxxxxx, 0x8xxxxxxx, or 0xa80000000xxxxxxx,
+	  but are all the same physical address).  Greg Banks.
+	* Calls Oops_truncate_address() from Oops_trace_line() so that the call
+	  trace is subject to the address fix.  Greg Banks.
+	* Handle exported symbols in sbss sections.  Keith Owens.
+	* White space cleanup.
+	* Add IA64 MCA support.
+
+2002-07-20  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.6
+
+	* m68k call trace does not have trailing ' '.  Reported by
+	  Richard Zidlicky.
+	* MIPS has a hole in the register dump, skip $26 and $27 (k0, k1).
+	  Maciej W. Rozycki.
+	* Only print decoded registers if they resolve to kernel symbols.
+
+2002-03-18  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.5
+
+	* Add x86-64 support.  Andi Kleen.
+	* Clean up and generalize register dumps.
+	* Print blank lines between each major block of output for readability.
+
+2002-03-01  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.4
+
+	* Defeat stupid gcc warning about ignored trigraphs.
+	* Fix truncate mask.  Hugh Dickens.
+	* Ignore syslog-ng prefix.
+	* Handle GPLONLY prefix in ksyms.
+	* Differentiate between i370/cris and arm register lines.
+	* Handle arm lr (last return).
+	* Handle alpha ra (return address).
+
+2001-09-21  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.3
+
+	* Add Pid:.
+	* Add -A "address list".  Idea pinched from Randy Dunlap's ksysmap.
+
+2001-08-29  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.2
+
+	* Add STATIC and DYNAMIC variables to Makefile for build flexibility.
+	  Maciej W. Rozycki.
+	* Handle multiple call traces from sysrq-t.
+	* Cris support.  Hans-Peter Nilsson.
+	* Regname cleanup.
+	* Fix incorrect adjustment for bss variables.
+	* Add --ignore-insmod-path (-i) and --ignore-insmod-all (-I) flags,
+	  mainly for initrd filenames.
+	* Add --truncate (-T) flag for mixed 32/64 bit symbol sources.
+
+2001-03-17  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.1
+
+	* Accept any 'Bad ' text in EIP.
+	* Add long option names.
+	* Recent modutils has support for ksymoops, update ksymoops man page.
+	* White space clean up.
+	* Remove deprecated gcc extensions.
+
+2001-01-05  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.4.0
+
+	* Clone from ksymoops 2.3.6.
+	* Correct DEF_VMLINUX.  Eirikur Hjartarson.
+
+2001-01-01  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.3.6
+
+	* Add INSTALL_MANDIR to Makefile and spec.
+	* Extra IA64 lines.
+	* Alpha changed 'Trace: '  to 'Trace:'.
+	* Add note about using bfd from non-standard location.
+
+2000-11-06  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.3.5
+
+	* Handle SGI kdb initial report.
+	* Static link against libbfd, libiberty to stop version problems.
+	  Suggested by HJ Lu.
+	* Add BUG to printed text.
+	* Add wait_on_irq lines to printed text.
+	* Handle weak references that have been resolved.
+	* Support for IA64.
+	* Add mandir to spec file.
+
+	Ross Patterson <Ross.Patterson@CA.Com>
+	* Recognize s390 kernel PSW and registers.
+	* Don't try to decode s390 user PSW and registers.
+	* Set default target and architecture on recognition of i370 or s390
+	  kernel PSW (ala Oops_set_eip()).
+
+2000-03-29  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.3.4
+
+	* Support for s390 messages.
+	* Handle Bad EIP value.
+	* Allow any genksyms prefix.
+	* Handle SGI kdb backtrace.
+	* Detect merged system map and extract module data.
+	* Replace tmpnam with mkstemp and honour TMPDIR.  Requested by
+	  Joseph S. Myers.
+	* Document how to use ksymoops to decode XFree86 error reports.
+	* Fix Makefile bug that stopped the use of RPM_OPT_FLAGS.
+	  Reported by Ingo Oeser.
+
+1999-10-21  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.3.3
+
+	* Support for IKD patch messages.
+	* Support for i370 messages.
+	* Somebody thought it was a good idea to change the Alpha registers
+	  from "r" to "v", "t", "s" and "a".
+	* Handle Sparc spin_lock stuck.
+	* Handle kernel 2.2 2gig prefix on genksyms.
+	* Ignore address mismatches on ___[fbsahi]_.* symbols.
+	* Handle Andi Kleen's multi cpu traceback patch.
+	* Add RPM spec file.
+
+1999-10-19  Keith Owens  <kaos@ocs.com.au>
+
+	ksymoops 2.3.2
+
+	* Change version number to track the kernel.
+	* Load into PRCS repository, 0.6 versions as 2.3.0, 0.7 versions as
+	  2.3.1.
+
+Fri Jun 18 15:10:38 EST 1999
+Version 0.7c
+Update README to note that "Yes, Virginia, there *is* a manual page".
+Also ask people not to send me Oops reports unless there is something
+wrong with ksymoops.
+
+Thu Jun 10 19:00:21 1999
+Version 0.7b
+Correct typo in Makefile.
+
+Sun Jun  6 10:24:50 EST 1999
+Version 0.7a
+Support for Alpha spinlock messages.
+
+Wed Jun  2 10:18:16 EST 1999
+Version 0.7
+Some of the changes in this version appeared in 2.2.x-ac kernels but
+never made it into the main kernel.
+Move code outside the kernel.
+Add manual page.
+Performance improvements in regular expression processing.
+Convert all tabs to spaces on input.  Simplifies and speeds up pattern
+matching as well as catching users who hand type Oops using tabs.
+Remove CR and nulls from input lines.
+Use __insmod symbols when insmod creates them.
+Changed the default to short lines, with -S option for users with large
+screens.
+Changed : to ; in ksymoops output.  Avoids problems when feeding
+ksymoops text back into itself.
+Remove all stderr, use stdout instead.  Too many users were only
+mailing stdout :(.
+Added -x toggle, print offsets and lengths in hex or decimal, default
+is hex.
+Added -a and -t options to allow cross system debugging.
+Replace -c code_bytes option with -e.
+Sparc and Alpha updates.
+Include module name in symbol mappings.
+Support for spinlock and sysrq showPc diagnostics.
+Major internal rewrite.
+
+Tue Jan  5 19:26:02 EST 1999
+Version 0.6e
+Added to kernel.
+
+Mon Jan  4 09:48:13 EST 1999
+Version 0.6d
+Add ARM support.
+
+Thu Nov 26 16:37:46 EST 1998
+Version 0.6c
+Typo in oops_code.
+Add -c option.
+Add -1 option.
+Report if options were specified or defaulted.
+
+Fri Nov  6 10:38:42 EST 1998
+Version 0.6b
+Remove false warnings when comparing ksyms and lsmod.
+
+Tue Nov  3 23:33:04 EST 1998
+Version 0.6a
+Performance inprovements.
+
+Tue Nov  3 02:31:01 EST 1998
+Version 0.6
+Read lsmod (/proc/modules).
+Ignore addresses 0-4095 when mapping address to symbol.
+Discard default objects if -o specified.
+Oops file must be regular.
+Add "invalid operand" to Oops_print.
+Move "Using_Version" copy to map.c.
+Add Makefile defaults for vmlinux, ksyms, objects, System.map, lsmod.
+Minor adjustment to re for ppc.
+Minor adjustment to re for objdump lines with <_EIP+xxx>.
+Convert from a.out to bfd, using same format as ksymoops.
+Added MIPS.
+PPC handling based on patches by "Ryan Nielsen" <ran@krazynet.com>
+
+Wed Oct 28 23:14:55 EST 1998
+Version 0.5
+No longer read vmlinux by default, it only duplicates System.map.
+
+Wed Oct 28 13:47:38 EST 1998
+Version 0.4
+Split into separate sources.
+
+Mon Oct 26 00:01:47 EST 1998
+Version 0.3c
+Add alpha (arm) processing.
+
+Mon Oct 26 00:01:47 EST 1998
+Version 0.3b
+Add sparc processing.
+Handle kernel symbol versions.
+
+Fri Oct 23 13:11:20 EST 1998
+Version 0.3
+Add -follow to find command for people who use symlinks to modules.
+Add Version_ checking.
+
+Thu Oct 22 22:28:30 EST 1998
+Version 0.2.
+Generalise text prefix handling.
+Handle messages on Code: line.
+Format addresses with leading zeroes.
+Minor bug fixes.
+
+Wed Oct 21 23:28:48 EST 1998
+Version 0.1.  Rewrite from scratch in C.

@@ -1,0 +1,331 @@
+/*
+ * P2020 RDB Device Tree Source
+ *
+ * Copyright 2009-2010 Freescale Semiconductor Inc.
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ */
+
+/include/ "fsl/p2020si-pre.dtsi"
+
+/ {
+	model = "fsl,P2020RDB";
+	compatible = "fsl,P2020RDB";
+
+	aliases {
+		ethernet0 = &enet0;
+		ethernet1 = &enet1;
+		serial0 = &serial0;
+		serial1 = &serial1;
+		pci0 = &pci0;
+		pci1 = &pci1;
+	};
+
+	memory {
+		device_type = "memory";
+	};
+
+	lbc: localbus@ffe05000 {
+		reg = <0 0xffe05000 0 0x1000>;
+		interrupts = <19 2>;
+		interrupt-parent = <&mpic>;
+
+		/* NOR, NAND Flashes */
+		ranges = <0x0 0x0 0x0 0xefe00000 0x00200000
+			  0x1 0x0 0x0 0xffa00000 0x00040000>;
+
+		nor@0,0 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "cfi-flash";
+			reg = <0x0 0x0 0x200000>;
+			bank-width = <2>;
+			device-width = <1>;
+
+			partition@00000000 {
+				/*128KB*/
+				reg = <0x00000000 0x00020000>;
+				label = "NOR (RW) WG CFG0";
+			};
+
+			partition@00020000 {
+				/*64KB*/
+				reg = <0x00020000 0x00010000>;
+				label = "NOR (RW) WG CFG1";
+			};
+
+			partition@00030000 {
+				/*64KB*/
+				reg = <0x00030000 0x00010000>;
+				label = "NOR (RW) WG MFG DATA";
+			};
+
+			partition@00040000 {
+				/*64KB*/
+				reg = <0x00040000 0x000B0000>;
+				label = "NOR (RW) WG bootOpt Data & reserved";
+			};
+
+			partition@000F0000 {
+				/*64KB*/
+				reg = <0x000F0000 0x00010000>;
+				label = "NOR (RW) WG U-Boot ENV";
+			};
+
+			partition@00100000 {
+				/*512KB*/
+				reg = <0x00100000 0x00080000>;
+				label = "NOR (RW) WG U-Boot Image";
+			};
+
+			partition@00180000 {
+				/*512KB*/
+				reg = <0x00180000 0x00080000>;
+				label = "NOR (RW) WG U-Boot FAILSAFE";
+			};
+
+		};
+
+		nand@1,0 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "fsl,p2020-fcm-nand",
+				     "fsl,elbc-fcm-nand";
+			reg = <0x1 0x0 0x00040000>;
+
+			partition@00000000 {
+				/* 128KB for DTB Image */
+				reg = <0x00000000 0x00020000>;
+				label = "NAND (RW) WG DTB Image";
+			};
+
+			partition@00020000 {
+				/* 5MB for sysa kernel */
+				reg = <0x00020000 0x00500000>;
+				label = "NAND (RW) WG SYSA Kernel";
+			};
+
+			partition@00520000 {
+				/* 121MB for sysa code */
+				reg = <0x00520000 0x079e0000>;
+				label = "NAND (RW) WG SYSA_CODE";
+			};
+
+			partition@07f00000 {
+				/* 352MB for sysa data */
+				reg = <0x07f00000 0x16000000>;
+				label = "NAND (RW) WG SYSA_DATA";
+			};
+
+			partition@1df00000 {
+				/* 5MB for sysb kernel */
+				reg = <0x1df00000 0x00500000>;
+				label = "NAND (RW) WG SYSB Kernel";
+			};
+
+			partition@1e400000 {
+				/* 24MB for sysb code */
+				reg = <0x1e400000 0x01800000>;
+				label = "NAND (RW) WG SYSB_CODE";
+			};
+
+			partition@1fc00000 {
+				/* 4MB for kdump */
+				reg = <0x1fc00000 0x00400000>;
+				label = "NAND (RW) WG KDUMP";
+			};
+		};
+	};
+
+	soc: soc@ffe00000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		device_type = "soc";
+		compatible = "fsl,p2020-immr", "simple-bus";
+		ranges = <0x0  0x0 0xffe00000 0x100000>;
+		bus-frequency = <0>;		// Filled out by uboot.
+
+		i2c@3000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			cell-index = <0>;
+			compatible = "fsl-i2c";
+			reg = <0x3000 0x100>;
+			interrupts = <43 2>;
+			interrupt-parent = <&mpic>;
+			dfsrr;
+			rtc@32 {
+				compatible = "ricoh,rs5c372a";
+				reg = <0x32>;
+			};
+			hwmon@2d {
+				compatible = "national,w83793";
+				reg = <0x2d>;
+			};
+		};
+
+		spi@7000 {
+			cell-index = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl,espi";
+			reg = <0x7000 0x1000>;
+			interrupts = <59 0x2>;
+			interrupt-parent = <&mpic>;
+			espi,num-ss-bits = <4>;
+			mode = "cpu";
+
+			fsl_m25p80@0 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				compatible = "fsl,espi-flash";
+				reg = <0>;
+				linux,modalias = "fsl_m25p80";
+				modal = "s25sl128b";
+				spi-max-frequency = <40000000>;
+				mode = <0>;
+
+				partition@0 {
+					/* 512KB for u-boot Bootloader Image */
+					reg = <0x0 0x00080000>;
+					label = "SPI (RO) U-Boot Image";
+					read-only;
+				};
+
+				partition@80000 {
+					/* 512KB for DTB Image */
+					reg = <0x00080000 0x00080000>;
+					label = "SPI (RO) DTB Image";
+					read-only;
+				};
+
+				partition@100000 {
+					/* 4MB for Linux Kernel Image */
+					reg = <0x00100000 0x00400000>;
+					label = "SPI (RO) Linux Kernel Image";
+					read-only;
+				};
+
+				partition@500000 {
+					/* 4MB for Compressed RFS Image */
+					reg = <0x00500000 0x00400000>;
+					label = "SPI (RO) Compressed RFS Image";
+					read-only;
+				};
+
+				partition@900000 {
+					/* 7MB for JFFS2 based RFS */
+					reg = <0x00900000 0x00700000>;
+					label = "SPI (RW) JFFS2 RFS";
+				};
+			};
+		};
+
+		usb@22000 {
+			phy_type = "ulpi";
+		};
+
+		enet0: ethernet@24000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			cell-index = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <0x24000 0x1000>;
+			ranges = <0x0 0x24000 0x1000>;
+			local-mac-address = [ 00 00 00 00 00 00 ];
+			interrupts = <29 2 30 2 34 2>;
+			interrupt-parent = <&mpic>;
+			fixed-link = <1 1 1000 0 0>;
+			phy-connection-type = "rgmii-id";
+
+			mdio@520 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				compatible = "fsl,gianfar-mdio";
+				reg = <0x520 0x20>;
+
+				phy0: ethernet-phy@0 {
+					interrupt-parent = <&mpic>;
+					interrupts = <0 1>;
+					reg = <0x11>;
+				};
+				phy1: ethernet-phy@1 {
+					interrupt-parent = <&mpic>;
+					interrupts = <0 1>;
+					reg = <0x10>;
+				};
+			};
+		};
+
+		enet1: ethernet@26000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			cell-index = <2>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "gianfar";
+			reg = <0x26000 0x1000>;
+			ranges = <0x0 0x26000 0x1000>;
+			local-mac-address = [ 00 00 00 00 00 00 ];
+			interrupts = <31 2 32 2 33 2>;
+			interrupt-parent = <&mpic>;
+			phy-handle = <&phy1>;
+			fixed-link = <2 1 1000 0 0>;
+			phy-connection-type = "rgmii-id";
+		};
+
+		sdhci@2e000 {
+			compatible = "fsl,p2020-esdhc", "fsl,esdhc";
+			reg = <0x2e000 0x1000>;
+			interrupts = <72 0x2>;
+			interrupt-parent = <&mpic>;
+			fsl,sdhci-dma-broken;
+			fsl,sdhci-adjust-timeout;
+			/* Filled in by U-Boot */
+			clock-frequency = <0>;
+		};
+	};
+
+
+	pci0: pcie@ffe08000 {
+		reg = <0 0xffe08000 0 0x1000>;
+		status = "disabled";
+	};
+
+	pci1: pcie@ffe09000 {
+		reg = <0 0xffe09000 0 0x1000>;
+		ranges = <0x2000000 0x0 0xa0000000 0 0xa0000000 0x0 0x20000000
+			  0x1000000 0x0 0x00000000 0 0xffc10000 0x0 0x10000>;
+		pcie@0 {
+			ranges = <0x2000000 0x0 0xa0000000
+				  0x2000000 0x0 0xa0000000
+				  0x0 0x20000000
+
+				  0x1000000 0x0 0x0
+				  0x1000000 0x0 0x0
+				  0x0 0x100000>;
+		};
+	};
+
+	pci2: pcie@ffe0a000 {
+		reg = <0 0xffe0a000 0 0x1000>;
+		ranges = <0x2000000 0x0 0x80000000 0 0x80000000 0x0 0x20000000
+			  0x1000000 0x0 0x00000000 0 0xffc00000 0x0 0x10000>;
+		pcie@0 {
+			ranges = <0x2000000 0x0 0x80000000
+				  0x2000000 0x0 0x80000000
+				  0x0 0x20000000
+
+				  0x1000000 0x0 0x0
+				  0x1000000 0x0 0x0
+				  0x0 0x100000>;
+		};
+	};
+};
+
+/include/ "fsl/p2020si-post.dtsi"

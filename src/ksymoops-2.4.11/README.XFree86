@@ -1,0 +1,32 @@
+XFree86 produces error reports very much like the kernel output.  For
+example, this is a sample XFree86 report.
+
+eip: 080b3cdc   eflags: 00013286
+eax: 082e4268   ebx: caaee805   ecx: 000000ed   edx: 0828ffd8
+esi: 082e41b0   edi: 082ae628   ebp: bffffa4c   esp: bffffa14
+Stack: 08348794 082e41b0 bffffa4c 0809c4be 082ae628 02400014 c0000001 00000002
+       08348794 082e41b0 082ae628 05bf64a0 08348794 02000000 bffffa7c 080b43bc
+       082e41b0 000000ed 000000ed 00000004 082ae628 00000000 bffffa94 00000000
+       00000000 082906a8 bffffcac 080968d3 082ae628 00000020 bffffcac 0809695b
+
+Call Trace: 0809c4be 080b43bc 080968d3 0809695b 080783b1 0806f7a5 080ba1e7
+       080a53bd 080a5628 080a5314 0815f734 08096848 080a51e2 080a51fb 081b844c
+       0806b1b0 0806b1d1 080a4d58 081b844c 0806b1b0
+
+Code: 39 4b 04 75 ef 85 db 74 76 85 d2 75 1a 8b 56 78 8b 03 89 42
+
+All you need is a small adjustment to the EIP line (ksymoops expects
+kernel format with a bracketed address) plus something that looks like
+a System.map but is actually generated from the failing program and you
+can use ksymoops on XFree86 programs.
+
+Generate the map by
+
+objdump -T /usr/X11R6/bin/failing_program | \
+	fgrep -v '*UND*' | \
+	awk '{print $1, $2, $NF}' > map
+
+Feed the oops with an adjusted EIP plus the map to ksymoops and send
+the decoded result to the person responsible for the failing program.
+
+sed -e 's/\(eip: *\)\([^ ]*\)/\1[<\2>]/' < oops | ksymoops -VKLO -m map

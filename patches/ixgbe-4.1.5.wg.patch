@@ -1,0 +1,3148 @@
+WatchGuard patches to sources for ixgbe-4.1.5 as of
+Thu May 26 11:33:14 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- ixgbe-4.1.5/SUMS.orig	2022-05-26 11:33:13.051434016 -0700
++++ ixgbe-4.1.5/SUMS	1969-12-31 16:00:00.000000000 -0800
+@@ -1,51 +0,0 @@
+-32350    10 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/ixgbe.spec
+-09576     6 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/scripts/set_irq_affinity
+-56511     7 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/pci.updates
+-15674    45 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/README
+-56763     8 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/ixgbe.7
+-03018     4 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_dcb_82598.h
+-00384    45 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_api.c
+-25929     7 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_osdep.h
+-44247    52 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/kcompat.c
+-55721     4 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_sriov.h
+-04371    73 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_phy.c
+-10046     2 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_82598.h
+-56780     8 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_common.h
+-05084   153 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_type.h
+-40817     2 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/Kbuild
+-38346    87 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_x550.c
+-17046   138 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/kcompat.h
+-30951    21 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_dcb.c
+-53143     6 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_dcb.h
+-54301     8 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_debugfs.c
+-10210     8 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_sysfs.c
+-32280   296 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_main.c
+-12190     1 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/Module.supported
+-31928   105 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_ethtool.c
+-10362    36 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe.h
+-10067    23 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_dcb_nl.c
+-62080    76 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_82599.c
+-10326    14 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/Makefile
+-03057     8 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_phy.h
+-02089     2 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_osdep2.h
+-23422     3 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_x540.h
+-16759    17 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_dcb_82599.c
+-14576    27 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_procfs.c
+-00516     5 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_x550.h
+-23794    40 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_82598.c
+-19713    45 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_ptp.c
+-14415     7 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_mbx.h
+-15112    39 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_sriov.c
+-21099    10 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_dcb_82598.c
+-38247     5 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_dcb_82599.h
+-53172    29 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_x540.c
+-44113    10 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_api.h
+-43555    37 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_lib.c
+-50343    29 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_fcoe.c
+-54750     3 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_fcoe.h
+-58442    20 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_mbx.c
+-27260     3 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_82599.h
+-19027    29 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/kcompat_ethtool.c
+-33462   134 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_common.c
+-50167    31 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/src/ixgbe_param.c
+-42571    18 /tmp/tmp.1CVOWcJx8Q/ixgbe-4.1.5/COPYING
+--- ixgbe-4.1.5/ixgbe.spec.orig	2022-05-26 11:33:13.055433852 -0700
++++ ixgbe-4.1.5/ixgbe.spec	1969-12-31 16:00:00.000000000 -0800
+@@ -1,398 +0,0 @@
+-Name: ixgbe
+-Summary: Intel(R) 10GbE PCI Express Ethernet Connection
+-Version: 4.1.5
+-Release: 1
+-Source: %{name}-%{version}.tar.gz
+-Vendor: Intel Corporation
+-License: GPL
+-ExclusiveOS: linux
+-Group: System Environment/Kernel
+-Provides: %{name}
+-URL: http://www.intel.com/network/connectivity/products/server_adapters.htm
+-BuildRoot: %{_tmppath}/%{name}-%{version}-root
+-# do not generate debugging packages by default - newer versions of rpmbuild
+-# may instead need:
+-#%define debug_package %{nil}
+-%debug_package %{nil}
+-# macros for finding system files to update at install time (pci.ids, pcitable)
+-%define find() %(for f in %*; do if [ -e $f ]; then echo $f; break; fi; done)
+-%define _pciids   /usr/share/pci.ids        /usr/share/hwdata/pci.ids
+-%define _pcitable /usr/share/kudzu/pcitable /usr/share/hwdata/pcitable /dev/null
+-%define pciids    %find %{_pciids}
+-%define pcitable  %find %{_pcitable}
+-Requires: kernel, fileutils, findutils, gawk, bash
+-
+-%description
+-This package contains the Linux driver for the Intel(R) 10GbE PCI Express Family of Server Adapters.
+-
+-%prep
+-%setup
+-
+-%build
+-make -C src clean
+-make -C src
+-
+-%install
+-make -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} install
+-# Append .new to driver name to avoid conflict with kernel RPM
+-cd %{buildroot}
+-find lib -name "ixgbe.*o" -exec mv {} {}.new \; \
+-         -fprintf %{_builddir}/%{name}-%{version}/file.list "/%p.new\n"
+-
+-
+-%clean
+-rm -rf %{buildroot}
+-
+-%files -f file.list
+-%defattr(-,root,root)
+-%{_mandir}/man7/ixgbe.7.gz
+-%doc COPYING
+-%doc README
+-%doc file.list
+-%doc pci.updates
+-
+-%post
+-FL="%{_docdir}/%{name}-%{version}/file.list
+-    %{_docdir}/%{name}/file.list"
+-FL=$(for d in $FL ; do if [ -e $d ]; then echo $d; break; fi;  done)
+-
+-if [ -d /usr/local/lib/%{name} ]; then
+-	rm -rf /usr/local/lib/%{name}
+-fi
+-if [ -d /usr/local/share/%{name} ]; then
+-	rm -rf /usr/local/share/%{name}
+-fi
+-
+-# Save old drivers (aka .o and .o.gz)
+-echo "original pci.ids saved in /usr/local/share/%{name}";
+-if [ "%{pcitable}" != "/dev/null" ]; then
+-	echo "original pcitable saved in /usr/local/share/%{name}";
+-fi
+-for k in $(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-]*\).*/\1/' $FL) ; 
+-do
+-	d_drivers=/lib/modules/$k
+-	d_usr=/usr/local/share/%{name}/$k
+-	mkdir -p $d_usr
+-	cd $d_drivers; find . -name %{name}.*o -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}_*.*o -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}.*o.gz -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}_*.*o.gz -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cp --parents %{pciids} /usr/local/share/%{name}/
+-	if [ "%{pcitable}" != "/dev/null" ]; then
+-		cp --parents %{pcitable} /usr/local/share/%{name}/
+-	fi
+-done
+-
+-# Add driver link
+-for f in $(sed 's/\.new$//' $FL) ; do
+-	ln -f $f.new $f 
+-done
+-
+-# Check if kernel version rpm was built on IS the same as running kernel
+-BK_LIST=$(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-]*\).*/\1/' $FL)
+-MATCH=no
+-for i in $BK_LIST
+-do
+-	if [ $(uname -r) == $i ] ; then
+-		MATCH=yes
+-		break
+-	fi
+-done
+-if [ $MATCH == no ] ; then
+-	echo -n "WARNING: Running kernel is $(uname -r).  "
+-	echo -n "RPM supports kernels (  "
+-	for i in $BK_LIST
+-	do
+-		echo -n "$i  "
+-	done
+-	echo ")"
+-fi
+-
+-LD="%{_docdir}/%{name}";
+-if [ -d %{_docdir}/%{name}-%{version} ]; then
+-	LD="%{_docdir}/%{name}-%{version}";
+-fi
+-
+-#Yes, this really needs bash
+-bash -s %{pciids} \
+-	%{pcitable} \
+-	$LD/pci.updates \
+-	$LD/pci.ids.new \
+-	$LD/pcitable.new \
+-	%{name} \
+-<<"END"
+-#! /bin/bash
+-# $1 = system pci.ids file to update
+-# $2 = system pcitable file to update
+-# $3 = file with new entries in pci.ids file format
+-# $4 = pci.ids output file
+-# $5 = pcitable output file
+-# $6 = driver name for use in pcitable file
+-
+-exec 3<$1
+-exec 4<$2
+-exec 5<$3
+-exec 6>$4
+-exec 7>$5
+-driver=$6
+-IFS=
+-
+-# pattern matching strings
+-ID="[[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]]"
+-VEN="${ID}*"
+-DEV="	${ID}*"
+-SUB="		${ID}*"
+-TABLE_DEV="0x${ID}	0x${ID}	\"*"
+-TABLE_SUB="0x${ID}	0x${ID}	0x${ID}	0x${ID}	\"*"
+-
+-line=
+-table_line=
+-ids_in=
+-table_in=
+-vendor=
+-device=
+-ids_device=
+-table_device=
+-subven=
+-ids_subven=
+-table_subven=
+-subdev=
+-ids_subdev=
+-table_subdev=
+-ven_str=
+-dev_str=
+-sub_str=
+-
+-# force a sub-shell to fork with a new stdin
+-# this is needed if the shell is reading these instructions from stdin
+-while true
+-do
+-	# get the first line of each data file to jump start things
+-	exec 0<&3
+-	read -r ids_in
+-	if [ "$2" != "/dev/null" ];then
+-	exec 0<&4
+-	read -r table_in
+-	fi
+-
+-	# outer loop reads lines from the updates file
+-	exec 0<&5
+-	while read -r line
+-	do
+-		# vendor entry
+-		if [[ $line == $VEN ]]
+-		then
+-			vendor=0x${line:0:4}
+-			ven_str=${line#${line:0:6}}
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $VEN ||
+-				 0x${ids_in:0:4} < $vendor ]]
+-			do
+-				echo "$ids_in"
+-				read -r ids_in
+-			done
+-			echo "$line"
+-			if [[ 0x${ids_in:0:4} == $vendor ]]
+-			then
+-				read -r ids_in
+-			fi
+-
+-		# device entry
+-		elif [[ $line == $DEV ]]
+-		then
+-			device=`echo ${line:1:4} | tr "[:upper:]" "[:lower:]"`
+-			table_device=0x${line:1:4}
+-			dev_str=${line#${line:0:7}}
+-			ids_device=`echo ${ids_in:1:4} | tr "[:upper:]" "[:lower:]"`
+-			table_line="$vendor	$table_device	\"$driver\"	\"$ven_str|$dev_str\""
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $DEV ||
+-				 $ids_device < $device ]]
+-			do
+-				if [[ $ids_in == $VEN ]]
+-				then
+-					break
+-				fi
+-				if [[ $ids_device != ${ids_in:1:4} ]]
+-				then
+-					echo "${ids_in:0:1}$ids_device${ids_in#${ids_in:0:5}}"
+-				else
+-					echo "$ids_in"
+-				fi
+-				read -r ids_in
+-				ids_device=`echo ${ids_in:1:4} | tr "[:upper:]" "[:lower:]"`
+-			done
+-			if [[ $device != ${line:1:4} ]]
+-			then
+-				echo "${line:0:1}$device${line#${line:0:5}}"
+-			else
+-				echo "$line"
+-			fi
+-			if [[ $ids_device == $device ]]
+-			then
+-				read -r ids_in
+-			fi
+-			# add entry to pcitable
+-			if [ "$2" != "/dev/null" ];then
+-			exec 0<&4
+-			exec 1>&7
+-			while [[ $table_in != $TABLE_DEV ||
+-				 ${table_in:0:6} < $vendor ||
+-				 ( ${table_in:0:6} == $vendor &&
+-				   ${table_in:7:6} < $table_device ) ]]
+-			do
+-				echo "$table_in"
+-				read -r table_in
+-			done
+-			echo "$table_line"
+-			if [[ ${table_in:0:6} == $vendor &&
+-			      ${table_in:7:6} == $table_device ]]
+-			then
+-				read -r table_in
+-			fi
+-			fi
+-		# subsystem entry
+-		elif [[ $line == $SUB ]]
+-		then
+-			subven=`echo ${line:2:4} | tr "[:upper:]" "[:lower:]"`
+-			subdev=`echo ${line:7:4} | tr "[:upper:]" "[:lower:]"`
+-			table_subven=0x${line:2:4}
+-			table_subdev=0x${line:7:4}
+-			sub_str=${line#${line:0:13}}
+-			ids_subven=`echo ${ids_in:2:4} | tr "[:upper:]" "[:lower:]"`
+-			ids_subdev=`echo ${ids_in:7:4} | tr "[:upper:]" "[:lower:]"`
+-			table_line="$vendor	$table_device	$table_subven	$table_subdev	\"$driver\"	\"$ven_str|$sub_str\""
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $SUB ||
+-				 $ids_subven < $subven ||
+-				 ( $ids_subven == $subven && 
+-				   $ids_subdev < $subdev ) ]]
+-			do
+-				if [[ $ids_in == $VEN ||
+-				      $ids_in == $DEV ]]
+-				then
+-					break
+-				fi
+-				if [[ ! (${ids_in:2:4} == "1014" &&
+-					 ${ids_in:7:4} == "052C") ]]
+-				then
+-					if [[ $ids_subven != ${ids_in:2:4} || $ids_subdev != ${ids_in:7:4} ]]
+-					then
+-						echo "${ids_in:0:2}$ids_subven $ids_subdev${ids_in#${ids_in:0:11}}"
+-					else
+-						echo "$ids_in"
+-					fi
+-				fi
+-				read -r ids_in
+-				ids_subven=`echo ${ids_in:2:4} | tr "[:upper:]" "[:lower:]"`
+-				ids_subdev=`echo ${ids_in:7:4} | tr "[:upper:]" "[:lower:]"`
+-			done
+-			if [[ $subven != ${line:2:4} || $subdev != ${line:7:4} ]]
+-			then
+-				echo "${line:0:2}$subven $subdev${line#${line:0:11}}"
+-			else
+-				echo "$line"
+-			fi
+-			if [[ $ids_subven == $subven  &&
+-			      $ids_subdev == $subdev ]]
+-			then
+-				read -r ids_in
+-			fi
+-			# add entry to pcitable
+-			if [ "$2" != "/dev/null" ];then
+-			exec 0<&4
+-			exec 1>&7
+-			while [[ $table_in != $TABLE_SUB ||
+-				 ${table_in:14:6} < $table_subven ||
+-				 ( ${table_in:14:6} == $table_subven &&
+-				   ${table_in:21:6} < $table_subdev ) ]]
+-			do
+-				if [[ $table_in == $TABLE_DEV ]]
+-				then
+-					break
+-				fi
+-				if [[ ! (${table_in:14:6} == "0x1014" &&
+-					 ${table_in:21:6} == "0x052C") ]]
+-				then
+-					echo "$table_in"
+-				fi
+-				read -r table_in
+-			done
+-			echo "$table_line"
+-			if [[ ${table_in:14:6} == $table_subven &&
+-			      ${table_in:21:6} == $table_subdev ]]
+-			then
+-				read -r table_in
+-			fi
+-			fi
+-		fi
+-
+-		exec 0<&5
+-	done
+-
+-	# print the remainder of the original files
+-	exec 0<&3
+-	exec 1>&6
+-	echo "$ids_in"
+-	while read -r ids_in
+-	do
+-		echo "$ids_in"
+-	done
+-
+-	if [ "$2" != "/dev/null" ];then
+-	exec 0>&4
+-	exec 1>&7
+-	echo "$table_in"
+-	while read -r table_in
+-	do
+-		echo "$table_in"
+-	done
+-	fi
+-
+-	break
+-done <&5
+-
+-exec 3<&-
+-exec 4<&-
+-exec 5<&-
+-exec 6>&-
+-exec 7>&-
+-
+-END
+-
+-mv -f $LD/pci.ids.new  %{pciids}
+-if [ "%{pcitable}" != "/dev/null" ]; then
+-mv -f $LD/pcitable.new %{pcitable}
+-fi
+-
+-uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+-
+-%preun
+-# If doing RPM un-install
+-if [ $1 -eq 0 ] ; then
+-	FL="%{_docdir}/%{name}-%{version}/file.list
+-    		%{_docdir}/%{name}/file.list"
+-	FL=$(for d in $FL ; do if [ -e $d ]; then echo $d; break; fi;  done)
+-
+-	# Remove driver link
+-	for f in $(sed 's/\.new$//' $FL) ; do
+-		rm -f $f
+-	done
+-
+-	# Restore old drivers
+-	if [ -d /usr/local/share/%{name} ]; then
+-		cd /usr/local/share/%{name}; find . -name '%{name}.*o*' -exec cp --parents {} /lib/modules/ \;
+-		cd /usr/local/share/%{name}; find . -name '%{name}_*.*o*' -exec cp --parents {} /lib/modules/ \;
+-		rm -rf /usr/local/share/%{name}
+-	fi
+-fi
+-
+-%postun
+-uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+-
+--- ixgbe-4.1.5/src/ixgbe_type.h.orig	2022-05-26 11:33:13.103431887 -0700
++++ ixgbe-4.1.5/src/ixgbe_type.h	2022-05-26 11:33:13.231426646 -0700
+@@ -1828,6 +1828,7 @@
+ #define IXGBE_ETQS_LLI			0x20000000 /* bit 29 */
+ #define IXGBE_ETQS_QUEUE_EN		0x80000000 /* bit 31 */
+ 
++#ifndef CONFIG_WG_PLATFORM	// WG XD FBX-10648 CVE Backport
+ /*
+  * ETQF filter list: one static filter per filter consumer. This is
+  *		   to avoid filter collisions later. Add new filters
+@@ -1841,12 +1842,31 @@
+  *	LLDP (0x88CC):	 Filter 5
+  *	LACP (0x8809):	 Filter 6
+  */
++#else
++/*
++ * ETQF filter list: one static filter per filter consumer. This is
++ *		   to avoid filter collisions later. Add new filters
++ *		   here!!
++ *
++ * Current filters:
++ *	EAPOL 802.1x (0x888e): Filter 0
++ *	FCoE (0x8906):	 Filter 2
++ *	1588 (0x88f7):	 Filter 3
++ *	FIP  (0x8914):	 Filter 4
++ *	LLDP (0x88CC):	 Filter 5
++ *	LACP (0x8809):	 Filter 6
++ *	FC   (0x8808):	 Filter 7
++ */
++#endif
+ #define IXGBE_ETQF_FILTER_EAPOL		0
+ #define IXGBE_ETQF_FILTER_FCOE		2
+ #define IXGBE_ETQF_FILTER_1588		3
+ #define IXGBE_ETQF_FILTER_FIP		4
+ #define IXGBE_ETQF_FILTER_LLDP		5
+ #define IXGBE_ETQF_FILTER_LACP		6
++#ifdef CONFIG_WG_PLATFORM	// WG XD FBX-10648 CVE Backport
++#define IXGBE_ETQF_FILTER_FC		7
++#endif
+ /* VLAN Control Bit Masks */
+ #define IXGBE_VLNCTRL_VET		0x0000FFFF  /* bits 0-15 */
+ #define IXGBE_VLNCTRL_CFI		0x10000000  /* bit 28 */
+--- ixgbe-4.1.5/src/ixgbe_lib.c.orig	2022-05-26 11:33:13.095432214 -0700
++++ ixgbe-4.1.5/src/ixgbe_lib.c	2022-05-26 11:33:13.211427464 -0700
+@@ -671,6 +671,29 @@
+ 	return true;
+ }
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Limit RSS if we have too many CPUs
++// Return how many RSS queus we should have
++u8 wg_max_rss(int q)
++{
++	int k = num_online_cpus();
++
++	// If we don't have too many CPUs, return passed value
++	if (q >= k) return q;
++
++	// Too many CPUs, try to divide into groups
++	while (k > q)
++	if ((k % 2) == 0) k /= 2; else
++	if ((k % 3) == 0) k /= 3; else
++	if ((k % 5) == 0) k /= 5; else
++	if ((k % 7) == 0) k /= 7; else	k = q;
++
++	if (000&000)
++	printk(KERN_DEBUG "%s: MAC Max %d RSS %d\n", __FUNCTION__, q, k);
++
++	return k;
++}
++#endif
++
+ /**
+  * ixgbe_set_rss_queues: Allocate queues for RSS
+  * @adapter: board private structure to initialize
+@@ -688,6 +711,12 @@
+ 	f = &adapter->ring_feature[RING_F_RSS];
+ 	rss_i = f->limit;
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Limit RSS if we have too many CPUs
++	if (rss_i < num_online_cpus())
++	printk(KERN_INFO "ixgbe %s: rss limited to %2d\n",
++	       adapter->netdev->name, rss_i);
++#endif
++
+ 	f->indices = rss_i;
+ 	f->mask = IXGBE_RSS_16Q_MASK;
+ 
+--- ixgbe-4.1.5/src/ixgbe_phy.c.orig	2022-05-26 11:33:13.103431887 -0700
++++ ixgbe-4.1.5/src/ixgbe_phy.c	2022-05-26 11:33:13.223426973 -0700
+@@ -24,6 +24,9 @@
+ 
+ #include "ixgbe_api.h"
+ #include "ixgbe_common.h"
++#ifdef CONFIG_WG_PLATFORM	// WG XD FBX-5815
++#include "ixgbe.h"
++#endif
+ #include "ixgbe_phy.h"
+ 
+ STATIC void ixgbe_i2c_start(struct ixgbe_hw *hw);
+@@ -1320,6 +1323,9 @@
+ 	u8 cable_tech = 0;
+ 	u8 cable_spec = 0;
+ 	u16 enforce_sfp = 0;
++#ifdef CONFIG_WG_PLATFORM	// WG XD FBX-5815
++	struct ixgbe_adapter* adapter = (struct ixgbe_adapter*) hw->back;
++#endif
+ 
+ 	DEBUGFUNC("ixgbe_identify_sfp_module_generic");
+ 
+@@ -1581,9 +1587,37 @@
+ 	}
+ 
+ out:
++#ifdef CONFIG_WG_PLATFORM	// WG XD FBX-5815
++	// to avoid flooding of printk msgs in case the port is brought up, we will only
++	// print out info every 128 polls (4 min)
++	if ((adapter->sfp_poll_count & 0x7f) == 0x00) {
++		e_dev_info("@@ %s SFF id: %02x, sfp vendor: %06x, cable_tech: %02x, "
++			   "comp codes 1G: %02x, 10G: %02x, phy type: %04x, sfp_phy type: %04x\n",
++			   adapter->netdev->name, identifier, vendor_oui, cable_tech,
++			   comp_codes_1g, comp_codes_10g, hw->phy.type, hw->phy.sfp_type);
++	}
++	if (status == IXGBE_ERR_SFP_NOT_SUPPORTED) {
++		if ((adapter->sfp_poll_count & 0x7f) == 0x00)
++			e_dev_info("@@ SFP not supported. treat it as SFP_NOT_PRESENT ...\n");
++		status = IXGBE_ERR_SFP_NOT_PRESENT;
++		// doing the same as for tag "err_read_i2c_eeprom:"
++		hw->phy.sfp_type = ixgbe_sfp_type_not_present;
++		if (hw->phy.type != ixgbe_phy_nl) {
++			hw->phy.id = 0;
++			hw->phy.type = ixgbe_phy_unknown;
++		}
++	}
++	adapter->sfp_poll_count++;
++#endif
+ 	return status;
+ 
+ err_read_i2c_eeprom:
++#ifdef CONFIG_WG_PLATFORM	// WG XD FBX-5815
++	if ((adapter->sfp_poll_count & 0x7f) == 0x00)
++		printk(KERN_WARNING "@@ %s err_read_i2c_eeprom, sfp may not exist\n",
++			   adapter->netdev->name);
++	adapter->sfp_poll_count++;
++#endif
+ 	hw->phy.sfp_type = ixgbe_sfp_type_not_present;
+ 	if (hw->phy.type != ixgbe_phy_nl) {
+ 		hw->phy.id = 0;
+--- ixgbe-4.1.5/src/ixgbe_main.c.orig	2022-05-26 11:33:13.099432050 -0700
++++ ixgbe-4.1.5/src/ixgbe_main.c	2022-05-26 11:33:13.219427137 -0700
+@@ -334,6 +334,571 @@
+ 	clear_bit(__IXGBE_SERVICE_SCHED, &adapter->state);
+ }
+ 
++#ifdef CONFIG_WG_PLATFORM	// WG: XD FBX-2063 Dump Tx/Rx ring Desc
++struct ixgbe_reg_info {
++	u32 ofs;
++	char *name;
++};
++
++static const struct ixgbe_reg_info ixgbe_reg_info_tbl[] = {
++
++	/* General Registers */
++	{IXGBE_CTRL, "CTRL"},
++	{IXGBE_STATUS, "STATUS"},
++	{IXGBE_CTRL_EXT, "CTRL_EXT"},
++	{IXGBE_GRC, "GRC"},
++
++	/* PCIe */
++	{IXGBE_GCR, "PCIe GCR"},
++	{IXGBE_GSCL_1, "GSCL1"},
++	{IXGBE_GSCL_2, "GSCL2"},
++	{IXGBE_GSCN_0, "GSCN0"},
++	{IXGBE_GSCN_1, "GSCN0"},
++	{IXGBE_GSCN_2, "GSCN0"},
++	{IXGBE_GSCN_3, "GSCN0"},
++	{IXGBE_FACTPS, "FACTPS"},
++
++	/* Interrupt Registers */
++	{IXGBE_PICAUSE, "PICAUSE"},
++	{IXGBE_PIENA, "PIENA"},
++	{IXGBE_EICR, "EICR"},
++	{IXGBE_EIMS, "EIMS"},
++	{IXGBE_EITR(0), "EITR"},
++	{IXGBE_GPIE, "GPIE"},
++
++	/* RX Registers */
++	{IXGBE_SRRCTL(0), "SRRCTL"},
++	{IXGBE_DCA_RXCTRL(0), "DRXCTL"},
++	{IXGBE_RDLEN(0), "RDLEN"},
++	{IXGBE_RDH(0), "RDH"},
++	{IXGBE_RDT(0), "RDT"},
++	{IXGBE_RXDCTL(0), "RXDCTL"},
++	{IXGBE_RETA(0), "RETA"},
++
++	/* TX Registers */
++	{IXGBE_TDLEN(0), "TDLEN"},
++	{IXGBE_TDH(0), "TDH"},
++	{IXGBE_TDT(0), "TDT"},
++	{IXGBE_TXDCTL(0), "TXDCTL"},
++	{IXGBE_DMATXCTL, "DMATXCTL"},
++	{IXGBE_MTQC, "MTQC"},
++	{IXGBE_TXPBSIZE(0), "TXPBSIZE"},
++	{IXGBE_MTQC, "MTQC"},
++	{IXGBE_MNGTXMAP, "MNGTXMAP"},
++	{IXGBE_TXPBTHRESH(0), "TXPBTHRESH"},
++
++	/* PHY & MAC */
++	{IXGBE_HLREG0, "HLREG0"},
++	{IXGBE_HLREG1, "HLREG1"},
++	{IXGBE_AUTOC, "AUTOC"},
++	{IXGBE_AUTOC2, "AUTOC2"},
++	{IXGBE_LINKS, "LINKS"},
++	{IXGBE_LINKS2, "LINKS2"},
++	{IXGBE_FECS1, "FECS1"},
++	{IXGBE_FECS2, "FECS2"},
++	{IXGBE_PCSS1, "PCSS1"},
++	{IXGBE_PCSS2, "PCSS2"},
++	{IXGBE_XPCSS, "XPCSS"},
++	{IXGBE_MACS, "MACS"},
++
++	/* stats */
++	{IXGBE_CRCERRS, "CRCERRS"},
++	{IXGBE_ILLERRC, "ILLERRC"},
++	{IXGBE_ERRBC, "ERRBC"},
++	{IXGBE_MPC(0), "MPC(0)"},
++	{IXGBE_MLFC, "MLFC"},
++	{IXGBE_MRFC, "RFC"},
++	{IXGBE_RLEC, "RLEC"},
++	{IXGBE_LXONTXC, "LXONTXC"},
++	{IXGBE_LXONRXCNT, "LXONRXC"},
++	{IXGBE_LXOFFTXC, "LXOFFTXC"},
++	{IXGBE_LXOFFRXCNT, "LXOFFRXC"},
++	{IXGBE_PXONTXC(0), "PXONTXC(0)"},
++	{IXGBE_PXONRXCNT(0), "PXONTXC(0)"},
++	{IXGBE_PXON2OFFCNT(0), "PXON2OFFCNT(0)"},
++	{IXGBE_PXOFFTXC(0), "PXOFFTXC(0)"},
++	{IXGBE_PXOFFRXCNT(0), "PXOFFRXCNT(0)"},
++
++	/* List Terminator */
++	{}
++};
++
++static const struct ixgbe_reg_info ixgbe_pcie_reg_tbl[] = {
++	{0x4,	"CMD REG"},
++	{0x6,	"PCI STATUS"},
++	{0x44,	"PM CTRL/STATUS"},
++
++	{0xA8,	"DEV_CTRL"},
++	{IXGBE_PCI_DEVICE_STATUS, "DEV_STATUS"},
++	{0xB0,	"LINK_CTRL"},
++	{IXGBE_PCI_LINK_STATUS, "LINK_STATUS"},
++
++	{0xC4, "DEV_CAP2L"},
++	{0xC6, "DEV_CAP2H"},
++	{IXGBE_PCI_DEVICE_CONTROL2, "DEV_CTRL2"},
++	{0xd2, "LINK_STATUS2"},
++
++	{0x100, "ADV_ERR_REP_CAP"},
++	{0x104, "Unc Err status1"},
++	{0x106, "Unc Err status2"},
++	{0x108, "Unc Err mask1"},
++	{0x10a, "Unc Err mask2"},
++	{0x10c, "U Err Sever L"},
++	{0x10e, "U Err Sever H"},
++	{0x110, "C Err status"},
++	{0x114, "C Err Mask"},
++	{0x118, "Err Cap Ctrl"},
++
++	{0x168, "SR IOV Ctrl"},
++	{0x16a, "SR IOV Status"},
++	
++	/* List Terminator */
++	{}
++};
++
++#define LOG_REG_SIZE		8		// 16 byte, 8 u16 words
++#define LOG_REG_ADDR		0x11c
++static void ixgbe_pcie_dump(struct ixgbe_hw *hw)
++{
++  struct ixgbe_reg_info *reginfo;
++
++  pr_info("PCIe Register             Value\n");
++  for (reginfo = (struct ixgbe_reg_info*) ixgbe_pcie_reg_tbl;
++	   reginfo->name; reginfo++)
++	printk(KERN_WARNING "%-24s %04x\n", reginfo->name, 
++		   IXGBE_READ_PCIE_WORD(hw, reginfo->ofs));
++
++  return;
++}
++
++#define REG_COUNT	8
++/*
++ * ixgbe_regdump - register printout routine
++ */
++static void ixgbe_regdump(struct ixgbe_hw *hw, struct ixgbe_reg_info *reginfo)
++{
++	int i = 0, j = 0;
++	char rname[16];
++	u32 regs[64];
++
++	switch (reginfo->ofs) {
++	case IXGBE_SRRCTL(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_SRRCTL(i));
++		break;
++	case IXGBE_DCA_RXCTRL(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_DCA_RXCTRL(i));
++		break;
++	case IXGBE_RDLEN(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_RDLEN(i));
++		break;
++	case IXGBE_RDH(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_RDH(i));
++		break;
++	case IXGBE_RDT(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_RDT(i));
++		break;
++	case IXGBE_RXDCTL(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_RXDCTL(i));
++		break;
++	case IXGBE_RDBAL(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_RDBAL(i));
++		break;
++	case IXGBE_RDBAH(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_RDBAH(i));
++		break;
++	case IXGBE_TDBAL(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_TDBAL(i));
++		break;
++	case IXGBE_TDBAH(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_TDBAH(i));
++		break;
++	case IXGBE_TDLEN(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_TDLEN(i));
++		break;
++	case IXGBE_TDH(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_TDH(i));
++		break;
++	case IXGBE_TDT(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_TDT(i));
++		break;
++	case IXGBE_TXDCTL(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_TXDCTL(i));
++		break;
++	case IXGBE_PXOFFTXC(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_PXOFFTXC(i));
++		break;
++	case IXGBE_PXOFFRXCNT(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_PXOFFRXCNT(i));
++		break;
++	case IXGBE_DCA_TXCTRL(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL(i));
++		break;
++	case IXGBE_TXPBSIZE(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_TXPBSIZE(i));
++		break;
++	case IXGBE_EITR(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_EITR(i));
++		break;
++	case IXGBE_TXPBTHRESH(0):
++		for (i = 0; i < REG_COUNT; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_TXPBTHRESH(i));
++		break;
++	case IXGBE_RETA(0):
++		for (i = 0; i < 32; i++)
++			regs[i] = IXGBE_READ_REG(hw, IXGBE_RETA(i));
++		break;
++		
++	default:
++		pr_info("%-15s %08x\n", reginfo->name,
++			IXGBE_READ_REG(hw, reginfo->ofs));
++		return;
++	}
++
++	// we only want the value of the first 8 registers
++	for (i = 0; i < 1; i++) {
++		snprintf(rname, 16, "%s[%d-%d]", reginfo->name, i*8, i*8+7);
++		pr_err("%-15s", rname);
++		for (j = 0; j < 8; j++)
++			pr_cont(" %08x", regs[i*8+j]);
++		pr_cont("\n");
++	}
++}
++
++/*
++ * ixgbe_dump - Print registers, tx-rings and rx-rings
++ */
++static void ixgbe_dump(struct ixgbe_adapter *adapter)
++{
++	struct net_device *netdev = adapter->netdev;
++	struct ixgbe_hw *hw = &adapter->hw;
++	struct ixgbe_reg_info *reginfo;
++	int n = 0;
++	struct ixgbe_ring *tx_ring;
++	struct ixgbe_tx_buffer *tx_buffer;
++	union ixgbe_adv_tx_desc *tx_desc;
++	struct my_u0 { u64 a; u64 b; } *u0;
++	struct ixgbe_ring *rx_ring;
++	union ixgbe_adv_rx_desc *rx_desc;
++	struct ixgbe_rx_buffer *rx_buffer_info;
++	u32 staterr;
++	int i = 0;
++
++#define INTERVAL 4
++	int start;
++	int counter;
++	int tx_ntu_dump_done = 0;
++	int rx_ntu_dump_done = 0;
++
++	/* Print netdevice Info */
++	if (netdev) {
++		dev_info(&adapter->pdev->dev, "Net device Info\n");
++		pr_info("Device Name     state            "
++			"trans_start      last_rx\n");
++		pr_info("%-15s %016lX %016lX %016lX\n",
++			netdev->name,
++			netdev->state,
++			netdev->trans_start,
++			netdev->last_rx);
++	}
++	
++	//dev_info(&adapter->pdev->dev, "SFP module Dump\n");
++	//wg_dump_sfp_regs(adapter);
++	ixgbe_pcie_dump(hw);
++
++	/* Print Registers */
++	dev_info(&adapter->pdev->dev, "Register Dump\n");
++	pr_info(" Register Name   Value\n");
++	for (reginfo = (struct ixgbe_reg_info *)ixgbe_reg_info_tbl;
++	     reginfo->name; reginfo++) {
++		ixgbe_regdump(hw, reginfo);
++	}
++
++	/* Print TX Ring Summary */
++	if (!netdev || !netif_running(netdev))
++		goto exit;
++
++	dev_info(&adapter->pdev->dev, "TX Rings Summary\n");
++	pr_info(" %s     %s              %s        %s\n",
++		"Queue [NTU] [NTC] [bi(ntc)->dma  ]",
++		"leng", "ntw", "timestamp");
++	for (n = 0; n < adapter->num_tx_queues; n++) {
++		tx_ring = adapter->tx_ring[n];
++		tx_buffer = &tx_ring->tx_buffer_info[tx_ring->next_to_clean];
++		pr_info(" %5d %5X %5X %016llX %08X %p %016llX\n",
++			   n, tx_ring->next_to_use, tx_ring->next_to_clean,
++			   (u64)dma_unmap_addr(tx_buffer, dma),
++			   dma_unmap_len(tx_buffer, len),
++			   tx_buffer->next_to_watch,
++			   (u64)tx_buffer->time_stamp);
++	}
++
++	dev_info(&adapter->pdev->dev, "TX Rings Dump\n");
++
++	/* Transmit Descriptor Formats
++	 *
++	 * 82598 Advanced Transmit Descriptor
++	 *   +--------------------------------------------------------------+
++	 * 0 |         Buffer Address [63:0]                                |
++	 *   +--------------------------------------------------------------+
++	 * 8 |  PAYLEN  | POPTS  | IDX | STA | DCMD  |DTYP |  RSV |  DTALEN |
++	 *   +--------------------------------------------------------------+
++	 *   63       46 45    40 39 36 35 32 31   24 23 20 19              0
++	 *
++	 * 82598 Advanced Transmit Descriptor (Write-Back Format)
++	 *   +--------------------------------------------------------------+
++	 * 0 |                          RSV [63:0]                          |
++	 *   +--------------------------------------------------------------+
++	 * 8 |            RSV           |  STA  |          NXTSEQ           |
++	 *   +--------------------------------------------------------------+
++	 *   63                       36 35   32 31                         0
++	 *
++	 * 82599+ Advanced Transmit Descriptor
++	 *   +--------------------------------------------------------------+
++	 * 0 |         Buffer Address [63:0]                                |
++	 *   +--------------------------------------------------------------+
++	 * 8 |PAYLEN  |POPTS|CC|IDX  |STA  |DCMD  |DTYP |MAC  |RSV  |DTALEN |
++	 *   +--------------------------------------------------------------+
++	 *   63     46 45 40 39 38 36 35 32 31  24 23 20 19 18 17 16 15     0
++	 *
++	 * 82599+ Advanced Transmit Descriptor (Write-Back Format)
++	 *   +--------------------------------------------------------------+
++	 * 0 |                          RSV [63:0]                          |
++	 *   +--------------------------------------------------------------+
++	 * 8 |            RSV           |  STA  |           RSV             |
++	 *   +--------------------------------------------------------------+
++	 *   63                       36 35   32 31                         0
++	 */
++
++	for (n = 0; n < adapter->num_tx_queues; n++) {
++		tx_ring = adapter->tx_ring[n];
++		pr_info("------------------------------------\n");
++		pr_info("TX QUEUE INDEX = %d\n", tx_ring->queue_index);
++		pr_info("------------------------------------\n");
++		pr_info("%s%s    %s              %s        %s          %s\n",
++			"T [desc]     [address 63:0  ] ",
++			"[PlPOIdStDDt Ln] [bi->dma       ] ",
++			"leng", "ntw", "timestamp", "bi->skb");
++
++		/* dumping 8 descriptors, 4 prior to and 4 after NTC */
++		if (tx_ring->next_to_clean >= INTERVAL)
++			start = tx_ring->next_to_clean - INTERVAL;
++		else
++			start = tx_ring->next_to_clean + tx_ring->count - INTERVAL;
++
++		tx_ntu_dump_done = 0;
++wg_txd_dump:
++		for (i = start, counter = 0;
++			tx_ring->desc && (counter < 2 * INTERVAL);
++			i++, counter++) {
++			if (i == tx_ring->count)
++				i = 0;
++			tx_desc = IXGBE_TX_DESC(tx_ring, i);
++			tx_buffer = &tx_ring->tx_buffer_info[i];
++			u0 = (struct my_u0 *)tx_desc;
++			if (dma_unmap_len(tx_buffer, len) > 0) {
++				pr_info("T [0x%03X]    %016llX %016llX %016llX %08X %p %016llX %p",
++					i,
++					le64_to_cpu(u0->a),
++					le64_to_cpu(u0->b),
++					(u64)dma_unmap_addr(tx_buffer, dma),
++					dma_unmap_len(tx_buffer, len),
++					tx_buffer->next_to_watch,
++					(u64)tx_buffer->time_stamp,
++					tx_buffer->skb);
++				if (i == tx_ring->next_to_use &&
++					i == tx_ring->next_to_clean)
++					pr_cont(" NTC/U\n");
++				else if (i == tx_ring->next_to_use)
++					pr_cont(" NTU\n");
++				else if (i == tx_ring->next_to_clean)
++					pr_cont(" NTC\n");
++				else
++					pr_cont("\n");
++
++				if (netif_msg_pktdata(adapter) &&
++				    tx_buffer->skb)
++					print_hex_dump(KERN_INFO, "",
++						DUMP_PREFIX_ADDRESS, 16, 1,
++						tx_buffer->skb->data,
++						dma_unmap_len(tx_buffer, len),
++						true);
++			}
++		}
++
++		/* dumping 8 descriptors, 4 prior to and 4 after NTU */
++		if (!tx_ntu_dump_done) {
++		  tx_ntu_dump_done = 1;
++		  printk(KERN_INFO "...\n");
++		  if (tx_ring->next_to_use >= INTERVAL)
++			start = tx_ring->next_to_use - INTERVAL;
++		  else
++			start = tx_ring->next_to_use + tx_ring->count - INTERVAL;
++
++          /* goto is not that bad in this case */
++		  goto wg_txd_dump;
++		}
++		
++	}
++
++	/* Print RX Rings Summary */
++	dev_info(&adapter->pdev->dev, "RX Rings Summary\n");
++	pr_info("Queue [NTU] [NTC]\n");
++	for (n = 0; n < adapter->num_rx_queues; n++) {
++		rx_ring = adapter->rx_ring[n];
++		pr_info("%5d %5X %5X\n",
++			n, rx_ring->next_to_use, rx_ring->next_to_clean);
++	}
++
++	dev_info(&adapter->pdev->dev, "RX Rings Dump\n");
++
++	/* Receive Descriptor Formats
++	 *
++	 * 82598 Advanced Receive Descriptor (Read) Format
++	 *    63                                           1        0
++	 *    +-----------------------------------------------------+
++	 *  0 |       Packet Buffer Address [63:1]           |A0/NSE|
++	 *    +----------------------------------------------+------+
++	 *  8 |       Header Buffer Address [63:1]           |  DD  |
++	 *    +-----------------------------------------------------+
++	 *
++	 *
++	 * 82598 Advanced Receive Descriptor (Write-Back) Format
++	 *
++	 *   63       48 47    32 31  30      21 20 16 15   4 3     0
++	 *   +------------------------------------------------------+
++	 * 0 |       RSS Hash /  |SPH| HDR_LEN  | RSV |Packet|  RSS |
++	 *   | Packet   | IP     |   |          |     | Type | Type |
++	 *   | Checksum | Ident  |   |          |     |      |      |
++	 *   +------------------------------------------------------+
++	 * 8 | VLAN Tag | Length | Extended Error | Extended Status |
++	 *   +------------------------------------------------------+
++	 *   63       48 47    32 31            20 19               0
++	 *
++	 * 82599+ Advanced Receive Descriptor (Read) Format
++	 *    63                                           1        0
++	 *    +-----------------------------------------------------+
++	 *  0 |       Packet Buffer Address [63:1]           |A0/NSE|
++	 *    +----------------------------------------------+------+
++	 *  8 |       Header Buffer Address [63:1]           |  DD  |
++	 *    +-----------------------------------------------------+
++	 *
++	 *
++	 * 82599+ Advanced Receive Descriptor (Write-Back) Format
++	 *
++	 *   63       48 47    32 31  30      21 20 17 16   4 3     0
++	 *   +------------------------------------------------------+
++	 * 0 |RSS / Frag Checksum|SPH| HDR_LEN  |RSC- |Packet|  RSS |
++	 *   |/ RTT / PCoE_PARAM |   |          | CNT | Type | Type |
++	 *   |/ Flow Dir Flt ID  |   |          |     |      |      |
++	 *   +------------------------------------------------------+
++	 * 8 | VLAN Tag | Length |Extended Error| Xtnd Status/NEXTP |
++	 *   +------------------------------------------------------+
++	 *   63       48 47    32 31          20 19                 0
++	 */
++
++	for (n = 0; n < adapter->num_rx_queues; n++) {
++		rx_ring = adapter->rx_ring[n];
++		pr_info("------------------------------------\n");
++		pr_info("RX QUEUE INDEX = %d\n", rx_ring->queue_index);
++		pr_info("------------------------------------\n");
++		pr_info("%s%s%s",
++			"R  [desc]      [ PktBuf     A0] ",
++			"[  HeadBuf   DD] [bi->dma       ] [bi->skb       ] ",
++			"<-- Adv Rx Read format\n");
++		pr_info("%s%s%s",
++			"RWB[desc]      [PcsmIpSHl PtRs] ",
++			"[vl er S cks ln] ---------------- [bi->skb       ] ",
++			"<-- Adv Rx Write-Back format\n");
++
++        /* dumping 16 descriptors, 8 prior to and 8 after NTC */
++		if (rx_ring->next_to_clean >= INTERVAL)
++			start = rx_ring->next_to_clean - INTERVAL;
++		else
++			start = rx_ring->next_to_clean + rx_ring->count - INTERVAL;
++
++		rx_ntu_dump_done = 0;
++wg_rxd_dump:
++		for (i = start, counter = 0;
++			rx_ring->desc && (counter < 2 * INTERVAL);
++			i++, counter++) {
++			if (i == rx_ring->count)
++				i = 0;
++			rx_buffer_info = &rx_ring->rx_buffer_info[i];
++			rx_desc = IXGBE_RX_DESC(rx_ring, i);
++			u0 = (struct my_u0 *)rx_desc;
++			staterr = le32_to_cpu(rx_desc->wb.upper.status_error);
++			if (staterr & IXGBE_RXD_STAT_DD) {
++				/* Descriptor Done */
++				pr_info("RWB[0x%03X]     %016llX "
++					"%016llX ---------------- %p", i,
++					le64_to_cpu(u0->a),
++					le64_to_cpu(u0->b),
++					rx_buffer_info->skb);
++			} else {
++				pr_info("R  [0x%03X]     %016llX "
++					"%016llX %016llX %p", i,
++					le64_to_cpu(u0->a),
++					le64_to_cpu(u0->b),
++					(u64)rx_buffer_info->dma,
++					rx_buffer_info->skb);
++
++				if (netif_msg_pktdata(adapter) &&
++				    rx_buffer_info->dma) {
++					print_hex_dump(KERN_INFO, "",
++					   DUMP_PREFIX_ADDRESS, 16, 1,
++					   page_address(rx_buffer_info->page) +
++						    rx_buffer_info->page_offset,
++					   ixgbe_rx_bufsz(rx_ring), true);
++				}
++			}
++
++			if (i == rx_ring->next_to_use)
++				pr_cont(" NTU\n");
++			else if (i == rx_ring->next_to_clean)
++				pr_cont(" NTC\n");
++			else
++				pr_cont("\n");
++
++		}
++
++		/* dumping 16 descriptors, 8 prior to and 8 after NTU */
++		if (!rx_ntu_dump_done) {
++			rx_ntu_dump_done = 1;
++			printk(KERN_INFO "...\n");
++			if (rx_ring->next_to_use >= INTERVAL)
++				start = rx_ring->next_to_use - INTERVAL;
++			else
++				start = rx_ring->next_to_use + rx_ring->count - INTERVAL;
++
++          /* goto is not that bad in this case */
++			goto wg_rxd_dump;
++		}
++	}
++
++exit:
++	return;
++}
++#endif	// WG: XD FBX-2063 Dump Tx/Rx ring Desc
++
+ static void ixgbe_remove_adapter(struct ixgbe_hw *hw)
+ {
+ 	struct ixgbe_adapter *adapter = hw->back;
+@@ -814,6 +1379,11 @@
+ 		       "tx hang %d detected on queue %d, resetting adapter\n",
+ 		       adapter->tx_timeout_count + 1, tx_ring->queue_index);
+ 
++		ixgbe_dump(adapter);
++		mdelay(1500);
++		printk(KERN_WARNING "@@ %s 2nd dump ...\n", adapter->netdev->name);
++		ixgbe_dump(adapter);
++		
+ 		ixgbe_tx_timeout_reset(adapter);
+ 
+ 		/* the adapter is about to reset, no point in enabling stuff */
+@@ -4196,6 +4766,7 @@
+ 	hw->mac.ops.set_mac_anti_spoofing(hw, (adapter->num_vfs != 0),
+ 						adapter->num_vfs);
+ 
++#ifndef CONFIG_WG_PLATFORM	// WG XD FBX-10648 CVE Backport
+ 	/* Ensure LLDP is set for Ethertype Antispoofing if we will be
+ 	 * calling set_ethertype_anti_spoofing for each VF in loop below.
+ 	 */
+@@ -4204,7 +4775,23 @@
+ 			(IXGBE_ETQF_FILTER_EN    | /* enable filter */
+ 			 IXGBE_ETQF_TX_ANTISPOOF | /* enable tx antispoof */
+ 			 IXGBE_ETH_P_LLDP));       /* LLDP eth procotol type */
+-
++#else
++	/* Ensure LLDP and FC is set for Ethertype Antispoofing if we will be
++ 	 * calling set_ethertype_anti_spoofing for each VF in loop below
++ 	 */
++	if (hw->mac.ops.set_ethertype_anti_spoofing) {
++		IXGBE_WRITE_REG(hw, IXGBE_ETQF(IXGBE_ETQF_FILTER_LLDP),
++						(IXGBE_ETQF_FILTER_EN    |
++						 IXGBE_ETQF_TX_ANTISPOOF |
++						 IXGBE_ETH_P_LLDP));
++
++		IXGBE_WRITE_REG(hw, IXGBE_ETQF(IXGBE_ETQF_FILTER_FC),
++						(IXGBE_ETQF_FILTER_EN |
++						 IXGBE_ETQF_TX_ANTISPOOF |
++						 ETH_P_PAUSE));
++	}
++#endif	
++	
+ 	for (i = 0; i < adapter->num_vfs; i++) {
+ #ifdef HAVE_VF_SPOOFCHK_CONFIGURE
+ 		if (!adapter->vfinfo[i].spoofchk_enabled)
+@@ -5805,6 +6392,9 @@
+ 	/* put off any impending NetWatchDogTimeout */
+ 	adapter->netdev->trans_start = jiffies;
+ 
++	printk(KERN_WARNING "@@ %s reseting %s ...\n", __FUNCTION__, adapter->netdev->name);
++	ixgbe_dump(adapter);
++	
+ 	while (test_and_set_bit(__IXGBE_RESETTING, &adapter->state))
+ 		usleep_range(1000, 2000);
+ 	ixgbe_down(adapter);
+@@ -6119,11 +6709,16 @@
+ 		ixgbe_reset(adapter);
+ 
+ 	/* power down the optics for 82599 SFP+ fiber */
++#ifndef	CONFIG_WG_PLATFORM // WG:XD Fix for BUG77152
+ 	if (hw->mac.ops.disable_tx_laser)
+ 		hw->mac.ops.disable_tx_laser(hw);
++#endif
+ 
+ 	ixgbe_clean_all_tx_rings(adapter);
+ 	ixgbe_clean_all_rx_rings(adapter);
++#ifdef CONFIG_WG_PLATFORM	// WG XD FBX-5815
++	adapter->sfp_poll_count = 0;
++#endif
+ }
+ 
+ /**
+@@ -6669,6 +7264,9 @@
+ #ifdef HAVE_VXLAN_CHECKS
+ 	vxlan_get_rx_port(netdev);
+ #endif /* HAVE_VXLAN_CHECKS */
++#ifdef CONFIG_WG_PLATFORM	// WG XD FBX-5815
++	adapter->sfp_poll_count = 0;
++#endif
+ 	return IXGBE_SUCCESS;
+ 
+ err_set_queues:
+@@ -10235,8 +10833,10 @@
+ #endif
+ 
+ 	/* power down the optics for 82599 SFP+ fiber */
++#ifndef	CONFIG_WG_PLATFORM // WG:XD Fix for BUG77152
+ 	if (hw->mac.ops.disable_tx_laser)
+ 		hw->mac.ops.disable_tx_laser(hw);
++#endif
+ 
+ 	/* carrier off reporting is important to ethtool even BEFORE open */
+ 	netif_carrier_off(netdev);
+--- ixgbe-4.1.5/src/ixgbe.h.orig	2022-05-26 11:33:13.055433852 -0700
++++ ixgbe-4.1.5/src/ixgbe.h	2022-05-26 11:33:13.171429102 -0700
+@@ -977,20 +977,33 @@
+ 	unsigned int indices;
+ #endif
+ #endif
++#ifdef CONFIG_WG_PLATFORM	// WG XD FBX-5815
++	unsigned int sfp_poll_count;	// for avoiding flooding printk message only
++#endif
+ };
+ 
++extern u8 wg_max_rss(int); // WG:JB Limit RSS if we have too many CPUs
++
+ static inline u8 ixgbe_max_rss_indices(struct ixgbe_adapter *adapter)
+ {
+ 	switch (adapter->hw.mac.type) {
+ 	case ixgbe_mac_82598EB:
+ 	case ixgbe_mac_82599EB:
+ 	case ixgbe_mac_X540:
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Limit RSS if we have too many CPUs
++		return wg_max_rss(IXGBE_MAX_RSS_INDICES);
++#else
+ 		return IXGBE_MAX_RSS_INDICES;
+ 		break;
++#endif
+ 	case ixgbe_mac_X550:
+ 	case ixgbe_mac_X550EM_x:
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Limit RSS if we have too many CPUs
++		return wg_max_rss(IXGBE_MAX_RSS_INDICES_X550);
++#else
+ 		return IXGBE_MAX_RSS_INDICES_X550;
+ 		break;
++#endif
+ 	default:
+ 		return 0;
+ 		break;
+--- ixgbe-4.1.5/src/ixgbe_82599.c.orig	2022-05-26 11:33:13.059433688 -0700
++++ ixgbe-4.1.5/src/ixgbe_82599.c	2022-05-26 11:33:13.183428612 -0700
+@@ -1026,8 +1026,17 @@
+ 
+ 	/* Call adapter stop to disable tx/rx and clear interrupts */
+ 	status = hw->mac.ops.stop_adapter(hw);
++#ifdef CONFIG_WG_PLATFORM // WG:XD FBX-2063 do extra reset, ref. intel errata
++	if (status != IXGBE_SUCCESS) {
++		printk(KERN_WARNING "@@ issuing 2nd reset cmd ...\n");
++		IXGBE_WRITE_REG(hw, IXGBE_CTRL, IXGBE_CTRL_RST);
++		IXGBE_WRITE_FLUSH(hw);
++		printk(KERN_WARNING "@@ done sending 2nd reset cmd\n");
++	}
++#else
+ 	if (status != IXGBE_SUCCESS)
+ 		goto reset_hw_out;
++#endif
+ 
+ 	/* flush pending Tx transactions */
+ 	ixgbe_clear_tx_pending(hw);
+--- ixgbe-4.1.5/README.orig	2022-05-26 11:33:13.035434671 -0700
++++ ixgbe-4.1.5/README	1969-12-31 16:00:00.000000000 -0800
+@@ -1,1206 +0,0 @@
+-
+-
+-ixgbe Linux* Base Driver for Intel® Ethernet Network Connection
+-===============================================================
+-
+-
+-================================================================================
+-
+-February 04, 2015
+-
+-================================================================================
+-
+-
+-Contents
+---------
+-
+-- Important Note
+-- Overview
+-- Building and Installation
+-- Command Line Parameters
+-- Additional Configurations
+-- Known Issues/Troubleshooting
+-- Support
+-- License
+-
+-
+-================================================================================
+-
+-
+-Important Note
+---------------
+-
+-WARNING: The ixgbe driver compiles by default with the Large Receive Offload
+-(LRO) feature enabled. This option offers the lowest CPU utilization for
+-receives but is completely incompatible with *routing/ip forwarding* and
+-*bridging*. If enabling ip forwarding or bridging is a requirement, it is
+-necessary to disable LRO using compile time options as noted in the LRO
+-section later in this document. The result of not disabling LRO when combined
+-with ip forwarding or bridging can be low throughput or even a kernel panic.
+-
+-
+-Overview
+---------
+-
+-This document describes the ixgbe Linux* Base Driver for the 10 Gigabit PCI
+-Express Family of Adapters. The Linux* base driver supports the 2.6.x and 3.x
+-kernels and includes support for any Linux supported system, including
+-Itanium(R)2, x86_64, i686, and PPC.
+-
+-These drivers are only supported as a loadable module at this time. Intel is
+-not supplying patches against the kernel source to allow for static linking of
+-the driver. A version of the driver may already be included by your
+-distribution and/or the kernel.org kernel. For questions related to hardware
+-requirements, refer to the documentation supplied with your Intel adapter. All
+-hardware requirements listed apply to use with Linux.
+-
+-The following features are now available in supported kernels:
+-
+-- Native VLANs
+-- Channel Bonding (teaming)
+-- SNMP
+-- Generic Receive Offload
+-- Data Center Bridging
+-
+-Channel Bonding documentation can be found in the Linux kernel source:
+-/documentation/networking/bonding.txt
+-
+-The driver information previously displayed in the /proc file system is not
+-supported in this release. Alternatively, you can use ethtool (version 1.6 or
+-later), lspci, and ifconfig to obtain the same information. Instructions on
+-updating ethtool can be found in the section Additional Configurations later
+-in this document.
+-
+-
+-Identifying Your Adapter
+-------------------------
+-
+-The driver in this release is compatible with 82598, 82599, X540, X550, 
+-and X552-based Intel Ethernet Network Connections.
+-
+-For more information on how to identify your adapter, go to the Adapter &
+-Driver ID Guide at:
+-http://support.intel.com/support/go/network/adapter/proidguide.htm
+-
+-For the latest Intel network drivers for Linux, refer to the following
+-website. Select the link for your adapter.
+-http://support.intel.com/support/go/network/adapter/home.htm
+-
+-
+-SFP+ Devices with Pluggable Optics
+-----------------------------------
+-
+-82599-BASED ADAPTERS
+---------------------
+-
+-NOTES:
+-
+-- If your 82599-based Intel® Network Adapter came with Intel optics or is an
+-  Intel® Ethernet Server Adapter X520-2, then it only supports Intel optics
+-  and/or the direct attach cables listed below.
+-- When 82599-based SFP+ devices are connected back to back, they should be
+-  set to the same Speed setting via ethtool. Results may vary if you mix speed
+-  settings.
+-
+-Supplier  Type                                 Part Numbers
+---------  ----                                 ------------
+-SR Modules
+-Intel     DUAL RATE 1G/10G SFP+ SR (bailed)    FTLX8571D3BCV-IT
+-Intel     DUAL RATE 1G/10G SFP+ SR (bailed)    AFBR-703SDZ-IN2
+-Intel     DUAL RATE 1G/10G SFP+ SR (bailed)    AFBR-703SDDZ-IN1
+-
+-LR Modules
+-Intel     DUAL RATE 1G/10G SFP+ LR (bailed)    FTLX1471D3BCV-IT
+-Intel     DUAL RATE 1G/10G SFP+ LR (bailed)    AFCT-701SDZ-IN2
+-Intel     DUAL RATE 1G/10G SFP+ LR (bailed)    AFCT-701SDDZ-IN1
+-
+-The following is a list of 3rd party SFP+ modules that have received some
+-testing. Not all modules are applicable to all devices.
+-
+-Supplier  Type                                 Part Numbers
+---------  ----                                 ------------
+-Finisar   SFP+ SR bailed, 10g single rate      FTLX8571D3BCL
+-Avago     SFP+ SR bailed, 10g single rate      AFBR-700SDZ
+-Finisar   SFP+ LR bailed, 10g single rate      FTLX1471D3BCL
+-
+-Finisar   DUAL RATE 1G/10G SFP+ SR (No Bail)   FTLX8571D3QCV-IT
+-Avago     DUAL RATE 1G/10G SFP+ SR (No Bail)   AFBR-703SDZ-IN1
+-Finisar   DUAL RATE 1G/10G SFP+ LR (No Bail)   FTLX1471D3QCV-IT
+-Avago     DUAL RATE 1G/10G SFP+ LR (No Bail)   AFCT-701SDZ-IN1
+-
+-Finisar   1000BASE-T SFP                       FCLF8522P2BTL
+-Avago     1000BASE-T SFP                       ABCU-5710RZ
+-HP        1000BASE-SX SFP                      453153-001
+-
+-82599-based adapters support all passive and active limiting direct attach
+-cables that comply with SFF-8431 v4.1 and SFF-8472 v10.4 specifications.
+-
+-
+-Laser turns off for SFP+ when ifconfig ethX down
+-------------------------------------------------
+-
+-"ifconfig ethX down" turns off the laser for 82599-based SFP+ fiber adapters.
+-"ifconfig ethX up" turns on the laser.
+-
+-
+-82599-based QSFP+ Adapters
+---------------------------
+-
+-NOTES:
+-
+-- If your 82599-based Intel(R) Network Adapter came with Intel optics, it 
+-  only supports Intel optics.
+-- 82599-based QSFP+ adapters only support 4x10 Gbps connections. 
+-  1x40 Gbps connections are not supported. QSFP+ link partners must be 
+-  configured for 4x10 Gbps.  
+-- 82599-based QSFP+ adapters do not support automatic link speed detection. 
+-  The link speed must be configured to either 10 Gbps or 1 Gbps to match the 
+-  link partners speed capabilities. Incorrect speed configurations will result 
+-  in failure to link. 
+-- Intel(R) Ethernet Converged Network Adapter X520-Q1 only supports the 
+-  optics and direct attach cables listed below.
+-
+-
+-Supplier  Type                                 Part Numbers
+---------  ----                                 ------------
+-Intel     DUAL RATE 1G/10G QSFP+ SRL (bailed)  E10GQSFPSR
+-
+-82599-based QSFP+ adapters support all passive and active limiting QSFP+ 
+-direct attach cables that comply with SFF-8436 v4.1 specifications.
+-
+-
+-82598-BASED ADAPTERS
+---------------------
+-
+-NOTES:
+-
+-- Intel® Ethernet Network Adapters that support removable optical modules
+-  only support their original module type (for example, the Intel® 10 Gigabit
+-  SR Dual Port Express Module only supports SR optical modules). If you plug
+-  in a different type of module, the driver will not load.
+-- Hot Swapping/hot plugging optical modules is not supported.
+-- Only single speed, 10 gigabit modules are supported.
+-- LAN on Motherboard (LOMs) may support DA, SR, or LR modules. Other module
+-  types are not supported. Please see your system documentation for details.
+-
+-The following is a list of SFP+ modules and direct attach cables that have
+-received some testing. Not all modules are applicable to all devices.
+-
+-Supplier  Type                                 Part Numbers
+---------  ----                                 ------------
+-Finisar   SFP+ SR bailed, 10g single rate      FTLX8571D3BCL
+-Avago     SFP+ SR bailed, 10g single rate      AFBR-700SDZ
+-Finisar   SFP+ LR bailed, 10g single rate      FTLX1471D3BCL
+-
+-82598-based adapters support all passive direct attach cables that comply with
+-SFF-8431 v4.1 and SFF-8472 v10.4 specifications. Active direct attach cables
+-are not supported.
+-
+-Third party optic modules and cables referred to above are listed only for the
+-purpose of highlighting third party specifications and potential
+-compatibility, and are not recommendations or endorsements or sponsorship of
+-any third party's product by Intel. Intel is not endorsing or promoting
+-products made by any third party and the third party reference is provided
+-only to share information regarding certain optic modules and cables with the
+-above specifications. There may be other manufacturers or suppliers, producing
+-or supplying optic modules and cables with similar or matching descriptions.
+-Customers must use their own discretion and diligence to purchase optic
+-modules and cables from any third party of their choice. Customers are solely
+-responsible for assessing the suitability of the product and/or devices and
+-for the selection of the vendor for purchasing any product. THE OPTIC MODULES
+-AND CABLES REFERRED TO ABOVE ARE NOT WARRANTED OR SUPPORTED BY INTEL. INTEL
+-ASSUMES NO LIABILITY WHATSOEVER, AND INTEL DISCLAIMS ANY EXPRESS OR IMPLIED
+-WARRANTY, RELATING TO SALE AND/OR USE OF SUCH THIRD PARTY PRODUCTS OR
+-SELECTION OF VENDOR BY CUSTOMERS.
+-
+-
+-================================================================================
+-
+-
+-Building and Installation
+--------------------------
+-
+-
+-To build a binary RPM* package of this driver, run 
+-'rpmbuild -tb ixgbe-<x.x.x>.tar.gz', where <x.x.x> is the version number
+-for the driver tar file.
+-
+-NOTES:
+-
+-- For the build to work properly, the currently running kernel MUST match
+-  the version and configuration of the installed kernel sources. If you have
+-  just recompiled the kernel reboot the system before building.
+-- RPM functionality has only been tested in Red Hat distributions.
+-
+-1. Move the base driver tar file to the directory of your choice. For
+-   example, use '/home/username/ixgbe' or '/usr/local/src/ixgbe'.
+-
+-2. Untar/unzip the archive, where <x.x.x> is the version number for the
+-   driver tar file:
+-   tar zxf ixgbe-<x.x.x>.tar.gz
+-
+-3. Change to the driver src directory, where <x.x.x> is the version number
+-   for the driver tar:
+-   cd ixgbe-<x.x.x>/src/
+-
+-4. Compile the driver module:
+-   # make install
+-
+-   The binary will be installed as:
+-   /lib/modules/<KERNEL VERSION>/kernel/drivers/net/ixgbe/ixgbe.[k]o
+-
+-   The install location listed above is the default location. This may differ
+-   for various Linux distributions.
+-
+-5. Load the module. Use the modprobe command:
+-   modprobe ixgbe <parameter>=<value>
+-
+-   Ensure that older ixgbe drivers are removed from the kernel, before 
+-   loading the new module:
+-   rmmod ixgbe; modprobe ixgbe
+-
+-6. Assign an IP address to the interface by entering the following, where x
+-   is the interface number:
+-   ifconfig eth<x> <IP_address> <netmask>
+-
+-7. Verify that the interface works. Enter the following, where IP_address
+-   is the IP address for another machine on the same subnet as the interface
+-   that is being tested:
+-   ping <IP_address>
+-
+-
+-To build ixgbe driver with DCA
+-------------------------------
+-If your kernel supports DCA, the driver will build by default with DCA enabled.
+-
+-Note: DCA is not supported on X550-based adapters.
+-
+-
+-================================================================================
+-
+-
+-Command Line Parameters
+------------------------
+-If the driver is built as a module, the following optional parameters are used
+-by entering them on the command line with the modprobe command using this
+-syntax:
+-modprobe ixgbe [<option>=<VAL1>,<VAL2>,...]
+-
+-There needs to be a <VAL#> for each network port in the system supported by
+-this driver. The values will be applied to each instance, in function order.
+-For example:
+-modprobe ixgbe InterruptThrottleRate=16000,16000
+-
+-In this case, there are two network ports supported by ixgbe in the system.
+-The default value for each parameter is generally the recommended setting,
+-unless otherwise noted.
+-
+-NOTES:
+-- For more information about the InterruptThrottleRate parameter, see the
+-  application note at: http://www.intel.com/design/network/applnots/ap450.htm
+-- A descriptor describes a data buffer and attributes related to the data
+-  buffer. This information is accessed by the hardware.
+-
+-
+-Receive Side Scaling (RSS) or multiple queues for receives
+-----------------------------------------------------------
+-Valid Range:    0-16
+-
+-Default Value:  1
+-
+-0 = Assign up to the lesser value of the number of CPUs or the number of queues
+-
+-X = Assign X queues, where X is less than or equal to the maximum number of
+-queues.
+-
+-RSS affects the number of transmit queues allocated on 2.6.23 and newer
+-kernels with CONFIG_NETDEVICES_MULTIQUEUE set in the kernel .config file.
+-CONFIG_NETDEVICES_MULTIQUEUE only exists from kernels 2.6.23 to 2.6.26. Other
+-options enable multiqueue in 2.6.27 and newer kernels.
+-
+-
+-Multi Queue (MQ)
+-----------------
+-Valid Range:    0, 1
+-
+-Default Value:  1
+-
+-0 = Disables MQ support
+-
+-1 = Enables MQ support, which is a prerequisite for RSS
+-
+-
+-Direct Cache Access (DCA)
+--------------------------
+-Valid Range:    0, 1
+-
+-Default Value:  1 (when IXGBE_DCA is enabled)
+-
+-0 = Disables DCA support in the driver
+-
+-1 = Enables DCA support in the driver
+-
+-If the driver is enabled for DCA, this parameter allows load-time control of
+-the feature.
+-
+-Note: DCA is not supported on X550-based adapters.
+-
+-
+-IntMode
+--------
+-Valid Range:    0-2 (0 = Legacy Int, 1 = MSI and 2 = MSI-X)
+-
+-Default Value:  2
+-
+-IntMode controls allow load time control over the type of interrupt registered
+-for by the driver. MSI-X is required for multiple queue support, and some
+-kernels and combinations of kernel .config options will force a lower level of
+-interrupt support. 'cat /proc/interrupts' will show different values for each
+-type of interrupt.
+-
+-
+-InterruptThrottleRate
+----------------------
+-Valid Range:    956-488281 (0=off, 1=dynamic)
+-
+-Default Value:  1
+-
+-Interrupt Throttle Rate controls the number of interrupts each interrupt
+-vector can generate per second. Increasing ITR lowers latency at the cost of
+-increased CPU utilization, though it may help throughput in some circumstances.
+-
+-0 = Setting InterruptThrottleRate to 0 turns off any interrupt moderation and
+-may improve small packet latency. However, this is generally not suitable for
+-bulk throughput traffic due to the increased CPU utilization of the higher
+-interrupt rate. NOTES:
+-
+-- On 82599, X540, and X550-based adapters, disabling InterruptThrottleRate 
+-  will also result in the driver disabling HW RSC.
+-- On 82598-based adapters, disabling InterruptThrottleRate will also result
+-  in disabling LRO (Large Receive Offloads).
+-
+-1 = Setting InterruptThrottleRate to Dynamic mode attempts to moderate
+-interrupts per vector while maintaining very low latency. This can sometimes
+-cause extra CPU utilization. If planning on deploying ixgbe in a latency
+-sensitive environment, this parameter should be considered.
+-
+-
+-Low Latency Interrupts (LLI)
+-----------------------------
+-LLI allows for immediate generation of an interrupt upon processing receive
+-packets that match certain criteria as set by the parameters described below.
+-LLI parameters are not enabled when Legacy interrupts are used. MSI or MSI-X
+-interrupt modes must be used to successfully use LLI. (To verify MSI or MSI-X
+-is being used, see cat /proc/interrupts.)
+-
+-Note: LLI is not supported on X550-based adapters.
+-
+-
+-LLIPort
+--------
+-Valid Range:    0-65535
+-
+-Default Value:  0 (disabled)
+-
+-LLI is configured with the LLIPort command line parameter, which specifies
+-which TCP port should generate Low Latency Interrupts. For example, using
+-LLIPort=80 would cause the hardware to generate an immediate interrupt upon
+-receipt of any packet sent to TCP port 80 on the local machine.
+-
+-WARNING: Enabling LLI can result in an excessive number of interrupts/second
+-that may cause problems with the system and, in some cases, may cause a kernel
+-panic.
+-
+-Note: LLI is not supported on X550-based adapters.
+-
+-
+-LLIPush
+--------
+-Valid Range:    0-1
+-
+-Default Value:  0 (disabled)
+-
+-LLIPush can be set to enabled or disabled (default). It is most effective in
+-an environment with many small transactions.
+-
+-NOTE: Enabling LLIPush may allow a denial of service attack.
+-
+-Note: LLI is not supported on X550-based adapters.
+-
+-
+-LLISize
+--------
+-Valid Range:    0-1500
+-
+-Default Value:  0 (disabled)
+-
+-LLISize causes an immediate interrupt if the hardware receives a packet
+-smaller than the specified size.
+-
+-Note: LLI is not supported on X550-based adapters.
+-
+-
+-LLIEType
+---------
+-Valid Range:    0-0x8FFF
+-
+-Default Value:  0 (disabled)
+-
+-This parameter specifies the LLI Ethernet protocol type.
+-
+-Note: LLI is not supported on X550-based adapters.
+-
+-
+-LLIVLANP
+---------
+-Valid Range:    0-7
+-
+-Default Value:  0 (disabled)
+-
+-This parameter specifies the LLI on VLAN priority threshold.
+-
+-Note: LLI is not supported on X550-based adapters.
+-
+-
+-Flow Control
+-------------
+-Ethernet Flow Control (IEEE 802.3x) can be configured with ethtool to enable
+-receiving and transmitting pause frames for ixgbe. When transmit is enabled,
+-pause frames are generated when the receive packet buffer crosses a predefined
+-threshold. When receive is enabled, the transmit unit will halt for the time
+-delay specified when a pause frame is received. Flow Control is enabled by
+-default. If you want to disable a flow control capable link partner, use
+-ethtool:
+-ethtool -A eth? autoneg off rx off tx off
+-
+-NOTE: For 82598 backplane cards entering 1 gigabit mode, flow control default
+-behavior is changed to off.  Flow control in 1 gigabit mode on these devices
+-can lead to transmit hangs.
+-
+-
+-Intel(R) Ethernet Flow Director
+--------------------------------
+-NOTE: Flow director parameters are only supported on kernel versions 2.6.30 or
+-newer.
+-
+-This parameter supports advanced filters that direct receive packets by their
+-flows to different queues. It enables tight control on routing a flow in the
+-platform. It matches flows and CPU cores for flow affinity. It also supports
+-multiple parameters for flexible flow classification and load balancing.
+-
+-Flow director is enabled only if the kernel is multiple TX queue capable.
+-
+-An included script (set_irq_affinity) automates setting the IRQ to CPU
+-affinity.
+-
+-You can verify that the driver is using Flow Director by looking at the
+-counter in ethtool: fdir_miss and fdir_match.
+-
+-Other ethtool Commands:
+-
+-- To enable Flow Director:  ethtool -K ethX ntuple on
+-- To add a filter use -U switch:  ethtool -U ethX flow-type tcp4 src-ip
+-  192.168.0.100 action 1
+-- To see the list of filters currently present:  ethtool -u ethX
+-
+-
+-Perfect Filter
+---------------
+-Perfect filter is an interface to load the filter table that funnels all flow
+-into queue_0 unless an alternative queue is specified using "action". In that
+-case, any flow that matches the filter criteria will be directed to the
+-appropriate queue.
+-
+-Support for Virtual Function (VF) is through the user data field. ethtool must
+-be updated to the version built for the 2.6.40 kernel. Perfect Filter is
+-supported on all kernels 2.6.30 and later. Rules may be deleted from the table
+-itself. This is done using "ethtool -U ethX delete N", where N is the rule
+-number to be deleted.
+-
+-NOTE: Flow Director Perfect Filters can run in single queue mode when SR-IOV
+-is enabled or when DCB is enabled.
+-
+-If the queue is defined as -1, the filter will drop matching packets.
+-
+-To account for filter matches and misses, there are two stats in ethtool:
+-fdir_match and fdir_miss. In addition, rx_queue_N_packets shows the number of
+-packets processed by the Nth queue.
+-
+-NOTES:
+-
+-- Receive Packet Steering (RPS) and Receive Flow Steering (RFS) are not
+-  compatible with Flow Director. If Flow Director is enabled, these will be
+-  disabled
+-- For VLAN Masks only four masks are supported.
+-- Once a rule is defined, you must supply the same fields and masks (if
+-  masks are specified).
+-
+-
+-Support for UDP RSS
+--------------------
+-This feature adds an ON/OFF switch for hashing over certain flow types. Only
+-UDP can be turned on. The default setting is disabled. Only support for
+-enabling/disabling hashing on ports for UDP over IPv4 (UDP4) or IPv6 (UDP6) is
+-supported.
+-
+-NOTE: Fragmented packets may arrive out of order when RSS UDP support is
+-configured.
+-
+-Supported Ethtool Commands and Options:
+-  -n --show-nfc
+-      Retrieves the receive network flow classification configurations.
+-
+-  rx-flow-hash tcp4|udp4|ah4|esp4|sctp4|tcp6|udp6|ah6|esp6|sctp6
+-      Retrieves the hash options for the specified network traffic type. 
+-
+-  -N --config-nfc
+-      Configures the receive network flow classification. 
+-
+-  rx-flow-hash tcp4|udp4|ah4|esp4|sctp4|tcp6|udp6|ah6|esp6|sctp6
+-  m|v|t|s|d|f|n|r...
+-      Configures the hash options for the specified network traffic type. 
+-        udp4   UDP over IPv4 
+-        udp6   UDP over IPv6
+-        f      Hash on bytes 0 and 1 of the Layer 4 header of the rx packet.
+-        n      Hash on bytes 2 and 3 of the Layer 4 header of the rx packet.
+-
+-The following is an example using udp4 (UDP over IPv4):
+-  - To include UDP port numbers in RSS hashing run: 
+-      ethtool -N ethX rx-flow-hash udp4 sdfn 
+-
+-  - To exclude UDP port numbers from RSS hashing run: 
+-      ethtool -N ethX rx-flow-hash udp4 sd 
+-
+-  - To display UDP hashing current configuration run: 
+-      ethtool -n ethX rx-flow-hash udp4
+-
+-The results of running that call will be the following, if UDP hashing is
+-enabled.
+-
+-  UDP over IPV4 flows use these fields for computing Hash flow key:
+-
+-    IP SA
+-    IP DA
+-    L4 bytes 0 & 1 [TCP/UDP src port]
+-    L4 bytes 2 & 3 [TCP/UDP dst port]
+-
+-The results if UDP hashing is disabled are shown below.
+-
+-  UDP over IPV4 flows use these fields for computing Hash flow key:
+-
+-    IP SA
+-    IP DA
+-
+-Parameters FdirPballoc and AtrSampleRate impact Flow Director.
+-
+-
+-FdirPballoc
+------------
+-Valid Range:    1-3
+-
+-Default Value:  1 (64k)
+-
+-This specifies the Flow Director allocated packet buffer size.
+-1 = 64k
+-2 = 128k
+-3 = 256k
+-
+-AtrSampleRate
+--------------
+-Valid Range:    0-255
+-
+-Default Value:  20
+-
+-This parameter is used with the Flow Director and is the software ATR transmit
+-packet sample rate. For example, when AtrSampleRate is set to 20, every 20th
+-packet looks to see if the packet will create a new flow. A value of 0
+-indicates that ATR should be disabled and no samples will be taken.
+-
+-
+-max_vfs
+--------
+-Valid Range:    1-63
+-
+-Default Value:  0
+-
+-If the value is greater than 0, it will also force the VMDq parameter to 1 or
+-more.
+-
+-This parameter adds support for SR-IOV. It causes the driver to spawn up to
+-max_vfs worth of virtual function.
+-
+-NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN filtering
+-and VLAN tag stripping/insertion will remain enabled. An old VLAN filter
+-should be removed before new VLAN filter is added. For example,
+-ip link set eth0 vf 0 vlan 100     // set vlan 100 for VF 0
+-ip link set eth0 vf 0 vlan 0       // delete vlan 100
+-ip link set eth0 vf 0 vlan 200     // set a new vlan 200 for VF 0
+-
+-The parameters for the driver are referenced by position. Thus, if you have a
+-dual port 82599, X540, or X550-based adapter and want N virtual functions per 
+-port, you must specify a number for each port with each parameter separated 
+-by a comma. For example: modprobe ixgbe max_vfs=63,63
+-
+-NOTE: If an 82598-based adapter is installed in the same system as an 82599,
+-X540, or X550-based adapter, caution must be used in loading the driver with 
+-the parameters. Depending on system configuration, number of slots, etc., it 
+-is impossible to predict in all cases where the positions would be on the 
+-command line and any 82598 ports needs to be specified by a zero in their 
+-positions.
+-
+-With kernel 3.6, the driver supports the simultaneous usage of max_vfs and DCB
+-features, subject to the constraints described below. Prior to kernel 3.6, the
+-driver did not support the simultaneous operation of max_vfs greater than 0
+-and the DCB features (multiple traffic classes utilizing Priority Flow Control
+-and Extended Transmission Selection).
+-
+-When DCB is enabled, network traffic is transmitted and received through
+-multiple traffic classes (packet buffers in the NIC). The traffic is
+-associated with a specific class based on priority, which has a value of 0
+-through 7 used in the VLAN tag. When SR-IOV is not enabled, each traffic class
+-is associated with a set of receive/transmit descriptor queue pairs. The
+-number of queue pairs for a given traffic class depends on the hardware
+-configuration. When SR-IOV is enabled, the descriptor queue pairs are grouped
+-into pools. The Physical Function (PF) and each Virtual Function (VF) is
+-allocated a pool of receive/transmit descriptor queue pairs. When multiple
+-traffic classes are configured (for example, DCB is enabled), each pool
+-contains a queue pair from each traffic class. When a single traffic class is
+-configured in the hardware, the pools contain multiple queue pairs from the
+-single traffic class.
+-
+-The number of VFs that can be allocated depends on the number of traffic
+-classes that can be enabled. The configurable number of traffic classes for
+-each enabled VF is as follows:
+-0 - 15 VFs = Up to 8 traffic classes, depending on device support
+-16 - 31 VFs = Up to 4 traffic classes
+-32 - 63 VFs = 1 traffic class
+-
+-When VFs are configured, the PF is allocated one pool as well. The PF supports
+-the DCB features with the constraint that each traffic class will only use a
+-single queue pair. When zero VFs are configured, the PF can support multiple
+-queue pairs per traffic class.
+-
+-
+-Multi Queue Support for Virtual Functions in SR-IOV Mode
+---------------------------------------------------------
+-Multiple queues for virtual functions (VFs) is supported in this driver. 
+-To enable this feature at compile time, use the following command line:
+-
+-make CFLAGS_EXTRA="-DIXGBE_ENABLE_VF_MQ" install
+-
+-NOTE: The ixgbevf driver also needs to support multiple queues.
+-
+-
+-L2LBen
+-------
+-Valid Range:    0 (disabled), 1 (enabled)
+-
+-Default Value:  1 (enabled)
+-
+-This parameter controls the internal switch (L2 loopback between pf and vf).
+-By default the switch is enabled.
+-
+-
+-Large Receive Offload (LRO)
+----------------------------
+-Valid Range:    0 (disabled), 1 (enabled)
+-
+-Default Value:  1 (on)
+-
+-LRO is a technique for increasing inbound throughput of high-bandwidth network
+-connections by reducing CPU overhead. It works by aggregating multiple
+-incoming packets from a single stream into a larger buffer before they are
+-passed higher up the networking stack, thus reducing the number of packets
+-that have to be processed. LRO combines multiple Ethernet frames into a single
+-receive in the stack, thereby potentially decreasing CPU utilization for
+-receives.
+-
+-IXGBE_NO_LRO is a compile time flag. The user can enable it at compile time to
+-remove support for LRO from the driver. The flag is used by adding
+-CFLAGS_EXTRA="-DIXGBE_NO_LRO" to the make file when it is being compiled:
+-make CFLAGS_EXTRA="-DIXGBE_NO_LRO" install
+-
+-You can verify that the driver is using LRO by looking at these counters in
+-ethtool:
+-
+-- lro_flushed. This is the total number of receives using LRO.
+-- lro_aggregated. This counts the total number of Ethernet packets that were
+-  combined.
+-
+-NOTE: IPv6 and UDP are not supported by LRO.
+-
+-
+-DMAC
+-----
+-Valid Range:    0, 41-10000
+-
+-Default Value:  0 (disabled)	
+-
+-Values are in microseconds and set the internal DMA Coalescing internal timer.
+-
+-DMAC is available on Intel(R) X552 (and later) based adapters.
+-
+-DMA (Direct Memory Access) allows the network device to move packet data
+-directly to the system's memory, reducing CPU utilization. However, the
+-frequency and random intervals at which packets arrive do not allow the system
+-to enter a lower power state. DMA Coalescing allows the adapter to collect
+-packets before it initiates a DMA event. This may increase network latency
+-but also increases the chances that the system will enter a lower power state.
+-
+-Turning on DMA Coalescing may save energy with kernel 2.6.32 and newer. DMA 
+-Coalescing must be enabled across all active ports in order to save platform
+-power.
+-
+-InterruptThrottleRate (ITR) should be set to dynamic. When ITR=0, DMA Coalescing
+-is automatically disabled.
+-
+-A whitepaper containing information on how to best configure your platform is 
+-available on the Intel website.
+-
+-
+-================================================================================
+-
+-
+-Additional Configurations
+--------------------------
+-
+-
+-Configuring the Driver on Different Distributions
+--------------------------------------------------
+-Configuring a network driver to load properly when the system is started is
+-distribution dependent. Typically, the configuration process involves adding
+-an alias line to /etc/modules.conf or etc/modprobe.conf, as well as editing
+-other system startup scripts and/or configuration files. Many popular Linux
+-distributions ship with tools to make these changes for you. To learn the
+-proper way to configure a network device for your system, refer to your
+-distribution documentation. If during this process you are asked for the
+-driver or module name, the name for the Linux Base Driver for the 10 Gigabit
+-Family of Adapters is ixgbe.
+-
+-
+-Viewing Link Messages
+----------------------
+-Link messages will not be displayed to the console if the distribution is
+-restricting system messages. In order to see network driver link messages on
+-your console, set dmesg to eight by entering the following:
+-dmesg -n 8
+-
+-NOTE: This setting is not saved across reboots.
+-
+-
+-Jumbo Frames
+-------------
+-The driver supports Jumbo Frames for all adapters. Jumbo Frames support is
+-enabled by changing the MTU to a value larger than the default of 1500. The
+-maximum value for the MTU is 9710. Use the ifconfig command to increase the
+-MTU size. For example:
+-ifconfig ethX mtu 9000 up
+-
+-The maximum MTU setting for Jumbo Frames is 9710. This value coincides with
+-the maximum Jumbo Frames size of 9728. This driver will attempt to use
+-multiple page sized buffers to receive each jumbo packet. This should help
+-avoid buffer starvation issues when allocating receive packets.
+-
+-For 82599-based network connections, if you are enabling jumbo frames in a
+-virtual function (VF), jumbo frames must first be enabled in the physical
+-function (PF). The VF MTU setting cannot be larger than the PF MTU.
+-
+-
+-ethtool
+--------
+-The driver utilizes the ethtool interface for driver configuration and
+-diagnostics, as well as displaying statistical information. ethtool version 3
+-or later is required for this functionality, although we strongly recommend
+-downloading the latest version at:
+-
+-http://ftp.kernel.org/pub/software/network/ethtool/.
+-
+-
+-Hardware Receive Side Coalescing (HW RSC)
+------------------------------------------
+-82599, X540 and X550-based adapters support HW RSC, which can merge multiple 
+-frames from the same IPv4 TCP/IP flow into a single structure that can span 
+-one or more descriptors. It works similarly to Software Large Receive Offload
+-technique. By default HW RSC is enabled and SW LRO cannot be used for 82599,
+-X540, or X550-based adapters unless HW RSC is disabled.
+-
+-IXGBE_NO_HW_RSC is a compile time flag. The user can enable it at compile time
+-to remove support for HW RSC from the driver. The flag is used by adding
+-CFLAGS_EXTRA="-DIXGBE_NO_HW_RSC" to the make file when it is being compiled.
+-make CFLAGS_EXTRA="-DIXGBE_NO_HW_RSC" install
+-
+-You can verify that the driver is using HW RSC by looking at the counter in
+-ethtool:
+-
+-- hw_rsc_count. This counts the total number of Ethernet packets that were
+-  being combined.
+-
+-
+-MAC and VLAN anti-spoofing feature
+-----------------------------------
+-When a malicious driver attempts to send a spoofed packet, it is dropped by
+-the hardware and not transmitted. An interrupt is sent to the PF driver
+-notifying it of the spoof attempt.
+-
+-When a spoofed packet is detected, the PF driver sends the following message
+-to the system log (displayed by the "dmesg" command):
+-ixgbe ethX: ixgbe_spoof_check: n spoofed packets detected
+-
+-where "x" is the PF interface number; and "n" is number of spoofed packets.
+-
+-NOTE: Note that this feature can be disabled for a specific Virtual Function
+-(VF).
+-
+-
+-IPRoute2 Tool for setting MAC address, VLAN and rate limit
+-----------------------------------------------------------
+-You can set a MAC address of a Virtual Function (VF), a default VLAN and the
+-rate limit using the IProute2 tool. Download the latest version of the
+-iproute2 tool from Sourceforge if your version does not have all the features
+-you require.
+-
+-
+-Wake on LAN Support (WoL)
+--------------------------
+-Some adapters do not support Wake on LAN. To determine if your adapter
+-supports Wake on LAN, run
+-  ethtool ethX
+-
+-The Intel(R) Ethernet Converged Network Adapter X550-T1 and Intel(R) Ethernet 
+-Converged Network Adapter X550-T2 have a manageability/AUX power connector. 
+-These devices only support WoL if AUX power is supplied via this connector.
+-
+-
+-IEEE 1588 PTP
+--------------
+-Precision Time Protocol (PTP) is used to synchronize clocks in a computer
+-network and is supported in the ixgbe driver.
+-
+-The IXGBE_PTP is a compile time flag. The user may enable PTP at compile time
+-by adding CFLAGS_EXTRA="-DIXGBE_PTP" to the make file when it is being
+-compiled.
+-make CFLAGS_EXTRA="-DIXGBE_PTP" install
+-
+-
+-VXLAN Overlay HW Offloading
+----------------------------
+-VXLAN Overlay HW Offloading is enabled by default. The ixgbe Linux driver
+-features VXLAN Overlay HW Offloading support. To view and configure
+-VXLAN on a VXLAN-overlay offload enabled device,  use the following
+-commands:
+-
+-  # ethtool -k ethX
+-    (This command displays the offloads and their current state.)
+-  # ethtool -K ethX tx-udp_tnl-segmentation [off|on]
+-    (This enables/disables VXLAN support in the driver.)
+-
+-For more information on configuring your network for VXLAN overlay support,
+-refer to the Intel Technical Brief, "Creating Overlay Networks Using Intel
+-Ethernet Converged Network Adapters" (Intel Networking Division, August 2013):
+-
+-  http://www.intel.com/content/dam/www/public/us/en/documents/technology-briefs/
+-  overlay-networks-using-converged-network-adapters-brief.pdf
+-
+-
+-Virtual Function (VF) TX Rate Limit
+------------------------------------
+-Virtual Function (VF) TX rate limit  is configured with an ip command from the
+-PF interface.
+-  # ip link set eth0 vf 0 rate 1000
+-    (This command sets TX Rate Limit of 1000Mbps for VF 0)
+-
+-Note that the limit is set per queue and not for the entire VF interface.
+-
+-
+-================================================================================
+-
+-
+-Known Issues/Troubleshooting
+-----------------------------
+-
+-
+-Hardware Issues
+----------------
+-For known hardware and troubleshooting issues, either refer to the "Release
+-Notes" in your User Guide, or for more detailed information, go to
+-http://www.intel.com.
+-
+-In the search box enter your devices controller ID followed by "spec update"
+-(i.e., 82599 spec update). The specification update file has complete
+-information on known hardware issues.
+-
+-
+-Software Issues
+----------------
+-NOTE: After installing the driver, if your Intel Ethernet Network Connection
+-is not working, verify that you have installed the correct driver.
+-
+-
+-MSI-X Issues with Kernels between 2.6.19 - 2.6.21 (inclusive)
+--------------------------------------------------------------
+-Kernel panics and instability may be observed on any MSI-X hardware if you use
+-irqbalance with kernels between 2.6.19 and 2.6.21. If such problems are
+-encountered, you may disable the irqbalance daemon or upgrade to a newer
+-kernel.
+-
+-
+-LRO and iSCSI Incompatibility
+------------------------------
+-LRO is incompatible with iSCSI target or initiator traffic. A panic may occur
+-when iSCSI traffic is received through the ixgbe driver with LRO enabled. To
+-workaround this, the driver should be built and installed with:
+-# make CFLAGS_EXTRA=-DIXGBE_NO_LRO install
+-
+-
+-Multiple Interfaces on Same Ethernet Broadcast Network
+-------------------------------------------------------
+-Due to the default ARP behavior on Linux, it is not possible to have one
+-system on two IP networks in the same Ethernet broadcast domain
+-(non-partitioned switch) behave as expected. All Ethernet interfaces will
+-respond to IP traffic for any IP address assigned to the system. This results
+-in unbalanced receive traffic.
+-
+-If you have multiple interfaces in a server, either turn on ARP filtering by
+-entering: echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
+-
+-This only works if your kernel's version is higher than 2.4.5.
+-
+-NOTE: This setting is not saved across reboots. The configuration change can
+-be made permanent by adding the following line to the /etc/sysctl.conf file:
+-net.ipv4.conf.all.arp_filter = 1
+-
+-or,
+-install the interfaces in separate broadcast domains (either in different
+-switches or in a switch partitioned to VLANs)
+-
+-
+-UDP Stress Test Dropped Packet Issue
+-------------------------------------
+-Under small packets UDP stress test with 10GbE driver, the Linux system may
+-drop UDP packets due to the fullness of socket buffers. The driver Flow
+-Control variables may be changed to the minimum value for controlling packet
+-reception, or the kernel's default buffer sizes can be increased for UDP by
+-changing the values in
+-
+-/proc/sys/net/core/rmem_default and rmem_max
+-
+-
+-Cisco Catalyst 4948-10GE port resets may cause switch to shut down ports
+-------------------------------------------------------------------------
+-82598-based hardware can re-establish link quickly and when connected to some
+-switches, rapid resets within the driver may cause the switch port to become
+-isolated due to "link flap". This is typically indicated by a yellow instead
+-of a green link light. Several operations may cause this problem, such as
+-repeatedly running ethtool commands that cause a reset.
+-
+-A potential workaround is to use the Cisco IOS command "no errdisable detect
+-cause all" from the Global Configuration prompt which enables the switch to
+-keep the interfaces up, regardless of errors.
+-
+-
+-Rx Page Allocation Errors
+--------------------------
+-"order:0" errors may occur under stress with kernels 2.6.25 and newer. This is
+-caused by the way the Linux kernel reports this stressed condition.
+-
+-
+-DCB: Generic segmentation offload on causes bandwidth allocation issues
+------------------------------------------------------------------------
+-In order for DCB to work correctly, Generic Segmentation Offload (GSO), also
+-known as software TSO, must be disabled using ethtool. Since the hardware
+-supports TSO (hardware offload of segmentation), GSO will not be running by
+-default. The GSO state can be queried with ethtool using ethtool -k ethX.
+-
+-
+-When using 82598-based network connections, ixgbe driver only supports 16
+-queues on a platform with more than 16 cores
+-
+-
+-Due to known hardware limitations, RSS can only filter in a maximum of 16
+-receive queues.
+-
+-82599, X540, and X550-based network connections support up to 64 queues.
+-
+-
+-Disable GRO when routing/bridging
+----------------------------------
+-Due to a known kernel issue, GRO must be turned off when routing/bridging. GRO
+-can be turned off via ethtool.
+-ethtool -K ethX gro off
+-
+-where ethX is the ethernet interface being modified.
+-
+-
+-Lower than expected performance on dual port and quad port 10GbE devices
+-------------------------------------------------------------------------
+-Some PCIe x8 slots are actually configured as x4 slots. These slots have
+-insufficient bandwidth for full 10Gbe line rate with dual port and quad port
+-10GbE devices. In addition, if you put a PCIe Generation 3-capable adapter
+-into a PCIe Generation 2 slot, you cannot get full bandwidth. The driver
+-detects this situation and writes the following message in the system log:
+-"PCI-Express bandwidth available for this card is not sufficient for optimal
+-performance. For optimal performance a x8 PCI-Express slot is required."
+-
+-If this error occurs, moving your adapter to a true x8 slot will resolve the
+-issue.
+-
+-
+-ethtool may incorrectly display SFP+ fiber module as direct attached cable
+---------------------------------------------------------------------------
+-Due to kernel limitations, port type can only be correctly displayed on kernel
+-2.6.33 or greater.
+-
+-Under Redhat 5.4, system may crash when closing guest OS window after
+-loading/unloading the Physical Function (PF) driver
+-
+-Do not remove the ixgbe driver from Dom0 while Virtual Functions (VFs) are
+-assigned to guests. VFs must first use the xm "pci-detach" command to hot-plug
+-the VF device out of the VM it is assigned to or else shut down the VM.
+-
+-Unloading Physical Function (PF) driver may cause kernel panic or system
+-reboot when VM is running and VF is loaded on the VM
+-
+-On pre-3.2 Linux kernels, unloading the Physical Function (PF) driver causes
+-system reboots when the VM is running and VF is loaded on the VM.
+-
+-Do not unload the PF driver (ixgbe) while VFs are assigned to guests.
+-
+-
+-Running ethtool -t ethX command causes break between PF and test client
+------------------------------------------------------------------------
+-When there are active VFs, "ethtool -t" will only run the link test. The
+-driver will also log in syslog that VFs should be shut down to run a full
+-diagnostic test.
+-
+-
+-SLES10 SP3 random system panic when reloading driver
+-----------------------------------------------------
+-This is a known SLES-10 SP3 issue. After requesting interrupts for MSI-X
+-vectors, system may panic.
+-
+-Currently, the only known workaround is to build the drivers with
+-CFLAGS_EXTRA=-DDISABLE_PCI_MSI if the drivers need to be loaded/unloaded.
+-Otherwise, the driver can be loaded once and will be safe, but unloading it
+-will lead to the issue.
+-
+-Enabling SR-IOV in a 32-bit or 64-bit Microsoft* Windows* Server 2008/R2 Guest
+-OS using Intel® Intel® 82599- or X540-based 10GbE controller under KVM.
+-
+-KVM Hypervisor/VMM supports direct assignment of a PCIe device to a VM. This
+-includes traditional PCIe devices, as well as SR-IOV-capable devices using
+-Intel 82599 or X540-based controllers.
+-
+-While direct assignment of a PCIe device or an SR-IOV Virtual Function (VF) to
+-a Linux-based VM running 2.6.32 or newer kernel works fine, there is a known
+-issue with Microsoft Windows Server 2008/R2 VM that results in a "yellow bang"
+-error. This problem is within the KVM VMM itself, not the Intel driver or the
+-SR-IOV logic of the VMM, but rather that KVM emulates an older CPU model for
+-the guests. This older CPU model does not support MSI-X interrupts, which is a
+-requirement for Intel SR-IOV.
+-
+-If you wish to use the Intel 82599- or X540-based controllers in
+-SR-IOV mode with KVM and a Microsoft Windows Server 2008/R2 guest, try the
+-following workaround.
+-Configure the KVM to emulate a different model of CPU when using qemu to
+-create the KVM guest: "-cpu qemu64,model=13"
+-
+-
+-Unable to obtain DHCP lease on boot with RedHat
+------------------------------------------------
+-For configurations where the auto-negotiation process takes more than 5
+-seconds, the boot script may fail with the following message:
+-"ethX: failed. No link present. Check cable?"
+-
+-If this error appears even though the presence of a link can be confirmed
+-using ethtool ethX, try setting "LINKDELAY=5" in
+-/etc/sysconfig/network-scripts/ifcfg-ethX.
+-
+-NOTE: Link time can take up to 30 seconds. Adjust LINKDELAY value accordingly.
+-
+-
+-Host may Reboot after Removing PF when VF is Active in Guest
+-------------------------------------------------------------
+-Using kernel versions earlier than 3.2, do not unload the PF driver with
+-active VFs. Doing this will cause your VFs to stop working until you reload
+-the PF driver and may cause a spontaneous reboot of your system. Prior to
+-unloading the ixgbe PF driver, shutdown all VMs to ensure VFs are no longer
+-active and unloading the ixgbevf driver first.
+-
+-
+-Software bridging does not work with SR-IOV Virtual Functions
+--------------------------------------------------------------
+-SR-IOV Virtual Functions are unable to send or receive traffic between VMs
+-using emulated connections on a Linux Software bridge and connections that use
+-SR-IOV VFs.
+-
+-
+-Out of memory issues on IA32 systems
+--------------------------------------
+-The driver may consume a lot of memory based on the number of CPUs and network 
+-interfaces. This leads to memory segmentation. Thus, the driver may not be 
+-able to allocate enough memory. To resolve this, reduce the number of 
+-descriptors using ethtool -G or the number of queues through the RSS parameter.
+-
+-
+-VLAN tags are stripped on kernels earlier than 2.6.36
+------------------------------------------------------
+-In order to support DCB, kernels earlier than 2.6.36 strip VLAN tags for 
+-VLAN0. This ensures connectivity using 802.1p frames between kernels that 
+-have built-in support and kernels that do not.
+-
+-If the VLAN tags are necessary AND DCB is NOT used, disable vlan stripping 
+-on older kernels at build time with the following:
+-
+-  # make CFLAGS_EXTRA=-DIXGBE_DISABLE_8021P_SUPPORT
+-
+-
+-================================================================================
+-
+-
+-Support
+--------
+-For general information, go to the Intel support website at:
+-www.intel.com/support/
+-
+-or the Intel Wired Networking project hosted by Sourceforge at:
+-http://sourceforge.net/projects/e1000
+-
+-If an issue is identified with the released source code on the supported
+-kernel with a supported adapter, email the specific information related to the
+-issue to e1000-devel@lists.sf.net.
+-
+-
+-================================================================================
+-
+-
+-License
+--------
+-Intel 10 Gigabit Linux driver.
+-Copyright(c) 1999 - 2015 Intel Corporation.
+-
+-This program is free software; you can redistribute it and/or modify it under
+-the terms and conditions of the GNU General Public License, version 2, as
+-published by the Free Software Foundation.
+-
+-This program is distributed in the hope it will be useful, but WITHOUT ANY
+-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+-A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+-
+-You should have received a copy of the GNU General Public License along with
+-this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
+-St - Fifth Floor, Boston, MA 02110-1301 USA.
+-
+-The full GNU General Public License is included in this distribution in the
+-file called "COPYING".
+-
+-
+-================================================================================
+-
+-
+-Trademarks
+-----------
+-Intel, Itanium, and Pentium are trademarks or registered trademarks of Intel
+-Corporation or its subsidiaries in the United States and other countries.
+-
+-* Other names and brands may be claimed as the property of others.
+-
+--- ixgbe-4.1.5/pci.updates.orig	2022-05-26 11:33:13.055433852 -0700
++++ ixgbe-4.1.5/pci.updates	1969-12-31 16:00:00.000000000 -0800
+@@ -1,144 +0,0 @@
+-################################################################################
+-#
+-# Intel 10 Gigabit PCI Express Linux driver
+-# Copyright (c) 1999 - 2014 Intel Corporation.
+-#
+-# This program is free software; you can redistribute it and/or modify it
+-# under the terms and conditions of the GNU General Public License,
+-# version 2, as published by the Free Software Foundation.
+-#
+-# This program is distributed in the hope it will be useful, but WITHOUT
+-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+-# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+-# more details.
+-#
+-# The full GNU General Public License is included in this distribution in
+-# the file called "COPYING".
+-#
+-# Contact Information:
+-# Linux NICS <linux.nics@intel.com>
+-# e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
+-# Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
+-#
+-################################################################################
+-
+-# updates for the system pci.ids file
+-#
+-# IMPORTANT!  Entries in this list must be sorted as they
+-#             would appear in the system pci.ids file.  Entries
+-#             are sorted by ven, dev, subven, subdev
+-#             (numerical order).
+-#
+-8086  Intel(R)
+-	10b6  82598 10GbE PCI-Express Ethernet Controller
+-	10c6  82598EB 10-Gigabit AF Dual Port Network Connection
+-		8086 a05f  10-Gigabit XF SR Dual Port Server Adapter
+-		8086 a15f  10-Gigabit XF SR Dual Port Server Adapter
+-	10c7  82598EB 10-Gigabit AF Network Connection
+-		1014 037f  10-Gigabit XF SR Server Adapter
+-		1014 0380  10-Gigabit XF LR Server Adapter
+-		8086 a05f  10-Gigabit XF SR Server Adapter
+-		8086 a15f  10-Gigabit XF SR Server Adapter
+-		8086 a16f  10-Gigabit XF SR Server Adapter
+-	10c8  82598EB 10-Gigabit AT Network Connection
+-		8086 a10c  10-Gigabit AT Server Adapter
+-		8086 a11c  10-Gigabit AT Server Adapter
+-		8086 a12c  10-Gigabit AT Server Adapter
+-	10db  82598EB 10-Gigabit Dual Port Network Connection
+-	10dd  82598EB 10-Gigabit AT CX4 Network Connection
+-	10e1  82598EB 10-Gigabit AF Dual Port Network Connection
+-		8086 a15f  10-Gigabit SR Dual Port Express Module
+-	10ec  82598EB 10-Gigabit AT CX4 Network Connection
+-		8086 a01f  10-Gigabit CX4 Dual Port Server Adapter
+-		8086 a11f  10-Gigabit CX4 Dual Port Server Adapter
+-	10f1  82598EB 10-Gigabit AF Dual Port Network Connection
+-		8086 a20f  10-Gigabit AF DA Dual Port Server Adapter
+-		8086 a21f  10-Gigabit AF DA Dual Port Server Adapter
+-	10f4  82598EB 10-Gigabit AF Network Connection
+-		8086 106f  10-Gigabit XF LR Server Adapter
+-		8086 a06f  10-Gigabit XF LR Server Adapter
+-	10f7  10-Gigabit BR KX4 Dual Port Network Connection
+-		108e 7b12  Sun Dual 10GbE PCIe 2.0 FEM
+-		8086 000d  Ethernet Mezzanine Adapter X520-KX4-2
+-	10f8  82599 10 Gigabit Dual Port Backplane Connection
+-		1028 1f63  10GbE 2P X520k bNDC
+-		103c 17d2  Ethernet 10Gb 2-port 560M Adapter
+-		103c 18d0  HP Ethernet 10Gb 2-port 560FLB Adapter
+-		8086 000c  Ethernet X520 10GbE Dual Port KX4-KR Mezz
+-	10f9  82599 10 Gigabit CX4 Dual Port Network Connection
+-	10fb  82599 10 Gigabit Dual Port Network Connection
+-		1028 06ee  Ethernet 10G X520 LOM
+-		1028 1f72  Ethernet 10G 4P X520/I350 rNDC
+-		103c 17d0  HP Ethernet 10Gb 2-port 560FLR-SFP+ Adapter
+-		103c 17d3  HP Ethernet 10Gb 2-port 560SFP+ Adapter
+-		103c 211b  HP Ethernet 10Gb 1-port P560FLR-SFP+ Adapter
+-		103c 2159  HP Ethernet 10Gb 2-port 562i Adapter
+-		108e 7b11  Ethernet Server Adapter X520-2
+-		17aa 1071  ThinkServer X520-2 AnyFabric
+-		8086 0002  Ethernet Server Adapter X520-DA2
+-		8086 0003  Ethernet Server Adapter X520-2
+-		8086 0006  Ethernet Server Adapter X520-1
+-		8086 0008  Ethernet OCP Server Adapter X520-2
+-		8086 000a  Ethernet Server Adapter X520-1
+-		8086 000c  Ethernet Server Adapter X520-2
+-		8086 000d  Ethernet Server Adapter X520-1OCP
+-		8086 0470  Ethernet 10GSFP+ DP Embedded CNA X520-2
+-		8086 7a11  Ethernet Server Adapter X520-2
+-		8086 7a12  Ethernet Server Adapter X520-2
+-	10fc  82599 10 Gigabit Dual Port Network Connection
+-	1507  Ethernet Express Module X520-P2
+-		108e 7b10  Ethernet Express Module X520-P2
+-	1508  82598EB Gigabit BX Network Connection
+-	150b  10-Gigabit AT2 Server Adapter
+-		8086 a10c  10-Gigabit AT2 Server Adapter
+-		8086 a11c  10-Gigabit AT2 Server Adapter
+-		8086 a12c  10-Gigabit AT2 Server Adapter
+-	1514  Ethernet X520 10GbE Dual Port KX4 Mezz
+-		8086 000b  Ethernet X520 10GbE Dual Port KX4 Mezz
+-	1517  82599ES 10 Gigabit Network Connection
+-		1137 006a  Cisco UCS CNA M61KR-I Intel Converged Network Adapter
+-	151c  82599 10 Gigabit TN Network Connection
+-		108e 7b13  Sun Dual 10GBASE-T LP
+-		8086 a02c  Ethernet Server Adapter X520-T2
+-		8086 a03c  Ethernet Server Adapter X520-T2
+-		8086 a21c  Ethernet Server Adapter X520-T2
+-	1528  Ethernet Controller X540-AT2
+-		1028 1f61  Ethernet 10G 4P X540/I350 rNDC
+-		103c 192d  HP Ethernet 10Gb 2-port 561FLR-T Adapter
+-		103c 211a  HP Ethernet 10Gb 2-port 561T Adapter
+-		108e 7b14  Sun Dual Port 10 GbE PCIe 2.0 ExpressModule, Base-T
+-		108e 7b15  Sun Dual Port 10 GbE PCIe 2.0 Low Profile Adapter, Base-T
+-		1137 00bf  Ethernet Converged Network Adapter X540-T2
+-		17aa 1073  ThinkServer X540-T2 AnyFabric
+-		8086 0001  Ethernet Converged Network Adapter X540-T2
+-		8086 0002  Ethernet Converged Network Adapter X540-T1
+-		8086 001a  Ethernet Converged Network Adapter X540-T2
+-		8086 00a2  Ethernet Converged Network Adapter X540-T1
+-		8086 0471  Ethernet 10GBT DP Embedded CNA X540-T2
+-		8086 5003  Ethernet 10G 2P X540-t Adapter
+-		8086 5004  Ethernet 10G 2P X540-t Adapter
+-	1529  82599 10 Gigabit Dual Port Network Connection with FCoE
+-	152a  82599 10 Gigabit Dual Port Backplane Connection with FCoE
+-	154a  Ethernet Converged Network Adapter X520-4
+-		8086 011a  Ethernet Converged Network Adapter X520-4
+-		8086 011b  Ethernet Converged Network Adapter X520-4
+-		8086 011c  Ethernet Converged Network Adapter X520-4
+-	154d  Ethernet 10G 2P X520 Adapter
+-		8086 7b11  Ethernet 10G 2P X520 Adapter
+-	154f  82599 10 Gigabit Dual Port Network Connection
+-	1557  82599 10 Gigabit Network Connection
+-		8086 0001  Ethernet OCP Server Adapter X520-1
+-	1558  Ethernet Converged Network Adapter X520-Q1
+-		8086 011a  Ethernet Converged Network Adapter X520-Q1
+-		8086 011b  Ethernet Converged Network Adapter X520-Q1
+-	1560  Ethernet Controller X540
+-	1563  Ethernet Controller 10G X550T
+-		8086 0001  Ethernet Converged Network Adapter X550-T2
+-		8086 0002  Ethernet Converged Network Adapter X550-T1
+-		8086 001A  Ethernet Converged Network Adapter X550-T2
+-		8086 00A2  Ethernet Converged Network Adapter X550-T1
+-	15AA  Ethernet Connection X552 10 GbE Backplane
+-	15AB  Ethernet Connection X552 10 GbE Backplane
+-	15AC  Ethernet Controller 10G X550EM SFP
+-	15AD  Ethernet Connection X552/X557-AT 10GBASE-T
+-	15AE  Ethernet Controller 1G X550EM Copper
+--- ixgbe-4.1.5/ixgbe.7.orig	2022-05-26 11:33:13.051434016 -0700
++++ ixgbe-4.1.5/ixgbe.7	1969-12-31 16:00:00.000000000 -0800
+@@ -1,226 +0,0 @@
+-.\" LICENSE
+-.\"
+-.\" This software program is released under the terms of a license agreement between you ('Licensee') and Intel. Do not use or load this software or any associated materials (collectively, the 'Software') until you have carefully read the full terms and conditions of the LICENSE located in this software package. By loading or using the Software, you agree to the terms of this Agreement. If you do not agree with the terms of this Agreement, do not install or use the Software.
+-.\"
+-.\" * Other names and brands may be claimed as the property of others.
+-.\"
+-.TH ixgbe 1 "April 1, 2013"
+-
+-.SH NAME
+-ixgbe \-This file describes the Linux* Base Driver for the 10 Gigabit Family of Adapters.
+-.SH SYNOPSIS
+-.PD 0.4v
+-modprobe ixgbe [<option>=<VAL1>,<VAL2>,...]
+-.br
+-.PD 1v
+-.LP
+-.SH DESCRIPTION
+-This driver supports the \fB2.6.x\fR kernel, and includes support for any Linux supported system, including Itanium(R)2, x86_64, i686, and PPC
+-.LP
+-This driver is only supported as a loadable module at this time. Intel is not supplying patches against the kernel source to allow for static linking of the driver. For questions related to hardware requirements, refer to the documentation supplied with your 10 Gigabit adapter. All hardware requirements listed apply to use with Linux.
+-.SH OPTIONS
+-The following optional parameters are used by entering them on the command line with the modprobe command. For example:
+-.IP
+-.B modprobe ixgbe InterruptThrottleRate=16000,16000
+-.PP
+-.LP
+-.B RSS - Receive Side Scaling (or multiple queues for receives)
+-.IP
+-.B Valid Range:
+-0 - 16
+-.br
+-.B Default Value:
+-0
+-.IP
+-0 = Sets the descriptor queue count to whichever is less, number of CPUS or 16
+-1-16 = Sets the descriptor queue count to 1-16
+-.IP
+-RSS also effects the number of transmit queues allocated on 2.6.23 and      
+-newer kernels with CONFIG_NETDEVICES_MULTIQUEUE set in the kernel .config file.
+-CONFIG_NETDEVICES_MULTIQUEUE only exists from 2.6.23 to 2.6.26.  Other options 
+-enable multiqueue in 2.6.27 and newer kernels.     
+-.LP
+-.B MQ - Multi Queue
+-.IP
+-.LP
+-.B Valid Range:
+-0, 1
+-.IP
+-.B Default Value: 
+-1
+-.IP
+-0 = Disables Multiple Queue support
+-1 = Enabled Multiple Queue support (a prerequisite for RSS)
+-.LP
+-.B DCA - Direct Cache Access 
+-.IP
+-.B Valid Range: 
+-0, 1
+-.IP
+-.B Default Value:
+-1 (when IXGBE_DCA is enabled)
+-0 = Disables DCA support in the driver
+-1 = Enables DCA support in the driver
+-.IP
+-See the instructions in the README for enabling DCA.  If the driver is enabled for
+-DCA this parameter allows load-time control of the feature.
+-.LP
+-.B IntMode
+-.IP
+-.B Valid Range: 
+-0-2 0 = Legacy Int, 1 = MSI and 2 = MSIX
+-.br
+-.B Default Value: 
+-2
+-.IP
+-IntMode controls allow load time control over the type of interrupt
+-registered for by the driver.  MSI-X is required for multiple queue
+-support, and some kernels and combinations of kernel .config options will
+-force a lower level of interrupt support.  'cat /proc/interrupts' will show
+-different values for each type of interrupt. 
+-.LP
+-.B InterruptThrottleRate
+-.IP
+-.B Valid Range: 
+-956-488281 (0=off, 1=dynamic)
+-.br
+-.B Default Value: 1
+-.IP
+-Interrupt Throttle Rate (interrupts/sec)
+-.br
+-The ITR parameter controls how many interrupts each interrupt vector can
+-generate per second.  On MQ/RSS enabled kernels with MSI-X interrupts this
+-means that each RX vector can generate (by default) 8000 interrupts per second
+-and each TX vector can generate (by default) 4000 interrupts per second.
+-Increasing ITR lowers latency at the cost of increased CPU utilization, though
+-it may help throughput in some circumstances.
+-.br
+-1 = Dynamic mode attempts to moderate interrupts per vector while maintaining
+-very low latency.  This can sometimes cause extra CPU utilization.  If planning
+-on deploying ixgbe in a latency sensitive environment please consider this
+-parameter.
+-.br
+-0 = Setting InterruptThrottleRate to 0 turns off any interrupt moderation and 
+-may improve small packet latency, but is generally not suitable for bulk 
+-throughput traffic due to the increased cpu utilization of the higher interrupt
+-rate. Please note that on 82599-based adapters, disabling InterruptThrottleRate
+-will also result in the driver disabling HW RSC. On 82598-based adapters, 
+-disabling InterruptThrottleRate will also result in disabling LRO (Large Receive
+-Offloads). 
+-.LP
+-.B LLIPort
+-.IP
+-.B Valid Range: 
+-0-65535
+-.br
+-.B Default Value: 
+-0 (disabled)
+-.IP
+-LLI is configured with the LLIPort command-line parameter, which specifies which TCP port should generate Low Latency Interrupts. For example, using LLIPort=80 would cause the board to generate an immediate interrupt upon receipt of any packet sent to TCP port 80 on the local machine.
+-.IP
+-WARNING: Enabling LLI can result in an excessive number of interrupts/second 
+-that may cause problems with the system and in some cases may cause a kernel 
+-panic.
+-.LP
+-.B LLIPush
+-.IP
+-.B Valid Range: 
+-0-1
+-.br
+-.B Default Value: 
+-0 (disabled)
+-.IP
+-LLIPush can be set to be enabled or disabled (default). It is most effective in 
+-an environment with many small transactions. NOTE: Enabling LLIPush may allow a
+-denial of service attack.
+-.LP
+-.B LLISize
+-.IP
+-.B Valid Range: 
+-0-1500
+-.br
+-.B Default Value: 
+-0 (disabled)
+-.IP
+-LLISize causes an immediate interrupt if the board receives a packet smaller 
+-than the specified size.
+-.LP
+-.B LLIEType
+-.IP
+-.B Valid Range: 
+-0-x8fff
+-.br
+-.B Default Value: 
+-0 (disabled)
+-.IP
+-Low Latency Interrupt Ethernet Protocol Type.
+-.LP
+-.B LLIVLANP
+-.IP
+-.B Valid Range: 
+-0-7
+-.br
+-.B Default Value: 
+-0 (disabled)
+-.IP
+-Low Latency Interrupt on VLAN priority threshold.
+-.LP
+-.B FdirPballoc
+-.IP
+-.B Valid Range: 
+-0-2 (0=64k, 1=128k, 2=256k)
+-.br
+-.B Default Value: 
+-0
+-.IP
+-Flow Director allocated packet buffer size.
+-.LP
+-.B AtrSampleRate
+-.IP
+-.B Valid Range: 
+-0-255
+-.br
+-.B Default Value: 
+-20
+-.IP
+-Software ATR Tx packet sample rate. For example, when set to 20, every 20th
+-packet, looks to see if the packet will create a new flow.
+-.LP
+-.B L2LBen
+-.IP
+-.B Valid Range: 
+-0 = disable, 1 = enable
+-.br
+-.B Default Value:
+-1 (enable)
+-.IP
+-This parameter controls the internal switch (L2 loopback between pf and vf).
+-By default the switch is enabled.
+-.LP
+-.B LRO
+-.IP
+-Enable/disable Large Receive Offload.
+-.B Valid Range: 
+-0(off), 1(on)
+-.B Default Value: 
+-1
+-.LP
+-.SH JUMBO FRAMES
+-The driver supports Jumbo Frames for all adapters. Jumbo Frames support is enabled by changing the MTU to a value larger than the default of 1500. Use the ifconfig command to increase the MTU size. For example, enter the following where <x> is the interface number:
+-.IP
+-ifconfig eth<x> mtu 9000 up
+-.IP
+-The maximum MTU setting for Jumbo Frames is 9710.  This value coincides
+-with the maximum Jumbo Frames size of 9728. This driver will attempt to
+-use multiple page sized buffers to receive each jumbo packet.  This
+-should help to avoid buffer starvation issues when allocating receive
+-packets.
+-.SH SUPPORT
+-For additional information, including supported adapters, building, and installation, see the README file included with the driver.
+-.LP
+-For general information and support, go to the Intel support website at:
+-.IP
+-.B http://support.intel.com
+-.LP
+-If an issue is identified with the released source code on the supported kernel with a supported adapter, email the specific information related to the issue to linux.nics@intel.com.
+-.LP
+--- ixgbe-4.1.5/scripts/set_irq_affinity.orig	2022-05-26 11:33:13.055433852 -0700
++++ ixgbe-4.1.5/scripts/set_irq_affinity	1969-12-31 16:00:00.000000000 -0800
+@@ -1,229 +0,0 @@
+-#!/bin/bash
+-#
+-# Copyright (c) 2014, Intel Corporation
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are met:
+-#
+-#     * Redistributions of source code must retain the above copyright notice,
+-#       this list of conditions and the following disclaimer.
+-#     * Redistributions in binary form must reproduce the above copyright
+-#       notice, this list of conditions and the following disclaimer in the
+-#       documentation and/or other materials provided with the distribution.
+-#     * Neither the name of Intel Corporation nor the names of its contributors
+-#       may be used to endorse or promote products derived from this software
+-#       without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-#
+-# Affinitize interrupts to cores
+-#
+-# typical usage is (as root):
+-# set_irq_affinity -x local eth1 <eth2> <eth3>
+-#
+-# to get help:
+-# set_irq_affinity
+-
+-usage()
+-{
+-	echo
+-	echo "Usage: $0 [-x] {all|local|remote|one|custom} [ethX] <[ethY]>"
+-	echo "	options: -x		Configure XPS as well as smp_affinity"
+-	echo "	options: {remote|one} can be followed by a specific node number"
+-	echo "	Ex: $0 local eth0"
+-	echo "	Ex: $0 remote 1 eth0"
+-	echo "	Ex: $0 custom eth0 eth1"
+-	echo "	Ex: $0 0-7,16-23 eth0"
+-	echo
+-	exit 1
+-}
+-
+-if [ "$1" == "-x" ]; then
+-	XPS_ENA=1
+-	shift
+-fi
+-
+-num='^[0-9]+$'
+-# Vars
+-AFF=$1
+-shift
+-
+-case "$AFF" in
+-    remote)	[[ $1 =~ $num ]] && rnode=$1 && shift ;;
+-    one)	[[ $1 =~ $num ]] && cnt=$1 && shift ;;
+-    all)	;;
+-    local)	;;
+-    custom)	;;
+-    [0-9]*)	;;
+-    -h|--help)	usage ;;
+-    "")		usage ;;
+-    *)		IFACES=$AFF && AFF=all ;;	# Backwards compat mode
+-esac
+-
+-# append the interfaces listed to the string with spaces
+-while [ "$#" -ne "0" ] ; do
+-	IFACES+=" $1"
+-	shift
+-done
+-
+-# for now the user must specify interfaces
+-if [ -z "$IFACES" ]; then
+-	usage
+-	exit 1
+-fi
+-
+-# support functions
+-
+-set_affinity()
+-{
+-	VEC=$core
+-	if [ $VEC -ge 32 ]
+-	then
+-		MASK_FILL=""
+-		MASK_ZERO="00000000"
+-		let "IDX = $VEC / 32"
+-		for ((i=1; i<=$IDX;i++))
+-		do
+-			MASK_FILL="${MASK_FILL},${MASK_ZERO}"
+-		done
+-
+-		let "VEC -= 32 * $IDX"
+-		MASK_TMP=$((1<<$VEC))
+-		MASK=$(printf "%X%s" $MASK_TMP $MASK_FILL)
+-	else
+-		MASK_TMP=$((1<<$VEC))
+-		MASK=$(printf "%X" $MASK_TMP)
+-	fi
+-
+-	printf "%s" $MASK > /proc/irq/$IRQ/smp_affinity
+-	printf "%s %d %s -> /proc/irq/$IRQ/smp_affinity\n" $IFACE $core $MASK
+-	if ! [ -z "$XPS_ENA" ]; then
+-		printf "%s %d %s -> /sys/class/net/%s/queues/tx-%d/xps_cpus\n" $IFACE $core $MASK $IFACE $((n-1))
+-		printf "%s" $MASK > /sys/class/net/$IFACE/queues/tx-$((n-1))/xps_cpus
+-	fi
+-}
+-
+-# Allow usage of , or -
+-#
+-parse_range () {
+-        RANGE=${@//,/ }
+-        RANGE=${RANGE//-/..}
+-        LIST=""
+-        for r in $RANGE; do
+-		# eval lets us use vars in {#..#} range
+-                [[ $r =~ '..' ]] && r="$(eval echo {$r})"
+-		LIST+=" $r"
+-        done
+-	echo $LIST
+-}
+-
+-# Affinitize interrupts
+-#
+-setaff()
+-{
+-	CORES=$(parse_range $CORES)
+-	ncores=$(echo $CORES | wc -w)
+-	n=1
+-
+-	# this script only supports interrupt vectors in pairs,
+-	# modification would be required to support a single Tx or Rx queue
+-	# per interrupt vector
+-
+-	queues="${IFACE}-.*TxRx"
+-
+-	irqs=$(grep "$queues" /proc/interrupts | cut -f1 -d:)
+-	[ -z "$irqs" ] && irqs=$(grep $IFACE /proc/interrupts | cut -f1 -d:)
+-	[ -z "$irqs" ] && irqs=$(for i in `ls -Ux /sys/class/net/$IFACE/device/msi_irqs` ;\
+-	                         do grep "$i:.*TxRx" /proc/interrupts | grep -v fdir | cut -f 1 -d : ;\
+-	                         done)
+-	[ -z "$irqs" ] && echo "Error: Could not find interrupts for $IFACE"
+-
+-	echo "IFACE CORE MASK -> FILE"
+-	echo "======================="
+-	for IRQ in $irqs; do
+-		[ "$n" -gt "$ncores" ] && n=1
+-		j=1
+-		# much faster than calling cut for each
+-		for i in $CORES; do
+-			[ $((j++)) -ge $n ] && break
+-		done
+-		core=$i
+-		set_affinity
+-		((n++))
+-	done
+-}
+-
+-# now the actual useful bits of code
+-
+-# these next 2 lines would allow script to auto-determine interfaces
+-#[ -z "$IFACES" ] && IFACES=$(ls /sys/class/net)
+-#[ -z "$IFACES" ] && echo "Error: No interfaces up" && exit 1
+-
+-# echo IFACES is $IFACES
+-
+-CORES=$(</sys/devices/system/cpu/online)
+-[ "$CORES" ] || CORES=$(grep ^proc /proc/cpuinfo | cut -f2 -d:)
+-
+-# Core list for each node from sysfs
+-node_dir=/sys/devices/system/node
+-for i in $(ls -d $node_dir/node*); do
+-	i=${i/*node/}
+-	corelist[$i]=$(<$node_dir/node${i}/cpulist)
+-done
+-
+-for IFACE in $IFACES; do
+-	# echo $IFACE being modified
+-
+-	dev_dir=/sys/class/net/$IFACE/device
+-	[ -e $dev_dir/numa_node ] && node=$(<$dev_dir/numa_node)
+-	[ "$node" ] && [ "$node" -gt 0 ] || node=0
+-
+-	case "$AFF" in
+-	local)
+-		CORES=${corelist[$node]}
+-	;;
+-	remote)
+-		[ "$rnode" ] || { [ $node -eq 0 ] && rnode=1 || rnode=0; }
+-		CORES=${corelist[$rnode]}
+-	;;
+-	one)
+-		[ -n "$cnt" ] || cnt=0
+-		CORES=$cnt
+-	;;
+-	all)
+-		CORES=$CORES
+-	;;
+-	custom)
+-		echo -n "Input cores for $IFACE (ex. 0-7,15-23): "
+-		read CORES
+-	;;
+-	[0-9]*)
+-		CORES=$AFF
+-	;;
+-	*)
+-		usage
+-		exit 1
+-	;;
+-	esac
+-
+-	# call the worker function
+-	setaff
+-done
+-
+-# check for irqbalance running
+-IRQBALANCE_ON=`ps ax | grep -v grep | grep -q irqbalance; echo $?`
+-if [ "$IRQBALANCE_ON" == "0" ] ; then
+-	echo " WARNING: irqbalance is running and will"
+-	echo "          likely override this script's affinitization."
+-	echo "          Please stop the irqbalance service and/or execute"
+-	echo "          'killall irqbalance'"
+-fi

@@ -1,0 +1,166 @@
+WatchGuard patches to sources for kexec-tools-2.0.9 as of
+Thu May 26 11:33:22 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- kexec-tools-2.0.9/configure.ac.orig	2022-05-26 11:33:21.031107241 -0700
++++ kexec-tools-2.0.9/configure.ac	2022-05-26 11:33:21.171101508 -0700
+@@ -21,7 +21,7 @@
+ 
+ dnl Compute ARCH from target cpu info
+ case $target_cpu in
+-	i?86 )
++	x86 | i?86 )
+ 		ARCH="i386"
+ 		;;
+ 	powerpc )
+--- kexec-tools-2.0.9/configure.orig	2022-05-26 11:33:21.031107241 -0700
++++ kexec-tools-2.0.9/configure	2022-05-26 11:33:21.171101508 -0700
+@@ -2181,7 +2181,7 @@
+   program_prefix=${target_alias}-
+ 
+ case $target_cpu in
+-	i?86 )
++	x86 | i?86 )
+ 		ARCH="i386"
+ 		;;
+ 	powerpc )
+--- kexec-tools-2.0.9/kexec/kexec.c.orig	2022-05-26 11:33:21.067105767 -0700
++++ kexec-tools-2.0.9/kexec/kexec.c	2022-05-26 11:33:21.223099379 -0700
+@@ -281,8 +281,8 @@
+ 			continue;
+ 		}
+ 		/* Is there enough space left so we can use it? */
+-		size = end - start;
+-		if (!hole_size || size >= hole_size - 1) {
++		size = end - start + 1;
++		if (!hole_size || size >= hole_size) {
+ 			if (hole_end > 0) {
+ 				hole_base = start;
+ 				break;
+--- kexec-tools-2.0.9/kexec/arch/ppc64/kexec-ppc64.h.orig	2022-05-26 11:33:21.059106095 -0700
++++ kexec-tools-2.0.9/kexec/arch/ppc64/kexec-ppc64.h	2022-05-26 11:33:21.211099870 -0700
+@@ -14,6 +14,8 @@
+ #define HAVE_DYNAMIC_MEMORY
+ #define NEED_RESERVE_DTB
+ 
++#define KERNEL_BOOTED_FROM_KEXEC_MAGIC 0x6e6b7863 /* "nkxc" */
++
+ int setup_memory_ranges(unsigned long kexec_flags);
+ 
+ int elf_ppc64_probe(const char *buf, off_t len);
+--- kexec-tools-2.0.9/kexec/arch/ppc64/kexec-elf-ppc64.c.orig	2022-05-26 11:33:21.055106258 -0700
++++ kexec-tools-2.0.9/kexec/arch/ppc64/kexec-elf-ppc64.c	2022-05-26 11:33:21.211099870 -0700
+@@ -97,7 +97,6 @@
+ 	struct mem_ehdr ehdr;
+ 	char *cmdline, *modified_cmdline = NULL;
+ 	const char *devicetreeblob;
+-	int cmdline_len, modified_cmdline_len;
+ 	uint64_t max_addr, hole_addr;
+ 	char *seg_buf = NULL;
+ 	off_t seg_size = 0;
+@@ -114,7 +113,7 @@
+ 	unsigned int my_panic_kernel;
+ 	uint64_t my_stack, my_backup_start;
+ 	uint64_t toc_addr;
+-	uint32_t my_run_at_load;
++	uint32_t my_run_at_load, my_booted_from_kexec;
+ 	unsigned int slave_code[256/sizeof (unsigned int)], master_entry;
+ 
+ 	/* See options.h -- add any more there, too. */
+@@ -162,10 +161,7 @@
+ 		}
+ 	}
+ 
+-	cmdline_len = 0;
+-	if (cmdline)
+-		cmdline_len = strlen(cmdline) + 1;
+-	else
++	if (!cmdline)
+ 		fprintf(stdout, "Warning: append= option is not passed. Using the first kernel root partition\n");
+ 
+ 	if (ramdisk && reuse_initrd)
+@@ -181,7 +177,6 @@
+ 			strncpy(modified_cmdline, cmdline, COMMAND_LINE_SIZE);
+ 			modified_cmdline[COMMAND_LINE_SIZE - 1] = '\0';
+ 		}
+-		modified_cmdline_len = strlen(modified_cmdline);
+ 	}
+ 
+ 	/* Parse the Elf file */
+@@ -219,7 +214,6 @@
+ 			return -1;
+ 		/* Use new command line. */
+ 		cmdline = modified_cmdline;
+-		cmdline_len = strlen(modified_cmdline) + 1;
+ 	}
+ 
+ 	/* Add v2wrap to the current image */
+@@ -321,6 +315,15 @@
+ 				sizeof(my_run_at_load));
+ 	}
+ 
++	elf_rel_get_symbol(&info->rhdr, "booted_from_kexec",
++			&my_booted_from_kexec,
++			sizeof(my_booted_from_kexec));
++	if (my_booted_from_kexec == KERNEL_BOOTED_FROM_KEXEC_MAGIC)
++		my_booted_from_kexec = 1;
++	elf_rel_set_symbol(&info->rhdr, "booted_from_kexec",
++			&my_booted_from_kexec,
++			sizeof(my_booted_from_kexec));
++
+ 	/* Set stack address */
+ 	my_stack = locate_hole(info, 16*1024, 0, 0, max_addr, 1);
+ 	my_stack += 16*1024;
+--- kexec-tools-2.0.9/kexec/arch/ppc64/crashdump-ppc64.c.orig	2022-05-26 11:33:21.055106258 -0700
++++ kexec-tools-2.0.9/kexec/arch/ppc64/crashdump-ppc64.c	2022-05-26 11:33:21.199100362 -0700
+@@ -33,6 +33,7 @@
+ #include "../../kexec-syscall.h"
+ #include "../../crashdump.h"
+ #include "kexec-ppc64.h"
++#include "../../fs2dt.h"
+ #include "crashdump-ppc64.h"
+ 
+ static struct crash_elf_info elf_info64 =
+@@ -187,7 +188,7 @@
+ 	DIR *dir, *dmem;
+ 	FILE *file;
+ 	struct dirent *dentry, *mentry;
+-	int i, n, crash_rng_len = 0;
++	int n, crash_rng_len = 0;
+ 	unsigned long long start, end;
+ 	int page_size;
+ 
+--- kexec-tools-2.0.9/purgatory/arch/ppc64/v2wrap.S.orig	2022-05-26 11:33:21.083105113 -0700
++++ kexec-tools-2.0.9/purgatory/arch/ppc64/v2wrap.S	2022-05-26 11:33:21.239098724 -0700
+@@ -51,11 +51,19 @@
+ 	.align 8
+ 	.globl purgatory_start
+ purgatory_start:	b	master
++
++	.org purgatory_start + 0x58     # ABI: possible booted_from_kexec flag
++	.globl booted_from_kexec
++booted_from_kexec:
++	.long 0
++	.size booted_from_kexec, . - booted_from_kexec
++
+ 	.org purgatory_start + 0x5c     # ABI: possible run_at_load flag at 0x5c
+ 	.globl run_at_load
+ run_at_load:
+ 	.long 0
+ 	.size run_at_load, . - run_at_load
++
+ 	.org purgatory_start + 0x60     # ABI: slaves start at 60 with r3=phys
+ slave:	b $
+ 	.org purgatory_start + 0x100    # ABI: end of copied region
+@@ -111,6 +119,9 @@
+ 	ld      9,0(6)          # load the OPAL entry address in r9
+ 	LOADADDR(6,kernel)
+ 	ld      4,0(6)          # load the kernel address
++	LOADADDR(6,booted_from_kexec)
++	lwz	7,0(6)		# possibly patched by kexec-elf-ppc64
++	stw	7,0x58(4)	# and patch it into the kernel
+ 	LOADADDR(6,run_at_load) # the load flag
+ 	lwz	7,0(6)		# possibly patched by kexec-elf-ppc64
+ 	stw	7,0x5c(4)	# and patch it into the kernel

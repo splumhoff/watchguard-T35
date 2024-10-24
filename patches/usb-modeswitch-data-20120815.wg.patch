@@ -1,0 +1,83 @@
+WatchGuard patches to sources for usb-modeswitch-data-20120815 as of
+Thu May 26 11:50:24 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- usb-modeswitch-data-20120815/usb_modeswitch.d/11f6:1035.orig	1969-12-31 16:00:00.000000000 -0800
++++ usb-modeswitch-data-20120815/usb_modeswitch.d/11f6:1035	2022-05-26 11:50:23.145615793 -0700
+@@ -0,0 +1,8 @@
++# UCXX devices
++
++TargetVendor=   0x11f6
++TargetProductList="1034"
++
++MessageContent="55534243123456780000000080000606f50402527000000000000000000000"
++
++NeedResponse=1
+--- usb-modeswitch-data-20120815/usb_modeswitch.d/1c9e:9bfd.orig	1969-12-31 16:00:00.000000000 -0800
++++ usb-modeswitch-data-20120815/usb_modeswitch.d/1c9e:9bfd	2022-05-26 11:50:23.165615005 -0700
+@@ -0,0 +1,7 @@
++# MobiData MBD-200HU and others
++
++TargetVendor=  0x1c9e
++TargetProductList="9000,9603,9605,9607,1f33"
++
++MessageContent="55534243123456780000000080000606f50402527000000000000000000000"
++
+--- usb-modeswitch-data-20120815/usb_modeswitch.d/2001:ab00.orig	1969-12-31 16:00:00.000000000 -0800
++++ usb-modeswitch-data-20120815/usb_modeswitch.d/2001:ab00	2022-05-26 11:50:23.185614216 -0700
+@@ -0,0 +1,8 @@
++# D-Link DWM-222 (Variant)
++
++TargetVendor=  0x2001
++TargetProduct= 0x7e35
++
++MessageContent="555342435b000000000000000001061e000000000000000000000000000000"
++MessageContent2="555342435c000000000000000001061b000000010000000000000000000000"
++MessageContent3="555342435d000000000000000001061b000000020000000000000000000000"
+--- usb-modeswitch-data-20120815/usb_modeswitch.d/1410:9020.orig	1969-12-31 16:00:00.000000000 -0800
++++ usb-modeswitch-data-20120815/usb_modeswitch.d/1410:9020	2022-05-26 11:50:23.149615636 -0700
+@@ -0,0 +1,8 @@
++# Novatel Wireless MC545 HSPA, U602L LTE
++
++TargetVendor=  0x1410
++TargetProductList="9020,9022"
++
++MessageContent="5553424312345678000000000000061b000000020000000000000000000000"
++NeedResponse=1
++
+--- usb-modeswitch-data-20120815/usb_modeswitch.d/19d2:0083.orig	1969-12-31 16:00:00.000000000 -0800
++++ usb-modeswitch-data-20120815/usb_modeswitch.d/19d2:0083	2022-05-26 11:50:23.157615320 -0700
+@@ -0,0 +1,9 @@
++# ZTE MF190 (Variant)
++
++TargetVendor=  0x19d2
++TargetProduct= 0x0117
++
++MessageContent="5553424312345678000000000000061b000000020000000000000000000000"
++
++NeedResponse=1
++
+--- usb-modeswitch-data-20120815/usb_modeswitch.d/1410:9030.orig	1969-12-31 16:00:00.000000000 -0800
++++ usb-modeswitch-data-20120815/usb_modeswitch.d/1410:9030	2022-05-26 11:50:23.149615636 -0700
+@@ -0,0 +1,8 @@
++# Novatel Wireless USB730L LTE
++
++TargetVendor=  0x1410
++TargetProductList="9030,9032"
++
++MessageContent="5553424312345678000000000000061b000000020000000000000000000000"
++NeedResponse=1
++
+--- usb-modeswitch-data-20120815/usb_modeswitch.d/2001:a401.orig	1969-12-31 16:00:00.000000000 -0800
++++ usb-modeswitch-data-20120815/usb_modeswitch.d/2001:a401	2022-05-26 11:50:23.181614374 -0700
+@@ -0,0 +1,8 @@
++# D-Link DWM-221
++
++TargetVendor=  0x2001
++TargetProduct= 0x7e19
++
++MessageContent="555342435b000000000000000001061e000000000000000000000000000000"
++MessageContent2="555342435c000000000000000001061b000000010000000000000000000000"
++MessageContent3="555342435d000000000000000001061b000000020000000000000000000000"

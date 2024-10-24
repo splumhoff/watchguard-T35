@@ -1,0 +1,8 @@
+# Makefile uses WG_TARGET_ARCH, WG_PLATFORM and CFG to find WG_KERNEL_ARCH
+
+include $(CFG)/$(WG_PLATFORM)/Config.mak
+
+all:
+	@echo $(WG_KERNEL_ARCH)
+
+.PHONY: all

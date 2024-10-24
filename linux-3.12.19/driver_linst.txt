@@ -1,0 +1,28 @@
+CONFIG_MARVELL_PHY
+
+[*] Network device support  --->
+	-*-   PHY Device support and infrastructure  --->
+		<*>   Drivers for Marvell PHYs
+
+-*- GPIO Support  --->
+CONFIG_GPIO_SYSFS
+	[*]   /sys/class/gpio/... (sysfs interface)
+CONFIG_GPIO_MPC8XXX
+	-*-   MPC512x/MPC8xxx GPIO support
+
+CONFIG_SENSORS_W83793
+ <*> Hardware Monitoring support  --->
+	<*>   Winbond W83793
+
+CONFIG_NEW_LEDS
+[*] LED Support  --->
+CONFIG_LEDS_CLASS
+<*>   LED Class Support
+CONFIG_LEDS_GPIO
+<*>   LED Support for GPIO connected LEDs
+
+
+CONFIG_RTC_CLASS
+[*] Real Time Clock  --->
+CONFIG_RTC_DRV_RS5C372
+<*>   Ricoh R2025S/D, RS5C372A/B, RV5C386, RV5C387A

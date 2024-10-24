@@ -1,0 +1,268 @@
+WatchGuard patches to sources for openssl-1.1.1k as of
+Thu May 26 11:37:23 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- openssl-1.1.1k/crypto/rand/rand_unix.c.orig	2022-05-26 11:37:02.302042649 -0700
++++ openssl-1.1.1k/crypto/rand/rand_unix.c	2022-05-26 11:37:05.049930045 -0700
+@@ -408,16 +408,61 @@
+ #  endif    /* defined(OPENSSL_RAND_SEED_GETRANDOM) */
+ 
+ #  if defined(OPENSSL_RAND_SEED_DEVRANDOM)
+-static const char *random_device_paths[] = { DEVRANDOM };
+-static struct random_device {
++struct random_device {
+     int fd;
+     dev_t dev;
+     ino_t ino;
+     mode_t mode;
+     dev_t rdev;
+-} random_devices[OSSL_NELEM(random_device_paths)];
++};
++
++static const char *normal_random_device_paths[] = { DEVRANDOM };
++#if defined(CSFC_DEVRANDOM)
++static const char *csfc_random_device_paths[] = { CSFC_DEVRANDOM };
++static const char **random_device_paths = NULL;
++#else
++static const char **random_device_paths = &normal_random_device_paths[0];
++#endif
++
++static struct random_device normal_random_devices[OSSL_NELEM(normal_random_device_paths)];
++#if defined(CSFC_DEVRANDOM)
++static struct random_device csfc_random_devices[OSSL_NELEM(csfc_random_device_paths)];
++static struct random_device *random_devices = NULL;
++static int nbr_random_devices = 0;
++#else
++static struct random_device *random_devices = &normal_random_devices[0];
++static int nbr_random_devices = OSSL_NELEM(normal_random_device_paths);
++#endif
++
+ static int keep_random_devices_open = 1;
+ 
++#if defined(CSFC_DEVRANDOM)
++static void _init_random_devices() {
++    struct stat ignored;
++    if (random_devices != NULL) {
++        return;
++    }
++    if (stat("/etc/wg/CSFC_ENABLED", &ignored) == 0) {
++        random_device_paths = &csfc_random_device_paths[0];
++        random_devices = &csfc_random_devices[0];
++        nbr_random_devices = OSSL_NELEM(csfc_random_device_paths);
++    } else {
++        random_device_paths = &normal_random_device_paths[0];
++        random_devices = &normal_random_devices[0];
++        nbr_random_devices = OSSL_NELEM(normal_random_device_paths);
++    }
++}
++#endif
++
++static void init_random_devices(void)
++{
++#if defined(CSFC_DEVRANDOM)
++    if (random_devices == NULL) {
++        _init_random_devices();
++    }
++#endif
++}
++
+ #   if defined(__linux) && defined(DEVRANDOM_WAIT) \
+        && defined(OPENSSL_RAND_SEED_GETRANDOM)
+ static void *shm_addr;
+@@ -432,15 +477,19 @@
+  * This is done by having the first start of libcrypto, wait until the device
+  * /dev/random becomes able to supply a byte of entropy.  Subsequent starts
+  * of the library and later reseedings do not need to do this.
++ *
+  */
+ static int wait_random_seeded(void)
+ {
+     static int seeded = OPENSSL_RAND_SEED_DEVRANDOM_SHM_ID < 0;
++    int shm_id, fd, r;
++    char c;
++#if !defined(WG_OLD_GLIBC)
+     static const int kernel_version[] = { DEVRANDOM_SAFE_KERNEL };
+     int kernel[2];
+-    int shm_id, fd, r;
+-    char c, *p;
++    char *p;
+     struct utsname un;
++#endif
+     fd_set fds;
+ 
+     if (!seeded) {
+@@ -454,7 +503,20 @@
+              * readable.  However, such kernels support the getentropy(2)
+              * system call and this should always succeed which renders
+              * this alternative but essentially identical source moot.
++             *
++             * WatchGuard:
++             * We compile against libc built against Linux 3.12 before 
++             * getrandom() but run under linux 4.14.  This sad state of
++             * affairs requires that we bypass the following check at least until
++             * we can upgrade our libc. Fortunately we start jitterentropy-rngd
++             * early in the boot sequence meaning we will have entropy by
++             * the time we need it.  Incidentally this also lets us comply
++             * with the instructions of Gossamer with regard to how to
++             * obtain entropy to pass CSfC. A further change will disable
++             * getting entropy from /dev/urandom relying only on /dev/random.
++             *
+              */
++#if !defined(WG_OLD_GLIBC)
+             if (uname(&un) == 0) {
+                 kernel[0] = atoi(un.release);
+                 p = strchr(un.release, '.');
+@@ -465,6 +527,7 @@
+                     return 0;
+                 }
+             }
++#endif
+             /* Open /dev/random and wait for it to be readable */
+             if ((fd = open(DEVRANDOM_WAIT, O_RDONLY)) != -1) {
+                 if (DEVRANDM_WAIT_USE_SELECT && fd < FD_SETSIZE) {
+@@ -529,7 +592,11 @@
+ static int get_random_device(size_t n)
+ {
+     struct stat st;
+-    struct random_device * rd = &random_devices[n];
++    struct random_device * rd;
++
++    init_random_devices();
++
++    rd = &random_devices[n];
+ 
+     /* reuse existing file descriptor if it is (still) valid */
+     if (check_random_device(rd))
+@@ -558,7 +625,11 @@
+  */
+ static void close_random_device(size_t n)
+ {
+-    struct random_device * rd = &random_devices[n];
++    struct random_device * rd;
++
++    init_random_devices();
++
++    rd = &random_devices[n];
+ 
+     if (check_random_device(rd))
+         close(rd->fd);
+@@ -569,7 +640,9 @@
+ {
+     size_t i;
+ 
+-    for (i = 0; i < OSSL_NELEM(random_devices); i++)
++    init_random_devices();
++
++    for (i = 0; i < nbr_random_devices; i++)
+         random_devices[i].fd = -1;
+ 
+     return 1;
+@@ -579,7 +652,9 @@
+ {
+     size_t i;
+ 
+-    for (i = 0; i < OSSL_NELEM(random_devices); i++)
++    init_random_devices();
++
++    for (i = 0; i < nbr_random_devices; i++)
+         close_random_device(i);
+ }
+ 
+@@ -670,9 +745,10 @@
+         unsigned char *buffer;
+         size_t i;
+ 
++        init_random_devices();
++
+         bytes_needed = rand_pool_bytes_needed(pool, 1 /*entropy_factor*/);
+-        for (i = 0; bytes_needed > 0 && i < OSSL_NELEM(random_device_paths);
+-             i++) {
++        for (i = 0; bytes_needed > 0 && i < nbr_random_devices; i++) {
+             ssize_t bytes = 0;
+             /* Maximum number of consecutive unsuccessful attempts */
+             int attempts = 3;
+@@ -830,7 +906,11 @@
+  */
+ static uint64_t get_timer_bits(void)
+ {
++#if defined(WG_NO_RDTSC)
++    uint64_t res = 0;
++#else
+     uint64_t res = OPENSSL_rdtsc();
++#endif
+ 
+     if (res != 0)
+         return res;
+--- openssl-1.1.1k/crypto/rsa/rsa_gen.c.orig	2022-05-26 11:37:02.310042322 -0700
++++ openssl-1.1.1k/crypto/rsa/rsa_gen.c	2022-05-26 11:37:05.053929881 -0700
+@@ -64,7 +64,11 @@
+ static int rsa_builtin_keygen(RSA *rsa, int bits, int primes, BIGNUM *e_value,
+                               BN_GENCB *cb)
+ {
++#ifdef WG_APPLIANCE // TSK85918: WG FIPS 2016
++    BIGNUM *r0 = NULL, *r1 = NULL, *r2 = NULL, *r3 = NULL, *r4 = NULL, *tmp, *prime;
++#else
+     BIGNUM *r0 = NULL, *r1 = NULL, *r2 = NULL, *tmp, *prime;
++#endif
+     int ok = -1, n = 0, bitsr[RSA_MAX_PRIME_NUM], bitse = 0;
+     int i = 0, quo = 0, rmd = 0, adj = 0, retries = 0;
+     RSA_PRIME_INFO *pinfo = NULL;
+@@ -92,8 +96,15 @@
+     r0 = BN_CTX_get(ctx);
+     r1 = BN_CTX_get(ctx);
+     r2 = BN_CTX_get(ctx);
++#ifdef WG_APPLIANCE // TSK85918: WG FIPS 2016
++    r3 = BN_CTX_get(ctx);
++    r4 = BN_CTX_get(ctx);
++    if (r4 == NULL) 
++        goto err;
++#else
+     if (r2 == NULL)
+         goto err;
++#endif
+ 
+     /* divide bits into 'primes' pieces evenly */
+     quo = bits / primes;
+@@ -297,9 +308,30 @@
+     /* q - 1 */
+     if (!BN_sub(r2, rsa->q, BN_value_one()))
+         goto err;
++#ifdef WG_APPLIANCE // TSK85918: WG FIPS 2016
++    /* 
++    * Per FIPS 186-4 section B.3.1, calculation of d changed from 
++    *   d = (e-1) % ((p-1)*(q-1))   (was OK under FIPS 186-2)
++    * to
++    *   d = (e-1) % (lcm(p-1, q-1)) (required under FIPS 186-4)
++    *
++    * Uses: lcm(a,b) == a*b / gcd(a,b) to calculate
++    * lcm(p-1, q-1) in r0 instead of (p-1)*(q-1)
++    */
++    /* r4 = (p-1)(q-1) */
++    if (!BN_mul(r4,r1,r2,ctx)) 
++        goto err;      
++    /* r3 = gcd((p-1),(q-1)) */
++    if (!BN_gcd(r3,r1,r2,ctx)) 
++        goto err;      
++    /* r0 = lcm((p-1),(q-1)) */
++    if (!BN_div(r0,NULL,r4,r3,ctx)) 
++        goto err; 
++#else
+     /* (p - 1)(q - 1) */
+     if (!BN_mul(r0, r1, r2, ctx))
+         goto err;
++#endif
+     /* multi-prime */
+     for (i = 2; i < primes; i++) {
+         pinfo = sk_RSA_PRIME_INFO_value(prime_infos, i - 2);
+--- openssl-1.1.1k/e_os.h.orig	2022-05-26 11:37:03.162007409 -0700
++++ openssl-1.1.1k/e_os.h	2022-05-26 11:37:05.141926275 -0700
+@@ -27,6 +27,7 @@
+  * set this to a comma-separated list of 'random' device files to try out. By
+  * default, we will try to read at least one of these files
+  */
++#  define CSFC_DEVRANDOM "/dev/random"
+ #  define DEVRANDOM "/dev/urandom", "/dev/random", "/dev/hwrng", "/dev/srandom"
+ #  if defined(__linux) && !defined(__ANDROID__)
+ #   ifndef DEVRANDOM_WAIT

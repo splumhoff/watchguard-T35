@@ -1,0 +1,19 @@
+ksymoops reads a Linux kernel Oops file and makes the best stab at
+converting the code to instructions and mapping addresses to kernel
+symbols.
+
+Copyright 1999 Keith Owens <kaos@ocs.com.au>.
+Released under the GNU Public Licence, Version 2.
+
+This is a complete replacement for the version of ksymoops in the
+kernel.  Older versions of ksymoops were in scripts/ksymoops.cc, more
+recently there was a version in the scripts/ksymoops directory.  This
+code has grown to the stage that it should be separated from the
+kernel.
+
+For full documentation, see the man page, ksymoops.8.
+
+Please do *not* send oops reports to kaos@ocs.com.au unless you find
+something wrong with ksymoops itself.  Oops reports should go to the
+maintainer of the failing code or, if you do not known who maintains
+the code, to an appropriate linux mailing list.

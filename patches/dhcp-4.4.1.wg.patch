@@ -1,0 +1,2133 @@
+WatchGuard patches to sources for dhcp-4.4.1 as of
+Thu May 26 11:27:55 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- dhcp-4.4.1/includes/dhcpd.h.orig	2022-05-26 11:27:51.880576211 -0700
++++ dhcp-4.4.1/includes/dhcpd.h	2022-05-26 11:27:52.160564765 -0700
+@@ -1354,6 +1354,11 @@
+ 	int dns_update_timeout;
+ };
+ 
++struct server_list {
++	struct server_list *next;
++	struct sockaddr_in to;
++};
++
+ /* Information about each network interface. */
+ 
+ struct interface_info {
+@@ -1387,6 +1392,12 @@
+ 	int rfdesc;			/* Its read file descriptor. */
+ 	int wfdesc;			/* Its write file descriptor, if
+ 					   different. */
++
++	int wfdesc_tunnel;  /* Its write file descriptor, 
++							only when dhcp relay packet need send through ipsec tunnel */
++	struct in_addr bind_src_addr;   /* bind this src address, 
++										when dhcp relay packet need send through ipsec tunnel */
++					   	
+ 	unsigned char *rbuf;		/* Read buffer, if required. */
+ 	unsigned int rbuf_max;		/* Size of read buffer. */
+ 	size_t rbuf_offset;		/* Current offset into buffer. */
+@@ -1412,6 +1423,8 @@
+ 	struct hardware dlpi_broadcast_addr;
+ # endif /* DLPI_SEND || DLPI_RECEIVE */
+ 	struct hardware anycast_mac_addr;
++
++	struct server_list *servers;
+ };
+ 
+ struct hardware_link {
+@@ -2124,6 +2137,7 @@
+ extern const char *path_dhcpd_conf;
+ extern const char *path_dhcpd_db;
+ extern const char *path_dhcpd_pid;
++extern int use_iface_alias;
+ 
+ extern int dhcp_max_agent_option_packet_length;
+ extern struct eventqueue *rw_queue_empty;
+@@ -2421,9 +2435,9 @@
+ int find_lease (struct lease **, struct packet *,
+ 		struct shared_network *, int *, int *, struct lease *,
+ 		const char *, int);
+-int mockup_lease (struct lease **, struct packet *,
+-		  struct shared_network *,
+-		  struct host_decl *);
++int find_static_lease (struct lease **, struct packet *,
++		       struct shared_network *,
++		       struct host_decl *);
+ void static_lease_dereference (struct lease *, const char *, int);
+ 
+ int allocate_lease (struct lease **, struct packet *,
+@@ -2732,6 +2746,8 @@
+ void if_reinitialize_send (struct interface_info *);
+ void if_register_send (struct interface_info *);
+ void if_deregister_send (struct interface_info *);
++void if_register_send_to_tunnel (struct interface_info *);
++void if_deregister_send_to_tunnel (struct interface_info *);
+ ssize_t send_packet (struct interface_info *,
+ 		     struct packet *, struct dhcp_packet *, size_t,
+ 		     struct in_addr,
+@@ -3062,6 +3078,8 @@
+ 
+ /* db.c */
+ int write_lease (struct lease *);
++int write_active_lease(struct shared_network *net, struct lease *lease, FILE *fp);
++int write_shared_network_summary(struct shared_network *s, FILE *fp, unsigned *total, unsigned *free_leases);
+ int write_host (struct host_decl *);
+ int write_server_duid(void);
+ #if defined (FAILOVER_PROTOCOL)
+@@ -3092,7 +3110,7 @@
+ 			  unsigned, struct hardware *);
+ ssize_t decode_udp_ip_header (struct interface_info *, unsigned char *,
+ 			      unsigned, struct sockaddr_in *,
+-			      unsigned, unsigned *, int);
++			      unsigned, unsigned *, int, uint32_t *);
+ 
+ /* ethernet.c */
+ void assemble_ethernet_header (struct interface_info *, unsigned char *,
+@@ -3515,6 +3533,7 @@
+ extern int numclasseswritten;
+ 
+ 
++void initialize_hash_tables(void);
+ isc_result_t enter_class (struct class *, int, int);
+ isc_result_t delete_class (struct class *, int);
+ isc_result_t enter_host (struct host_decl *, int, int);
+@@ -3527,7 +3546,7 @@
+ 		       unsigned, const char *, int);
+ int find_hosts_by_option(struct host_decl **, struct packet *,
+ 			 struct option_state *, const char *, int);
+-int find_host_for_network (struct subnet **, struct host_decl **,
++int find_host_for_network (struct subnet **, int, struct host_decl **,
+ 			   struct iaddr *, struct shared_network *);
+ 
+ void new_address_range (struct parse *, struct iaddr, struct iaddr,
+@@ -3575,7 +3594,7 @@
+ int lease_enqueue (struct lease *);
+ isc_result_t lease_instantiate(const void *, unsigned, void *);
+ void expire_all_pools (void);
+-void dump_subnets (void);
++void dump_active_leases (void *);
+ #if defined (DEBUG_MEMORY_LEAKAGE) || \
+ 		defined (DEBUG_MEMORY_LEAKAGE_ON_EXIT)
+ void free_everything (void);
+--- dhcp-4.4.1/server/dhcpv6.c.orig	2022-05-26 11:27:51.908575067 -0700
++++ dhcp-4.4.1/server/dhcpv6.c	2022-05-26 11:27:52.288559533 -0700
+@@ -101,6 +101,9 @@
+ 	/* Index into the data field that has been consumed. */
+ 	unsigned cursor;
+ 
++	int client_msg_type;  /*received packet type*/
++	int client_rc;        /*received packet rapid commit option*/
++
+ 	/* Space for the on commit statements for a fixed host */
+ 	struct on_star on_star;
+ 
+@@ -1786,6 +1789,15 @@
+ 	packet_reference(&reply.packet, packet, MDL);
+ 	data_string_copy(&reply.client_id, client_id, MDL);
+ 
++	reply.client_msg_type = packet->dhcpv6_msg_type;
++
++	if (lookup_option(&dhcpv6_universe, packet->options,
++		D6O_RAPID_COMMIT) != NULL) {
++		reply.client_rc = 1;
++	}  else {
++		reply.client_rc = 0;
++	}
++
+ 	if (!start_reply(packet, client_id, server_id, &reply.opt_state,
+ 			 &reply.buf.reply))
+ 		goto exit;
+@@ -3786,6 +3798,20 @@
+ 					    reply->host->group, group,
+ 					    on_star);
+ 
++	oc = lookup_option(&dhcpv6_universe,
++			reply->opt_state, D6O_RAPID_COMMIT);
++
++	if (oc != NULL) {
++		if (reply->client_msg_type == DHCPV6_SOLICIT
++			&& reply->client_rc == 1) {
++			/*Fixup reply message type*/
++			reply->buf.reply.msg_type = DHCPV6_REPLY;
++		} else {
++			delete_option(&dhcpv6_universe,
++					    reply->opt_state, D6O_RAPID_COMMIT);
++		}
++	}
++
+ 	/* Determine valid lifetime. */
+ 	if (reply->client_valid == 0)
+ 		reply->send_valid = DEFAULT_DEFAULT_LEASE_TIME;
+@@ -5061,6 +5087,20 @@
+ 					    reply->host->group, group,
+ 					    on_star);
+ 
++	oc = lookup_option(&dhcpv6_universe,
++			reply->opt_state, D6O_RAPID_COMMIT);
++
++	if (oc != NULL) {
++		if (reply->client_msg_type == DHCPV6_SOLICIT
++			&& reply->client_rc == 1) {
++			/*Fixup reply message type*/
++			reply->buf.reply.msg_type = DHCPV6_REPLY;
++		} else {
++			delete_option(&dhcpv6_universe,
++					    reply->opt_state, D6O_RAPID_COMMIT);
++		}
++	}
++
+ 	/* Determine valid lifetime. */
+ 	if (reply->client_valid == 0)
+ 		reply->send_valid = DEFAULT_DEFAULT_LEASE_TIME;
+--- dhcp-4.4.1/server/dhcpd.c.orig	2022-05-26 11:27:51.904575230 -0700
++++ dhcp-4.4.1/server/dhcpd.c	2022-05-26 11:27:52.244561332 -0700
+@@ -97,6 +97,7 @@
+ const char *path_dhcpd_conf = _PATH_DHCPD_CONF;
+ const char *path_dhcpd_db = _PATH_DHCPD_DB;
+ const char *path_dhcpd_pid = _PATH_DHCPD_PID;
++int lease_sz = 0;   // Value in KB
+ /* False (default) => we write and use a pid file */
+ isc_boolean_t no_pid_file = ISC_FALSE;
+ 
+@@ -164,6 +165,7 @@
+ #else /* !DHCPv6 */
+ #define DHCPD_USAGE1 \
+ "             [-cf config-file] [-lf lease-file]\n"
++"             [-ls lease-file-size]\n"
+ #endif /* DHCPv6 */
+ 
+ #if defined (PARANOIA)
+@@ -465,6 +467,10 @@
+ 				usage(use_noarg, argv[i-1]);
+ 			path_dhcpd_conf = argv [i];
+ 			have_dhcpd_conf = 1;
++		} else if (!strcmp (argv [i], "-ls")) {
++			if (++i == argc)
++				usage(use_noarg, argv[i-1]);
++			lease_sz = atoi (argv [i]);
+ 		} else if (!strcmp (argv [i], "-lf")) {
+ 			if (++i == argc)
+ 				usage(use_noarg, argv[i-1]);
+@@ -533,6 +539,8 @@
+ 			traceinfile = argv [i];
+ 			trace_replay_init ();
+ #endif /* TRACING */
++		} else if (!strcmp (argv [i], "-a")) {
++			use_iface_alias = 1;
+ 		} else if (argv [i][0] == '-') {
+ 			usage("Unknown command %s", argv[i]);
+ 		} else {
+@@ -1485,6 +1493,8 @@
+ 	dhcp_failover_startup ();
+ #endif
+ 
++	dump_active_leases(NULL);
++
+ 	/*
+ 	 * Begin our lease timeout background task.
+ 	 */
+--- dhcp-4.4.1/server/confpars.c.orig	2022-05-26 11:27:51.900575394 -0700
++++ dhcp-4.4.1/server/confpars.c	2022-05-26 11:27:52.216562476 -0700
+@@ -65,6 +65,10 @@
+ {
+ 	isc_result_t res;
+ 
++	/* Before parsing configuration, ensure all hash tables are allocated
++	 * and initialized. */
++	initialize_hash_tables();
++
+ 	res = read_conf_file (path_dhcpd_conf, root_group, ROOT_GROUP, 0);
+ #if defined(LDAP_CONFIGURATION)
+ 	if (res != ISC_R_SUCCESS)
+@@ -2673,6 +2677,71 @@
+ 	shared_network_dereference (&share, MDL);
+ }
+ 
++static void find_pool(struct pool **pool, struct shared_network *share, int dynamic)
++{
++	isc_result_t status;
++	struct pool *pl;
++	struct pool *last = (struct pool *)0;
++
++	/* If we're permitting dynamic bootp for this range,
++	   then look for a pool with an empty prohibit list and
++	   a permit list with one entry that permits all clients. */
++	for (pl = share -> pools; pl; pl = pl -> next) {
++		if ((!dynamic && !pl -> permit_list && 
++		     pl -> prohibit_list &&
++		     !pl -> prohibit_list -> next &&
++		     (pl -> prohibit_list -> type ==
++		      permit_dynamic_bootp_clients)) ||
++		    (dynamic && !pl -> prohibit_list &&
++		     pl -> permit_list &&
++		     !pl -> permit_list -> next &&
++		     (pl -> permit_list -> type ==
++		      permit_all_clients))) {
++			break;
++		}
++		last = pl;
++	}
++
++	/* If we didn't get a pool, make one. */
++	if (!pl) {
++		struct permit *p;
++		status = pool_allocate (&pl, MDL);
++		if (status != ISC_R_SUCCESS)
++			log_fatal ("no memory for ad-hoc pool: %s",
++				   isc_result_totext (status));
++		p = new_permit (MDL);
++		if (!p)
++			log_fatal ("no memory for ad-hoc permit.");
++
++		/* Dynamic pools permit all clients.   Otherwise
++		   we prohibit BOOTP clients. */
++		if (dynamic) {
++			p -> type = permit_all_clients;
++			pl -> permit_list = p;
++		} else {
++			p -> type = permit_dynamic_bootp_clients;
++			pl -> prohibit_list = p;
++		}
++
++		if (share -> pools)
++			pool_reference (&last -> next, pl, MDL);
++		else
++			pool_reference (&share -> pools, pl, MDL);
++		shared_network_reference (&pl -> shared_network,
++					  share, MDL);
++		if (!clone_group (&pl -> group, share -> group, MDL))
++			log_fatal ("no memory for anon pool group.");
++	} else {
++		pl = (struct pool *)0;
++		if (last)
++			pool_reference (&pl, last, MDL);
++		else
++			pool_reference (&pl, share -> pools, MDL);
++	}
++
++	*pool = pl;
++	return;
++}
+ 
+ static int
+ common_subnet_parsing(struct parse *cfile, 
+@@ -2681,6 +2750,7 @@
+ 	enum dhcp_token token;
+ 	struct subnet *t, *u;
+ 	const char *val;
++	struct pool *pool;
+ 	int declaration = 0;
+ 
+ 	enter_subnet(subnet);
+@@ -2713,6 +2783,12 @@
+ 					      declaration);
+ 	} while (1);
+ 
++	/* If no pool found in the subnet, mockup one */
++	if (share->pools == NULL) {
++		find_pool(&pool, share, 0);
++		pool_dereference(&pool, MDL);
++	}
++
+ 	/* Add the subnet to the list of subnets in this shared net. */
+ 	if (share->subnets == NULL) {
+ 		subnet_reference(&share->subnets, subnet, MDL);
+@@ -3772,7 +3848,6 @@
+ 	struct subnet *subnet;
+ 	struct shared_network *share;
+ 	struct pool *pool;
+-	isc_result_t status;
+ 
+ 	if ((token = peek_token (&val,
+ 				 (unsigned *)0, cfile)) == DYNAMIC_BOOTP) {
+@@ -3826,63 +3901,7 @@
+ 	}
+ 
+ 	if (!inpool) {
+-		struct pool *last = (struct pool *)0;
+-
+-		/* If we're permitting dynamic bootp for this range,
+-		   then look for a pool with an empty prohibit list and
+-		   a permit list with one entry that permits all clients. */
+-		for (pool = share -> pools; pool; pool = pool -> next) {
+-			if ((!dynamic && !pool -> permit_list && 
+-			     pool -> prohibit_list &&
+-			     !pool -> prohibit_list -> next &&
+-			     (pool -> prohibit_list -> type ==
+-			      permit_dynamic_bootp_clients)) ||
+-			    (dynamic && !pool -> prohibit_list &&
+-			     pool -> permit_list &&
+-			     !pool -> permit_list -> next &&
+-			     (pool -> permit_list -> type ==
+-			      permit_all_clients))) {
+-  				break;
+-			}
+-			last = pool;
+-		}
+-
+-		/* If we didn't get a pool, make one. */
+-		if (!pool) {
+-			struct permit *p;
+-			status = pool_allocate (&pool, MDL);
+-			if (status != ISC_R_SUCCESS)
+-				log_fatal ("no memory for ad-hoc pool: %s",
+-					   isc_result_totext (status));
+-			p = new_permit (MDL);
+-			if (!p)
+-				log_fatal ("no memory for ad-hoc permit.");
+-
+-			/* Dynamic pools permit all clients.   Otherwise
+-			   we prohibit BOOTP clients. */
+-			if (dynamic) {
+-				p -> type = permit_all_clients;
+-				pool -> permit_list = p;
+-			} else {
+-				p -> type = permit_dynamic_bootp_clients;
+-				pool -> prohibit_list = p;
+-			}
+-
+-			if (share -> pools)
+-				pool_reference (&last -> next, pool, MDL);
+-			else
+-				pool_reference (&share -> pools, pool, MDL);
+-			shared_network_reference (&pool -> shared_network,
+-						  share, MDL);
+-			if (!clone_group (&pool -> group, share -> group, MDL))
+-				log_fatal ("no memory for anon pool group.");
+-		} else {
+-			pool = (struct pool *)0;
+-			if (last)
+-				pool_reference (&pool, last, MDL);
+-			else
+-				pool_reference (&pool, share -> pools, MDL);
+-		}
++		find_pool(&pool, share, dynamic);
+ 	} else {
+ 		pool = (struct pool *)0;
+ 		pool_reference (&pool, inpool, MDL);
+@@ -5993,6 +6012,15 @@
+ 			continue;
+ 		}
+ 
++		if (pool->units != iapref->plen) {
++			ipv6_pool_dereference(&pool, MDL);
++			inet_ntop(AF_INET6, &iapref->addr,
++				  addr_buf, sizeof(addr_buf));
++			parse_warn(cfile, "no pool found for prefix %s/%d",
++				   addr_buf, iapref->plen);
++			return;
++		}
++
+ 		/* remove old information */
+ 		if (cleanup_lease6(ia_pd_active, pool,
+ 				   iapref, ia) != ISC_R_SUCCESS) {
+--- dhcp-4.4.1/server/omapi.c.orig	2022-05-26 11:27:51.912574904 -0700
++++ dhcp-4.4.1/server/omapi.c	2022-05-26 11:27:52.316558388 -0700
+@@ -474,7 +474,8 @@
+ 
+ 	if (lease-> uid)
+ 		uid_hash_delete (lease);
+-	hw_hash_delete (lease);
++	if (lease->hardware_addr.hlen)
++		hw_hash_delete (lease);
+ 
+ 	if (lease->on_star.on_release)
+ 		executable_statement_dereference (&lease->on_star.on_release,
+--- dhcp-4.4.1/server/mdb.c.orig	2022-05-26 11:27:51.912574904 -0700
++++ dhcp-4.4.1/server/mdb.c	2022-05-26 11:27:52.304558878 -0700
+@@ -37,6 +37,8 @@
+ lease_id_hash_t *lease_uid_hash;
+ lease_ip_hash_t *lease_ip_addr_hash;
+ lease_id_hash_t *lease_hw_addr_hash;
++char *active_leases_db = NULL;
++int dump_leases_timer = 0;
+ 
+ /*
+  * We allow users to specify any option as a host identifier.
+@@ -217,6 +219,59 @@
+ 		      host->client_identifier.len, host, MDL);
+ }
+ 
++static int enter_static_lease (struct host_decl *hp)
++{
++	struct lease *lease = (struct lease *)0;
++	struct lease *lp = (struct lease *)0;
++	struct host_decl *rhp = (struct host_decl *)0;
++	struct shared_network *share = (struct shared_network *)0;
++	
++	if (host_reference (&rhp, hp, MDL) != ISC_R_SUCCESS)
++		return 0;
++	if (lease_allocate (&lease, MDL) != ISC_R_SUCCESS)
++		return 0;
++
++	for (share = shared_networks; share; share = share -> next) {
++		if (find_host_for_network (&lease -> subnet, 0,
++					   &rhp, &lease -> ip_addr, share))
++			break;
++	}
++	if (!share) {
++		lease_dereference (&lease, MDL);
++		host_dereference (&rhp, MDL);
++		return 0;
++	}
++
++	/* If an existing static lease is found, give a warning. */
++	if (find_lease_by_ip_addr (&lp, lease -> ip_addr, MDL)) {
++		log_error ("Warning: an existing lease is found for the fixed address %s",
++			   piaddr (lease -> ip_addr));
++		lease_dereference (&lp, MDL);
++		lease_dereference (&lease, MDL);
++		host_dereference (&rhp, MDL);
++		return 0;
++	}
++
++	lease -> starts = lease -> cltt = lease -> ends = MIN_TIME;
++	lease -> flags = STATIC_LEASE;
++	lease -> binding_state = FTS_FREE;
++	lease -> next_binding_state = FTS_FREE;
++	lease -> rewind_binding_state = FTS_FREE;
++
++	/* Simply reference the static lease to the first pool of the shared network */
++	pool_reference (&lease -> pool, share -> pools, MDL);
++
++	/* Remember static lease in the IP address hash. */
++	lease_ip_hash_add (lease_ip_addr_hash,
++			   lease -> ip_addr.iabuf,
++			   lease -> ip_addr.len,
++			   lease, MDL);
++
++	lease_dereference (&lease, MDL);
++	host_dereference (&rhp, MDL);
++	return 1;
++}
++
+ isc_result_t enter_host (hd, dynamicp, commit)
+ 	struct host_decl *hd;
+ 	int dynamicp;
+@@ -421,6 +476,9 @@
+ 		}
+ 	}
+ 
++	if (local_family == AF_INET)
++		enter_static_lease (hd);
++
+ 	if (dynamicp && commit) {
+ 		if (!write_host (hd))
+ 			return ISC_R_IOERROR;
+@@ -710,7 +768,7 @@
+    the addr pointer, update the host pointer to point at the host_decl
+    that matched, and return the subnet that matched. */
+ 
+-int find_host_for_network (struct subnet **sp, struct host_decl **host,
++int find_host_for_network (struct subnet **sp, int all, struct host_decl **host,
+ 			   struct iaddr *addr, struct shared_network *share)
+ {
+ 	int i;
+@@ -721,6 +779,9 @@
+ 	memset (&fixed_addr, 0, sizeof fixed_addr);
+ 
+ 	for (hp = *host; hp; hp = hp -> n_ipaddr) {
++		if (!all && hp != *host)
++			break;
++
+ 		if (!hp -> fixed_addr)
+ 			continue;
+ 		if (!evaluate_option_cache (&fixed_addr, (struct packet *)0,
+@@ -756,6 +817,25 @@
+ 	return 0;
+ }
+ 
++void initialize_hash_tables(void)
++{
++	/* Initialize the hash table if it hasn't been done yet. */
++	if (!lease_uid_hash) {
++		if (!lease_id_new_hash(&lease_uid_hash, LEASE_HASH_SIZE, MDL))
++			log_fatal ("Can't allocate lease/uid hash");
++	}
++	if (!lease_ip_addr_hash) {
++		if (!lease_ip_new_hash(&lease_ip_addr_hash, LEASE_HASH_SIZE,
++				       MDL))
++			log_fatal ("Can't allocate lease/ip hash");
++	}
++	if (!lease_hw_addr_hash) {
++		if (!lease_id_new_hash(&lease_hw_addr_hash, LEASE_HASH_SIZE,
++				       MDL))
++			log_fatal ("Can't allocate lease/hw hash");
++	}
++}
++
+ void new_address_range (cfile, low, high, subnet, pool, lpchain)
+ 	struct parse *cfile;
+ 	struct iaddr low, high;
+@@ -782,22 +862,6 @@
+ 		       netbuf, piaddr (subnet -> netmask));
+ 	}
+ 
+-	/* Initialize the hash table if it hasn't been done yet. */
+-	if (!lease_uid_hash) {
+-		if (!lease_id_new_hash(&lease_uid_hash, LEASE_HASH_SIZE, MDL))
+-			log_fatal ("Can't allocate lease/uid hash");
+-	}
+-	if (!lease_ip_addr_hash) {
+-		if (!lease_ip_new_hash(&lease_ip_addr_hash, LEASE_HASH_SIZE,
+-				       MDL))
+-			log_fatal ("Can't allocate lease/ip hash");
+-	}
+-	if (!lease_hw_addr_hash) {
+-		if (!lease_id_new_hash(&lease_hw_addr_hash, LEASE_HASH_SIZE,
+-				       MDL))
+-			log_fatal ("Can't allocate lease/hw hash");
+-	}
+-
+ 	/* Make sure that high and low addresses are in this subnet. */
+ 	if (!addr_eq(subnet->net, subnet_number(low, subnet->netmask))) {
+ 		strcpy(lowbuf, piaddr(low));
+@@ -1092,6 +1156,14 @@
+ 	struct lease *comp = (struct lease *)0;
+ 
+ 	if (find_lease_by_ip_addr (&comp, lease -> ip_addr, MDL)) {
++		/* In case a static lease is found, drop it */
++		if (comp -> flags & STATIC_LEASE) {
++			log_error ("Warning: static lease found, dropping lease for %s",
++				   piaddr (lease -> ip_addr));
++			lease_dereference (&comp, MDL);
++			return;
++		}
++
+ 		if (!comp -> pool) {
+ 			log_error ("undeclared lease found in database: %s",
+ 				   piaddr (lease -> ip_addr));
+@@ -1101,6 +1173,7 @@
+ 		if (comp -> subnet)
+ 			subnet_reference (&lease -> subnet,
+ 					  comp -> subnet, MDL);
++
+ 		lease_ip_hash_delete(lease_ip_addr_hash,
+ 				     lease->ip_addr.iabuf, lease->ip_addr.len,
+ 				     MDL);
+@@ -1151,10 +1224,6 @@
+ 	if (!lease)
+ 		goto just_move_it;
+ 
+-	/* Static leases are not currently kept in the database... */
+-	if (lease -> flags & STATIC_LEASE)
+-		return 1;
+-
+ 	/* If the existing lease hasn't expired and has a different
+ 	   unique identifier or, if it doesn't have a unique
+ 	   identifier, a different hardware address, then the two
+@@ -2907,41 +2976,78 @@
+ 	server_starting = 0;
+ }
+ 
+-void dump_subnets ()
++void dump_active_leases (void *arg)
+ {
+ 	struct lease *l;
+ 	struct shared_network *s;
+-	struct subnet *n;
+ 	struct pool *p;
+ 	LEASE_STRUCT_PTR lptr[RESERVED_LEASES+1];
+ 	int i;
++	char tmp_leases_db[256];
++	FILE *pdb;
++	unsigned total = 0;
++	unsigned free_ = 0;
+ 
+-	log_info ("Subnets:");
+-	for (n = subnets; n; n = n -> next_subnet) {
+-		log_debug ("  Subnet %s", piaddr (n -> net));
+-		log_debug ("     netmask %s",
+-		       piaddr (n -> netmask));
++	if (local_family != AF_INET)
++		return;
++
++	snprintf(tmp_leases_db, sizeof(tmp_leases_db), "%s.active.tmp", path_dhcpd_db);
++	pdb = fopen(tmp_leases_db, "a");
++	if (pdb == NULL) {
++	    log_error("Failed to open database file %s for active leases!", tmp_leases_db);
++	    return;
+ 	}
+-	log_info ("Shared networks:");
++
+ 	for (s = shared_networks; s; s = s -> next) {
+-	    log_info ("  %s", s -> name);
+-	    for (p = s -> pools; p; p = p -> next) {
+-		lptr [FREE_LEASES] = &p -> free;
+-		lptr [ACTIVE_LEASES] = &p -> active;
+-		lptr [EXPIRED_LEASES] = &p -> expired;
+-		lptr [ABANDONED_LEASES] = &p -> abandoned;
+-		lptr [BACKUP_LEASES] = &p -> backup;
+-		lptr [RESERVED_LEASES] = &p->reserved;
++		if (!s->interface)
++			continue;
+ 
+-		for (i = FREE_LEASES; i <= RESERVED_LEASES; i++) {
+-		    for (l = LEASE_GET_FIRSTP(lptr[i]);
+-			 l != NULL;
+-			 l = LEASE_GET_NEXTP(lptr[i], l)) {
+-			    print_lease (l);
+-		    }
++		for (p = s -> pools; p; p = p -> next) {
++			lptr [FREE_LEASES] = &p -> free;
++			lptr [ACTIVE_LEASES] = &p -> active;
++			lptr [EXPIRED_LEASES] = &p -> expired;
++			lptr [ABANDONED_LEASES] = &p -> abandoned;
++			lptr [BACKUP_LEASES] = &p -> backup;
++			lptr [RESERVED_LEASES] = &p->reserved;
++
++			for (i = FREE_LEASES; i <= RESERVED_LEASES; i++) {
++				if (i != ACTIVE_LEASES)
++					continue;
++
++				for (l = *(lptr[i]); l; l = l->next) {
++					if (l->hardware_addr.hlen != 0 || l->uid_len != 0 ||
++							l->tsfp != 0 || l->binding_state != FTS_FREE)
++						write_active_lease(s, l, pdb);
++				}
++			}
+ 		}
++		/* For each pool, dump its statistics. */
++		write_shared_network_summary(s, pdb, &total, &free_);
++	}
++
++	fprintf(pdb, "all-shared-networks {\n");
++	fprintf(pdb, "  count %u;\n", total);
++	fprintf(pdb, "  leased %u;\n", total - free_);
++	fprintf(pdb, "}\n");
++
++	fclose(pdb);
++	if (!active_leases_db) {
++	    active_leases_db = malloc(256);
++	    if (active_leases_db == NULL) {
++		log_error("Failed to allocate memory for active lease db path!");
++		return;
+ 	    }
++
++	    snprintf(active_leases_db, 256, "%s.active", path_dhcpd_db);
++	}
++
++	/* Rename the tmp file to the real one */
++	if (rename(tmp_leases_db, active_leases_db) < 0) {
++	    log_error("Can't install new active lease database %s to %s: %m", tmp_leases_db, active_leases_db);
+ 	}
++
++	dump_leases_timer = 0;
++	return;
+ }
+ 
+ HASH_FUNCTIONS(lease_ip, const unsigned char *, struct lease, lease_ip_hash_t,
+--- dhcp-4.4.1/server/dhcp.c.orig	2022-05-26 11:27:51.904575230 -0700
++++ dhcp-4.4.1/server/dhcp.c	2022-05-26 11:27:52.236561659 -0700
+@@ -3180,16 +3180,7 @@
+ 	}
+ #endif /* NSUPDATE */
+ 
+-	/* Don't call supersede_lease on a mocked-up lease. */
+-	if (lease -> flags & STATIC_LEASE) {
+-		/* Copy the hardware address into the static lease
+-		   structure. */
+-		lease -> hardware_addr.hlen = packet -> raw -> hlen + 1;
+-		lease -> hardware_addr.hbuf [0] = packet -> raw -> htype;
+-		memcpy (&lease -> hardware_addr.hbuf [1],
+-			packet -> raw -> chaddr,
+-			sizeof packet -> raw -> chaddr); /* XXX */
+-	} else {
++	{
+ 		int commit = (!offer || (offer == DHCPACK));
+ 
+ 		/* If dhcp-cache-threshold is enabled, see if "lease" can
+@@ -4145,7 +4136,7 @@
+ 				       client_identifier.len, MDL)) {
+ 			/* Remember if we know of this client. */
+ 			packet -> known = 1;
+-			mockup_lease (&fixed_lease, packet, share, hp);
++			find_static_lease (&fixed_lease, packet, share, hp);
+ 		}
+ 
+ #if defined (DEBUG_FIND_LEASE)
+@@ -4162,6 +4153,9 @@
+ 
+ 		find_lease_by_uid (&uid_lease, client_identifier.data,
+ 				   client_identifier.len, MDL);
++		if (uid_lease && uid_lease -> flags & STATIC_LEASE) {
++			lease_dereference (&uid_lease, MDL);
++		}
+ 	}
+ 
+ 	/* If we didn't find a fixed lease using the uid, try doing
+@@ -4176,7 +4170,7 @@
+ 				host_dereference (&host, MDL);
+ 			host_reference (&host, hp, MDL);
+ 			host_dereference (&hp, MDL);
+-			mockup_lease (&fixed_lease, packet, share, host);
++			find_static_lease (&fixed_lease, packet, share, host);
+ #if defined (DEBUG_FIND_LEASE)
+ 			if (fixed_lease) {
+ 				log_info ("Found host for link address: %s.",
+@@ -4196,7 +4190,7 @@
+ 				host_dereference(&host, MDL);
+ 			host_reference(&host, hp, MDL);
+ 			host_dereference(&hp, MDL);
+-			mockup_lease (&fixed_lease, packet, share, host);
++			find_static_lease (&fixed_lease, packet, share, host);
+ #if defined (DEBUG_FIND_LEASE)
+ 			if (fixed_lease) {
+ 				log_info ("Found host via host-identifier");
+@@ -4311,6 +4305,9 @@
+ 	h.hbuf [0] = packet -> raw -> htype;
+ 	memcpy (&h.hbuf [1], packet -> raw -> chaddr, packet -> raw -> hlen);
+ 	find_lease_by_hw_addr (&hw_lease, h.hbuf, h.hlen, MDL);
++	if (hw_lease && hw_lease -> flags & STATIC_LEASE) {
++		lease_dereference (&hw_lease, MDL);
++	}
+ 	while (hw_lease) {
+ #if defined (DEBUG_FIND_LEASE)
+ 		log_info ("trying next lease matching hw addr: %s",
+@@ -4397,6 +4394,9 @@
+ 		lease_reference (&ip_lease, ip_lease_in, MDL);
+ 	else if (cip.len)
+ 		find_lease_by_ip_addr (&ip_lease, cip, MDL);
++	if (ip_lease && ip_lease -> flags & STATIC_LEASE) {
++		lease_dereference (&ip_lease, MDL);
++	}
+ 
+ #if defined (DEBUG_FIND_LEASE)
+ 	if (ip_lease)
+@@ -4823,45 +4823,59 @@
+    the specified shared network.  If one is found, mock up and return a
+    lease structure for it; otherwise return the null pointer. */
+ 
+-int mockup_lease (struct lease **lp, struct packet *packet,
++int find_static_lease (struct lease **lp, struct packet *packet,
+ 		  struct shared_network *share, struct host_decl *hp)
+ {
+ 	struct lease *lease = (struct lease *)0;
+ 	struct host_decl *rhp = (struct host_decl *)0;
+ 	
++	if (host_reference (&rhp, hp, MDL) != ISC_R_SUCCESS)
++		return 0;
+ 	if (lease_allocate (&lease, MDL) != ISC_R_SUCCESS)
+ 		return 0;
+-	if (host_reference (&rhp, hp, MDL) != ISC_R_SUCCESS) {
++	if (!find_host_for_network (&lease -> subnet, 1,
++				    &rhp, &lease -> ip_addr, share)) {
+ 		lease_dereference (&lease, MDL);
++		host_dereference (&rhp, MDL);
+ 		return 0;
+ 	}
+-	if (!find_host_for_network (&lease -> subnet,
+-				    &rhp, &lease -> ip_addr, share)) {
++
++	/* The static lease has been entered on startup with host declarations */
++	if (!find_lease_by_ip_addr (lp, lease -> ip_addr, MDL)) {
++		log_error ("Error: no static lease found for the fixed address %s",
++			   piaddr (lease -> ip_addr));
+ 		lease_dereference (&lease, MDL);
+ 		host_dereference (&rhp, MDL);
+ 		return 0;
+ 	}
+-	host_reference (&lease -> host, rhp, MDL);
+-	if (rhp -> client_identifier.len > sizeof lease -> uid_buf)
+-		lease -> uid = dmalloc (rhp -> client_identifier.len, MDL);
+-	else
+-		lease -> uid = lease -> uid_buf;
+-	if (!lease -> uid) {
++
++	lease_dereference (&lease, MDL);
++	lease = *lp;
++	if (!(lease -> flags & STATIC_LEASE)) {
++		log_error ("Warning: a non-static lease is found for a fixed address %s",
++			   piaddr (lease -> ip_addr));
+ 		lease_dereference (&lease, MDL);
+ 		host_dereference (&rhp, MDL);
+ 		return 0;
+ 	}
+-	memcpy (lease -> uid, rhp -> client_identifier.data,
+-		rhp -> client_identifier.len);
+-	lease -> uid_len = rhp -> client_identifier.len;
+-	lease -> hardware_addr = rhp -> interface;
+-	lease -> starts = lease -> cltt = lease -> ends = MIN_TIME;
+-	lease -> flags = STATIC_LEASE;
+-	lease -> binding_state = FTS_FREE;
+ 
+-	lease_reference (lp, lease, MDL);
++	host_reference (&lease -> host, rhp, MDL);
++	if (rhp -> client_identifier.len) {
++		if (rhp -> client_identifier.len > sizeof lease -> uid_buf)
++			lease -> uid = dmalloc (rhp -> client_identifier.len, MDL);
++		else
++			lease -> uid = lease -> uid_buf;
++		if (!lease -> uid) {
++			lease_dereference (&lease, MDL);
++			host_dereference (&rhp, MDL);
++			return 0;
++		}
++		memcpy (lease -> uid, rhp -> client_identifier.data,
++			rhp -> client_identifier.len);
++		lease -> uid_len = rhp -> client_identifier.len;
++	}
++	lease -> hardware_addr = rhp -> interface;
+ 
+-	lease_dereference (&lease, MDL);
+ 	host_dereference (&rhp, MDL);
+ 	return 1;
+ }
+@@ -4945,10 +4959,19 @@
+ 		} else
+ #endif
+ 		{
++			LEASE_STRUCT lc;
++
+ 			if (LEASE_NOT_EMPTY(pool->free))
+-				candl = LEASE_GET_FIRST(pool->free);
++				lc = pool->free;
+ 			else
+-				candl = LEASE_GET_FIRST(pool->abandoned);
++				lc = pool->abandoned;
++
++			for (candl = LEASE_GET_FIRST(lc);
++			     candl;
++			     candl = LEASE_GET_NEXT(lc, candl)) {
++				if (!(candl->flags & STATIC_LEASE))
++					break;
++			}
+ 		}
+ 
+ 		/*
+--- dhcp-4.4.1/server/db.c.orig	2022-05-26 11:27:51.900575394 -0700
++++ dhcp-4.4.1/server/db.c	2022-05-26 11:27:52.216562476 -0700
+@@ -41,6 +41,8 @@
+ static int count = 0;
+ TIME write_time;
+ int lease_file_is_corrupt = 0;
++extern int lease_sz;
++extern int dump_leases_timer;
+ 
+ /* Write a single binding scope value in parsable format.
+  */
+@@ -109,6 +111,9 @@
+ 		if (!new_lease_file (0))
+ 			return 0;
+ 
++	if (lease -> flags & STATIC_LEASE)
++		return 1;
++
+ 	if (counting)
+ 		++count;
+ 	errno = 0;
+@@ -295,6 +300,70 @@
+ 	return !errors;
+ }
+ 
++int write_active_lease(struct shared_network *net, struct lease *lease, FILE *fp)
++{
++	char *s;
++	const char *tval;
++
++	fprintf(fp, "lease %s {", piaddr(lease->ip_addr));
++	fprintf(fp, "\n  interface %s;", net->interface->name);
++
++	if (lease->starts && (tval = print_time(lease->starts)) != NULL)
++	    fprintf(fp, "\n  starts %s", tval);
++
++	if (lease->ends && (tval = print_time(lease->ends)) != NULL)
++	    fprintf(fp, "\n  ends %s", tval);
++
++	fprintf(fp, "\n  binding state %s;",
++		((lease->binding_state > 0 &&
++		  lease->binding_state <= FTS_LAST) ?
++		 binding_state_names[lease->binding_state - 1] :
++		 "abandoned"));
++
++	if (lease->flags & RESERVED_LEASE)
++	    fprintf(fp, "\n  reserved;");
++
++	/* hardware address */
++	if (lease->hardware_addr.hlen) {
++	    fprintf(fp, "\n  hardware %s %s;",
++		    hardware_types[lease->hardware_addr.hbuf[0]],
++		    print_hw_addr(lease->hardware_addr.hbuf[0],
++				  lease->hardware_addr.hlen - 1,
++				  &lease->hardware_addr.hbuf[1]));
++	}
++
++	if (lease->client_hostname &&
++	    db_printable((unsigned char *)lease->client_hostname)) {
++	    s = quotify_string(lease->client_hostname, MDL);
++	    if (s) {
++			fprintf(fp, "\n  client-hostname \"%s\";", s);
++			dfree(s, MDL);
++		}
++	}
++
++	fputs("\n}\n", fp);
++
++	return 0;
++}
++
++int write_shared_network_summary(struct shared_network *s, FILE *fp, unsigned *total, unsigned *free)
++{
++	struct pool *p;
++	unsigned lease_count = 0;
++	unsigned free_leases = 0;
++	for (p = s -> pools; p; p = p -> next) {
++		lease_count += p->lease_count;
++		free_leases += p->free_leases;
++	}
++	fprintf(fp, "shared-network %s {\n", s->name);
++	fprintf(fp, "  count %u;\n", lease_count);
++	fprintf(fp, "  leased %u;\n", lease_count - free_leases);
++	fprintf(fp, "}\n");
++	*total += lease_count;
++	*free += free_leases;
++	return 0;
++}
++
+ int write_host (host)
+ 	struct host_decl *host;
+ {
+@@ -1030,6 +1099,7 @@
+ 
+ int commit_leases ()
+ {
++	struct stat st;
+ 	/* Commit any outstanding writes to the lease database file.
+ 	   We need to do this even if we're rewriting the file below,
+ 	   just in case the rewrite fails. */
+@@ -1043,10 +1113,26 @@
+ 		return (0);
+ 	}
+ 
++	if (fstat (fileno (db_file), &st) < 0) {
++		log_info ("commit_leases: unable to commit: %m");
++		return 0;
++	}
++
++        if (!dump_leases_timer) {
++            struct timeval tv;
++
++            tv.tv_sec = cur_tv.tv_sec + 10;
++            tv.tv_usec = cur_tv.tv_usec;
++            add_timeout(&tv, dump_active_leases, NULL, NULL, NULL);
++            dump_leases_timer = 1;
++        }
++
+ 	/* If we haven't rewritten the lease database in over an
+ 	   hour, rewrite it now.  (The length of time should probably
+ 	   be configurable. */
+-	if (count && cur_time - write_time > LEASE_REWRITE_PERIOD) {
++	if (count && (cur_time - write_time > 3600 ||
++        (lease_sz > 0 && st.st_size > (lease_sz << 10))) ) // x 1024 (KB)) 
++	{
+ 		count = 0;
+ 		write_time = cur_time;
+ 		new_lease_file(0);
+--- dhcp-4.4.1/relay/dhcrelay.c.orig	2022-05-26 11:27:51.896575557 -0700
++++ dhcp-4.4.1/relay/dhcrelay.c	2022-05-26 11:27:52.184563784 -0700
+@@ -80,6 +80,11 @@
+ int no_daemon = 0;
+ int dfd[2] = { -1, -1 };
+ 
++int per_if_relay = 0; /*per interface relay mode*/
++
++char *cfg_file = NULL;
++
++extern int dhcp_state;
+ #ifdef DHCPv6
+ 	/* Force use of DHCPv6 interface-id option. */
+ isc_boolean_t use_if_id = ISC_FALSE;
+@@ -99,10 +104,7 @@
+ u_int16_t remote_port;
+ 
+ /* Relay agent server list. */
+-struct server_list {
+-	struct server_list *next;
+-	struct sockaddr_in to;
+-} *servers;
++struct server_list  *servers;
+ 
+ struct interface_info *uplink = NULL;
+ 
+@@ -141,6 +143,9 @@
+ 
+ static void request_v4_interface(const char* name, int flags);
+ 
++static int parse_relay_config(char *file);
++static struct interface_info* interface_lookup_with_name(char *ifname);
++
+ static const char copyright[] =
+ "Copyright 2004-2018 Internet Systems Consortium.";
+ static const char arr[] = "All rights reserved.";
+@@ -157,6 +162,7 @@
+ "Usage: %s [-4] [-d] [-q] [-a] [-D]\n" \
+ "                     [-A <length>] [-c <hops>]\n" \
+ "                     [-p <port> | -rp <relay-port>]\n" \
++"                     [-cf <config-file>]\n"\
+ "                     [-pf <pid-file>] [--no-pid]\n"\
+ "                     [-m append|replace|forward|discard]\n" \
+ "                     [-i interface0 [ ... -i interfaceN]\n" \
+@@ -177,6 +183,7 @@
+ #define DHCRELAY_USAGE \
+ "Usage: %s [-4] [-d] [-q] [-a] [-D]\n" \
+ "                     [-A <length>] [-c <hops>] [-p <port>]\n" \
++"                     [-cf <config-file>]\n"\
+ "                     [-pf <pid-file>] [--no-pid]\n"\
+ "                     [-m append|replace|forward|discard]\n" \
+ "                     [-i interface0 [ ... -i interfaceN]\n" \
+@@ -185,6 +192,7 @@
+ "                     [-U interface]\n" \
+ "                     server0 [ ... serverN]\n\n" \
+ "       %s -6   [-d] [-q] [-I] [-c <hops>] [-p <port>]\n" \
++"                     [-cf <config-file>]\n"\
+ "                     [-pf <pid-file>] [--no-pid]\n" \
+ "                     [-s <subscriber-id>]\n" \
+ "                     -l lower0 [ ... -l lowerN]\n" \
+@@ -198,6 +206,7 @@
+ #define DHCRELAY_USAGE \
+ "Usage: %s [-d] [-q] [-a] [-D] [-A <length>] [-c <hops>]\n" \
+ "                [-p <port> | -rp <relay-port>]\n" \
++"                [-cf <config-file>]\n"\
+ "                [-pf <pid-file>] [--no-pid]\n" \
+ "                [-m append|replace|forward|discard]\n" \
+ "                [-i interface0 [ ... -i interfaceN]\n" \
+@@ -209,7 +218,9 @@
+ #else
+ #define DHCRELAY_USAGE \
+ "Usage: %s [-d] [-q] [-a] [-D] [-A <length>] [-c <hops>] [-p <port>]\n" \
++"                [-cf <config-file>]\n"\
+ "                [-pf <pid-file>] [--no-pid]\n" \
++"                [-cf <config-file>]\n"\
+ "                [-m append|replace|forward|discard]\n" \
+ "                [-i interface0 [ ... -i interfaceN]\n" \
+ "                [-iu interface0 [ ... -iu interfaceN]\n" \
+@@ -415,7 +426,15 @@
+ 				  ntohs(relay_port));
+ 			add_agent_options = 1;
+ #endif
+-		} else if (!strcmp(argv[i], "-c")) {
++		} else if (!strcmp(argv[i], "-cf")) {
++			if (++i == argc) {
++				usage(use_noarg, argv[i-1]);
++			}
++
++			cfg_file = argv[i];
++			per_if_relay = 1;
++
++        } else if (!strcmp(argv[i], "-c")) {
+ 			int hcount;
+ 			if (++i == argc)
+ 				usage(use_noarg, argv[i-1]);
+@@ -611,6 +630,8 @@
+ 			local_family_set = 1;
+ 			local_family = AF_INET;
+ #endif
++			if (per_if_relay) break;
++
+ 			if (inet_aton(argv[i], &ia)) {
+ 				iap = &ia;
+ 			} else {
+@@ -700,6 +721,10 @@
+ 		endservent();
+ 	}
+ 
++	if (per_if_relay == 1) {
++		goto skip_init_servers;
++	}
++
+ 	if (local_family == AF_INET) {
+ 		/* We need at least one server */
+ 		if (servers == NULL) {
+@@ -745,13 +770,20 @@
+ 				  "option definition.");
+ 	}
+ #endif
+-
++skip_init_servers:
+ 	/* Get the current time... */
+ 	gettimeofday(&cur_tv, NULL);
+ 
++	dhcp_state = DISCOVER_RELAY;
++
+ 	/* Discover all the network interfaces. */
+ 	discover_interfaces(DISCOVER_RELAY);
+ 
++	/* Initialize per interface relay servers. */
++	if (per_if_relay) {
++		parse_relay_config(cfg_file);
++	}
++
+ #ifdef DHCPv6
+ 	if (local_family == AF_INET6)
+ 		setup_streams();
+@@ -823,11 +855,88 @@
+ 	return (0);
+ }
+ 
++#define NIPQUAD(addr) \
++    ((unsigned char *)&addr)[0], \
++    ((unsigned char *)&addr)[1], \
++    ((unsigned char *)&addr)[2], \
++    ((unsigned char *)&addr)[3]
++#define NIPQUAD_FMT "%u.%u.%u.%u"
++
++#define DHCRELAY_SRC_FILE "/proc/net/vpn_src_get"
++
++/*
++ * give /proc/net/vpn_src_get two ip addresses.
++ * src ip address is primary ip of a device that received a dhcp request.
++ * dst ip address is a dhcp serve address.
++ * /proc/net/vpn_src_get should return an ip address that may be the primary ip or one of the secondary IPs of that device
++ * and dhcp_relay packet's src address will use this address. dhcp_relay packet also can pass through one of ipsec tunnels.
++ * if /proc/net/vpn_src_get return null, dhcp_relay packet's src address will be set by kernel.
++ */
++void get_src_addr(struct interface_info *interface, struct in_addr src, struct in_addr dst)
++{
++	FILE *fp = NULL;
++	char buf[512];
++	u_int32_t local = 0;
++
++	interface->bind_src_addr.s_addr = 0;
++
++	/* write DHCRELAY_SRC_FILE */
++	if (NULL == (fp=fopen(DHCRELAY_SRC_FILE,"w"))) {
++		log_fatal("Unable to open %s\n", DHCRELAY_SRC_FILE);
++		goto out;
++	}
++
++	log_info("put %u.%u.%u.%u %u.%u.%u.%u into %s\n", NIPQUAD(src.s_addr), NIPQUAD(dst.s_addr), DHCRELAY_SRC_FILE);
++	if ( 0 == fprintf(fp,"%u.%u.%u.%u %u.%u.%u.%u", NIPQUAD(src.s_addr), NIPQUAD(dst.s_addr))){
++		log_error("Error when write %u.%u.%u.%u %u.%u.%u.%u to %s\n",
++				NIPQUAD(src.s_addr), NIPQUAD(dst.s_addr), DHCRELAY_SRC_FILE);
++		goto out;
++	}
++
++	fflush(fp);
++	fclose(fp);
++
++	/* read DHCRELAY_SRC_FILE */
++	if (NULL == (fp=fopen(DHCRELAY_SRC_FILE,"r"))) {
++		log_fatal("Unable to open %s\n", DHCRELAY_SRC_FILE);
++		goto out;
++	}
++
++	if(feof(fp) != 0){
++		log_info("%s is null \n", DHCRELAY_SRC_FILE);
++		goto out;
++	}
++
++	memset(buf, '\0', 512);
++	if (fgets(buf, 512, fp) == NULL ) {
++		local =0;
++		goto out;
++	}
++
++	log_info("content of %s: %s\n", DHCRELAY_SRC_FILE, buf);
++
++	local = inet_addr(buf);
++
++	if(local == 0 || local == 0xffffffff){
++		log_info("ip in %s is invalid \n", DHCRELAY_SRC_FILE);
++		goto out;
++	}
++
++	/* set interface */
++	interface->bind_src_addr.s_addr = local;
++
++out:
++	if (fp) fclose(fp);
++
++	return;
++}
++
+ static void
+ do_relay4(struct interface_info *ip, struct dhcp_packet *packet,
+ 	  unsigned int length, unsigned int from_port, struct iaddr from,
+ 	  struct hardware *hfrom) {
+ 	struct server_list *sp;
++	struct server_list *tservers;
+ 	struct sockaddr_in to;
+ 	struct interface_info *out;
+ 	struct hardware hto, *htop;
+@@ -952,13 +1061,36 @@
+ 	else
+ 		return;
+ 
++	if (per_if_relay) {
++
++		if(ip->servers) {
++			log_debug("BOOTREQUEST from interface %s\n", ip->name);
++			tservers = (struct server_list *)ip->servers;
++		}else {
++			log_debug("BOOTREQUEST from unconfig interface %s\n", ip->name);
++			return;
++		}
++
++	} else {
++		tservers = servers;
++	}
++
++	if(!tservers) {
++		log_fatal("relay server list empty\n");
++	}
++
+ 	/* Otherwise, it's a BOOTREQUEST, so forward it to all the
+ 	   servers. */
+-	for (sp = servers; sp; sp = sp->next) {
+-		if (send_packet((fallback_interface
+-				 ? fallback_interface : interfaces),
+-				 NULL, packet, length, ip->addresses[0],
+-				 &sp->to, NULL) < 0) {
++	for (sp = tservers; sp; sp = sp->next) {
++
++		struct interface_info *tmp = fallback_interface ? fallback_interface : interfaces;
++
++		get_src_addr(tmp, ip->addresses[0], sp->to.sin_addr);
++		if(tmp->bind_src_addr.s_addr != 0){
++			if_register_send_to_tunnel(tmp);
++		}
++
++		if (send_packet(tmp, NULL, packet, length, ip->addresses[0], &sp->to, NULL) < 0) {
+ 			++client_packet_errors;
+ 		} else {
+ 			log_debug("Forwarded BOOTREQUEST for %s to %s",
+@@ -967,6 +1099,10 @@
+ 			       inet_ntoa(sp->to.sin_addr));
+ 			++client_packets_relayed;
+ 		}
++
++        if(tmp->bind_src_addr.s_addr != 0){
++			if_deregister_send_to_tunnel(tmp);
++        }
+ 	}
+ 				 
+ }
+@@ -1095,6 +1231,146 @@
+ 	return (length);
+ }
+ 
++int parse_cfg_node(char *nline, int len)
++{
++
++	int     i     = 0;
++	int     iret  = -1;
++	char   *intf  = NULL;
++	char   *ip  = NULL;
++	struct  interface_info *ifi = NULL;
++	struct  server_list *sp = NULL;
++	struct 	in_addr	dst;
++
++	if(!nline || len <=0)
++		goto exit;
++
++	intf = strtok(nline,":");
++	if (!intf) {
++		goto exit;
++	}
++
++	ifi = interface_lookup_with_name(intf);   
++	if (!ifi) {
++		log_debug("non-existed interface %s.\n", intf);
++		goto exit;
++	}
++
++	log_debug("relay interface: %s\n", intf);
++
++	while(1) {
++		ip = strtok(NULL,"-");
++		if(!ip) {
++			break;
++		}
++
++		memset(&dst, 0, sizeof dst);
++		if (inet_aton(ip, &dst)) {
++			log_debug("server%d: %s\n",i++, ip);
++		}else {
++			continue;
++		}
++
++		sp = ((struct server_list *)
++				dmalloc(sizeof *sp, MDL));
++		if (!sp) {
++			log_fatal("no memory for server.\n");
++			goto exit;
++		}
++
++		memcpy(&sp->to.sin_addr, &dst, sizeof dst);
++
++		sp->to.sin_port = local_port;
++		sp->to.sin_family = AF_INET;
++#ifdef HAVE_SA_LEN
++		sp->to.sin_len = sizeof sp->to;
++#endif
++
++		sp->next = ifi->servers;
++		ifi->servers = sp;
++
++		sp = NULL;
++	}
++
++	/*for debug only*/
++	if(ifi->servers) {
++		log_debug("interface %s relay server list\n", ifi->name);
++
++		for (sp = ifi->servers; sp; sp = sp->next) {
++			log_debug("server IP: %s \n", inet_ntoa(sp->to.sin_addr));
++		}
++	} else {
++		log_debug("interface %s has no relay server", ifi->name );
++	}
++
++	iret = 0;
++exit:
++	return iret;
++}
++
++static int parse_relay_config(char *file)
++{
++	int     iret  =  -1;
++	size_t  len  =  0;
++	ssize_t read =  0;
++	FILE   *cfg  =  NULL;
++	char   *rstr  =  NULL;
++
++	if(!file) {
++		log_error("invalid config file\n");
++		goto parse_exit;
++	}
++
++	cfg = fopen(file, "r");
++	if (!cfg) {
++		log_error("open %s err \n", file );
++		goto parse_exit;
++	}
++
++	while (1) {
++
++		read = getline(&rstr, &len, cfg);
++		if(read == -1)
++			break;
++
++		if(read > 0 && rstr)
++			parse_cfg_node(rstr, read);
++
++		if (rstr) 
++			free(rstr);
++
++		rstr = NULL;
++	}
++
++	if (rstr) 
++		free(rstr);
++
++	iret = 0;
++
++parse_exit:
++	if (cfg) 
++		fclose(cfg);
++
++	return iret;
++}
++
++struct interface_info* interface_lookup_with_name(char *ifname)
++{
++	struct interface_info *ip = NULL;
++
++	if(!interfaces || !ifname)
++		goto exit;
++
++	for (ip = interfaces; ip; ip = ip->next) {
++
++		if (!strncmp(ip->name, ifname, IFNAMSIZ)) {
++			return ip;
++		}
++	}
++
++exit:
++	return NULL;
++}
+ 
+ /* Find an interface that matches the circuit ID specified in the
+    Relay Agent Information option.   If one is found, store it through
+--- dhcp-4.4.1/common/packet.c.orig	2022-05-26 11:27:51.824578501 -0700
++++ dhcp-4.4.1/common/packet.c	2022-05-26 11:27:52.108566891 -0700
+@@ -40,6 +40,7 @@
+ #endif /* PACKET_ASSEMBLY || PACKET_DECODING */
+ 
+ /* Compute the easy part of the checksum on a range of bytes. */
++extern int dhcp_state;
+ 
+ u_int32_t checksum (buf, nbytes, sum)
+ 	unsigned char *buf;
+@@ -252,7 +253,7 @@
+ decode_udp_ip_header(struct interface_info *interface,
+ 		     unsigned char *buf, unsigned bufix,
+ 		     struct sockaddr_in *from, unsigned buflen,
+-		     unsigned *rbuflen, int csum_ready)
++		     unsigned *rbuflen, int csum_ready, uint32_t *to)
+ {
+   unsigned char *data;
+   struct ip ip;
+@@ -359,6 +360,8 @@
+   /* Copy out the IP source address... */
+   memcpy(&from->sin_addr, &ip.ip_src, 4);
+ 
++  *to = ip.ip_dst.s_addr;
++
+   data = upp + sizeof(udp);
+   len = ulen - sizeof(udp);
+ 
+--- dhcp-4.4.1/common/socket.c.orig	2022-05-26 11:27:51.828578337 -0700
++++ dhcp-4.4.1/common/socket.c	2022-05-26 11:27:52.112566727 -0700
+@@ -40,6 +40,12 @@
+ #include <sys/ioctl.h>
+ #include <sys/uio.h>
+ #include <sys/uio.h>
++#include <net/if_packet.h>
++#include <netpacket/packet.h>
++#include <netinet/ip6.h>
++#include <netinet/udp.h>
++#include <linux/if_ether.h>
++#include <linux/filter.h>
+ 
+ #if defined(sun) && defined(USE_V4_PKTINFO)
+ #include <sys/sysmacros.h>
+@@ -342,6 +348,186 @@
+ 
+ #endif /* USE_SOCKET_SEND || USE_SOCKET_RECEIVE || USE_SOCKET_FALLBACK */
+ 
++
++#if defined (USE_SOCKET_SEND) || \
++	defined (USE_SOCKET_RECEIVE) || \
++defined (USE_SOCKET_FALLBACK)
++/* Generic interface registration routine... */
++	int
++if_register_socket_with_src(struct interface_info *info, int family,
++		int *do_multicast)
++{
++	struct sockaddr_storage name;
++	int name_len;
++	int sock;
++	int flag;
++	int domain;
++
++	/* INSIST((family == AF_INET) || (family == AF_INET6)); */
++
++#if !defined(SO_BINDTODEVICE) && !defined(USE_FALLBACK)
++	/* Make sure only one interface is registered. */
++	if (once) {
++		log_fatal ("The standard socket API can only support %s",
++				"hosts with a single network interface.");
++	}
++	once = 1;
++#endif
++
++	/* 
++	 * Set up the address we're going to bind to, depending on the
++	 * address family. 
++	 */ 
++	memset(&name, 0, sizeof(name));
++#ifdef DHCPv6
++	if (family == AF_INET6) {
++		struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&name; 
++		addr->sin6_family = AF_INET6;
++		addr->sin6_port = local_port;
++		/* XXX: What will happen to multicasts if this is nonzero? */
++		memcpy(&addr->sin6_addr,
++				&local_address6, 
++				sizeof(addr->sin6_addr));
++#ifdef HAVE_SA_LEN
++		addr->sin6_len = sizeof(*addr);
++#endif
++		name_len = sizeof(*addr);
++		domain = PF_INET6;
++		if ((info->flags & INTERFACE_STREAMS) == INTERFACE_UPSTREAM) {
++			*do_multicast = 0;
++		}
++	} else { 
++#else 
++		{
++#endif /* DHCPv6 */
++			struct sockaddr_in *addr = (struct sockaddr_in *)&name; 
++			addr->sin_family = AF_INET;
++			addr->sin_port = local_port;
++			memcpy(&addr->sin_addr,
++					&info->bind_src_addr,
++					sizeof(addr->sin_addr));
++#ifdef HAVE_SA_LEN
++			addr->sin_len = sizeof(*addr);
++#endif
++			name_len = sizeof(*addr);
++			domain = PF_INET;
++		}
++
++		/* Make a socket... */
++		sock = socket(domain, SOCK_DGRAM, IPPROTO_UDP);
++		if (sock < 0) {
++			log_fatal("Can't create dhcp socket: %m");
++		}
++
++		/* Set the REUSEADDR option so that we don't fail to start if
++		   we're being restarted. */
++		flag = 1;
++		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
++					(char *)&flag, sizeof(flag)) < 0) {
++			log_fatal("Can't set SO_REUSEADDR option on dhcp socket: %m");
++		}
++
++		/* Set the BROADCAST option so that we can broadcast DHCP responses.
++		   We shouldn't do this for fallback devices, and we can detect that
++		   a device is a fallback because it has no ifp structure. */
++		if (info->ifp &&
++				(setsockopt(sock, SOL_SOCKET, SO_BROADCAST,
++							(char *)&flag, sizeof(flag)) < 0)) {
++			log_fatal("Can't set SO_BROADCAST option on dhcp socket: %m");
++		}
++
++#if defined(DHCPv6) && defined(SO_REUSEPORT)
++		/*
++		 * We only set SO_REUSEPORT on AF_INET6 sockets, so that multiple
++		 * daemons can bind to their own sockets and get data for their
++		 * respective interfaces.  This does not (and should not) affect
++		 * DHCPv4 sockets; we can't yet support BSD sockets well, much
++		 * less multiple sockets.
++		 */
++		if (local_family == AF_INET6) {
++			flag = 1;
++			if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT,
++						(char *)&flag, sizeof(flag)) < 0) {
++				log_fatal("Can't set SO_REUSEPORT option on dhcp "
++						"socket: %m");
++			}
++		}
++#endif
++
++		/* Bind the socket to this interface's IP address. */
++		if (bind(sock, (struct sockaddr *)&name, name_len) < 0) {
++			log_error("Can't bind to dhcp address: %m");
++			log_error("Please make sure there is no other dhcp server");
++			log_error("running and that there's no entry for dhcp or");
++			log_error("bootp in /etc/inetd.conf.   Also make sure you");
++			log_error("are not running HP JetAdmin software, which");
++			log_fatal("includes a bootp server.");
++		}
++
++#if defined(SO_BINDTODEVICE)
++		/* Bind this socket to this interface. */
++		if ((local_family != AF_INET6) && (info->ifp != NULL) &&
++				setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE,
++					(char *)(info -> ifp), sizeof(*(info -> ifp))) < 0) {
++			log_fatal("setsockopt: SO_BINDTODEVICE: %m");
++		}
++#endif
++
++		/* IP_BROADCAST_IF instructs the kernel which interface to send
++		 * IP packets whose destination address is 255.255.255.255.  These
++		 * will be treated as subnet broadcasts on the interface identified
++		 * by ip address (info -> primary_address).  This is only known to
++		 * be defined in SCO system headers, and may not be defined in all
++		 * releases.
++		 */
++#if defined(SCO) && defined(IP_BROADCAST_IF)
++		if (info->address_count &&
++				setsockopt(sock, IPPROTO_IP, IP_BROADCAST_IF, &info->addresses[0],
++					sizeof(info->addresses[0])) < 0)
++			log_fatal("Can't set IP_BROADCAST_IF on dhcp socket: %m");
++#endif
++
++#ifdef DHCPv6
++		/*
++		 * If we turn on IPV6_PKTINFO, we will be able to receive 
++		 * additional information, such as the destination IP address.
++		 * We need this to spot unicast packets.
++		 */
++		if (family == AF_INET6) {
++			int on = 1;
++#ifdef IPV6_RECVPKTINFO
++			/* RFC3542 */
++			if (setsockopt(sock, IPPROTO_IPV6, IPV6_RECVPKTINFO, 
++						&on, sizeof(on)) != 0) {
++				log_fatal("setsockopt: IPV6_RECVPKTINFO: %m");
++			}
++#else
++			/* RFC2292 */
++			if (setsockopt(sock, IPPROTO_IPV6, IPV6_PKTINFO, 
++						&on, sizeof(on)) != 0) {
++				log_fatal("setsockopt: IPV6_PKTINFO: %m");
++			}
++#endif
++		}
++
++		if ((family == AF_INET6) &&
++				((info->flags & INTERFACE_UPSTREAM) != 0)) {
++			int hop_limit = 32;
++			if (setsockopt(sock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
++						&hop_limit, sizeof(int)) < 0) {
++				log_fatal("setsockopt: IPV6_MULTICAST_HOPS: %m");
++			}
++		}
++#endif /* DHCPv6 */
++
++		/* If this is a normal IPv4 address, get the hardware address. */
++		if ((local_family == AF_INET) && (strcmp(info->name, "fallback") != 0))
++			get_hw_addr(info->name, &info->hw_address);
++
++		return sock;
++	}
++#endif /* USE_SOCKET_SEND || USE_SOCKET_RECEIVE || USE_SOCKET_FALLBACK */
++
+ #if defined (USE_SOCKET_SEND) || defined (USE_SOCKET_FALLBACK)
+ void if_register_send (info)
+ 	struct interface_info *info;
+@@ -367,6 +553,20 @@
+ 		       info->shared_network->name : ""));
+ }
+ 
++void if_register_send_to_tunnel (info)
++	struct interface_info *info;
++{
++	info -> wfdesc_tunnel = if_register_socket_with_src (info, AF_INET, 0);
++	log_info("%s: wfdesc_tunnel: %d\n", __FUNCTION__, info->wfdesc_tunnel);
++
++	if (!quiet_interface_discovery)
++		log_info ("Sending on   Socket/%s%s%s",
++				info -> name,
++				(info -> shared_network ? "/" : ""),
++				(info -> shared_network ?
++				 info -> shared_network -> name : ""));
++}
++
+ #if defined (USE_SOCKET_SEND)
+ void if_deregister_send (info)
+ 	struct interface_info *info;
+@@ -384,6 +584,22 @@
+ 		       info -> shared_network -> name : ""));
+ }
+ #endif /* USE_SOCKET_SEND */
++
++void if_deregister_send_to_tunnel (info)
++	struct interface_info *info;
++{
++	info->bind_src_addr.s_addr = 0;
++	close (info -> wfdesc_tunnel);
++	info -> wfdesc_tunnel = -1;
++
++	if (!quiet_interface_discovery)
++		log_info ("Disabling output on Socket/%s%s%s",
++				info -> name,
++				(info -> shared_network ? "/" : ""),
++				(info -> shared_network ?
++				 info -> shared_network -> name : ""));
++}
++
+ #endif /* USE_SOCKET_SEND || USE_SOCKET_FALLBACK */
+ 
+ #ifdef USE_SOCKET_RECEIVE
+@@ -496,10 +712,59 @@
+ 	}
+ }
+ 
++static int if_register6_packet(int ifindex)
++{
++	int fd;
++	struct sockaddr_ll sock;
++
++	const struct sock_filter filter_instr[] = {
++		/* load 6th byte (protocol) */
++		BPF_STMT(BPF_LD|BPF_B|BPF_ABS, 6),
++		/* jump to L1 if it is IPPROTO_UDP, else to L1 */
++		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, IPPROTO_UDP, 0, 3),
++		/* L1: skip to udp dst port*/
++		BPF_STMT(BPF_LD|BPF_H|BPF_ABS, 42),
++		/* jump to L2 if udp dport is CLIENT_PORT, else to L3 */
++		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, 546, 0, 1),
++		/* L2: accept packet */
++		BPF_STMT(BPF_RET|BPF_K, 0xffffffff),
++		/* L3: discard packet */
++		BPF_STMT(BPF_RET|BPF_K, 0),
++	};
++
++	const struct sock_fprog filter_prog = {
++		.len = sizeof(filter_instr) / sizeof(filter_instr[0]),
++		/* casting const away: */
++		.filter = (struct sock_filter *) filter_instr,
++	};
++
++	fd = socket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IPV6));
++	if (fd < 0) {
++		log_fatal("Can't create dhcp socket: %m");
++	}
++	sock.sll_family = AF_PACKET;
++	sock.sll_protocol = htons(ETH_P_IPV6);
++	sock.sll_ifindex = ifindex;
++	if (bind(fd, (struct sockaddr *) &sock, sizeof(sock)) < 0) {
++		log_fatal("Can't bind to dhcp address: %m");
++	}
++
++	if (ntohs(local_port) == 546) {
++		/* Use only if standard port is in use */
++		/* Ignoring error (kernel may lack support for this) */
++		if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &filter_prog,
++				sizeof(filter_prog)) >= 0)
++			log_info("Attached filter to raw socket fd %d", fd);
++	}
++
++	return fd;
++}
++
+ void
+ if_register6(struct interface_info *info, int do_multicast) {
+ 	/* Bounce do_multicast to a stack variable because we may change it. */
+ 	int req_multi = do_multicast;
++	int ifindex = 0;
+ 
+ 	if (no_global_v6_socket) {
+ 		log_fatal("Impossible condition at %s:%d", MDL);
+@@ -531,13 +796,23 @@
+ 			log_info("Bound to [%s]:%d",
+ 				 addr6_str,
+ 				 (int) ntohs(local_port));
+-		} else {
+-			log_info("Bound to *:%d", (int) ntohs(local_port));
+ 		}
+ 	}
+ 		
+ 	info->rfdesc = global_v6_socket;
+ 	info->wfdesc = global_v6_socket;
++
++	if (!do_multicast) {
++		ifindex = if_nametoindex(info->name);
++		if (!ifindex)
++			log_fatal("Invalid interface %s", info->name);
++		info->rfdesc = if_register6_packet(ifindex);
++		if (info->rfdesc < 0) {
++			log_fatal("Impossible condition at %s:%d", MDL);
++		}
++	}
++	log_info("Bound to *:%d", ntohs(local_port));
++
+ 	global_v6_socket_references++;
+ 
+ #if defined(RELAY_PORT)
+@@ -564,7 +839,7 @@
+ 	}
+ #endif
+ 
+-	if (req_multi)
++	if (req_multi && (info->rfdesc == global_v6_socket))
+ 		if_register_multicast(info);
+ 
+ 	get_hw_addr(info->name, &info->hw_address);
+@@ -572,10 +847,10 @@
+ 	if (!quiet_interface_discovery) {
+ 		if (info->shared_network != NULL) {
+ 			log_info("Listening on Socket/%d/%s/%s",
+-				 global_v6_socket, info->name, 
++				 info->rfdesc, info->name, 
+ 				 info->shared_network->name);
+ 			log_info("Sending on   Socket/%d/%s/%s",
+-				 global_v6_socket, info->name,
++				 info->wfdesc, info->name,
+ 				 info->shared_network->name);
+ 		} else {
+ 			log_info("Listening on Socket/%s", info->name);
+@@ -647,11 +922,13 @@
+ 		close(info->rfdesc);
+ 		info->rfdesc = -1;
+ 		info->wfdesc = -1;
+-	} else if ((info->rfdesc == global_v6_socket) &&
+-		   (info->wfdesc == global_v6_socket) &&
++	} else if ( (info->wfdesc == global_v6_socket) &&
+ 		   (global_v6_socket_references > 0)) {
+ 		/* Dereference the global v6 socket. */
+ 		global_v6_socket_references--;
++		if (info->rfdesc != global_v6_socket) {
++			close(info->rfdesc);
++		}
+ 		info->rfdesc = -1;
+ 		info->wfdesc = -1;
+ #if defined(RELAY_PORT)
+@@ -728,8 +1005,13 @@
+ 				log_fatal("setsockopt: IP_PKTINFO: %m");
+ 		}
+ #endif
+-		result = sendto (interface -> wfdesc, (char *)raw, len, 0,
+-				 (struct sockaddr *)to, sizeof *to);
++		if (interface -> bind_src_addr.s_addr) {
++			result = sendto (interface -> wfdesc_tunnel, (char *)raw, len, 0,
++					(struct sockaddr *)to, sizeof *to);
++		} else {
++			result = sendto (interface -> wfdesc, (char *)raw, len, 0,
++					(struct sockaddr *)to, sizeof *to);
++		}  
+ #ifdef IGNORE_HOSTUNREACH
+ 	} while (to -> sin_addr.s_addr == htonl (INADDR_BROADCAST) &&
+ 		 result < 0 &&
+@@ -1111,25 +1393,61 @@
+ 		 * through the control messages we received and 
+ 		 * find the one with our destination address.
+ 		 */
+-		cmsg = CMSG_FIRSTHDR(&m);
+-		while (cmsg != NULL) {
+-			if ((cmsg->cmsg_level == IPPROTO_IPV6) && 
+-			    (cmsg->cmsg_type == IPV6_PKTINFO)) {
+-				pktinfo = (struct in6_pktinfo *)CMSG_DATA(cmsg);
+-				*to_addr = pktinfo->ipi6_addr;
+-				*if_idx = pktinfo->ipi6_ifindex;
++		if (interface->rfdesc == global_v6_socket) {
++			cmsg = CMSG_FIRSTHDR(&m);
++			while (cmsg != NULL) {
++				if ((cmsg->cmsg_level == IPPROTO_IPV6) && 
++				    (cmsg->cmsg_type == IPV6_PKTINFO)) {
++					pktinfo = (struct in6_pktinfo *)CMSG_DATA(cmsg);
++					*to_addr = pktinfo->ipi6_addr;
++					*if_idx = pktinfo->ipi6_ifindex;
++
++					return (result);
++				}
++				cmsg = CMSG_NXTHDR(&m, cmsg);
++			}
+ 
+-				return (result);
++			/*
++			 * We didn't find the necessary control message
++			 * flag is as an error
++			 */
++			result = -1;
++			errno = EIO;
++		} else {
++			struct ip6_hdr *ip6;
++			struct udphdr *udp;
++			if (result < (sizeof(struct ip6_hdr) + sizeof(struct udphdr))) {
++				log_error("Packet is too short, ignoring");
++				return (-1);
+ 			}
+-			cmsg = CMSG_NXTHDR(&m, cmsg);
+-		}
+ 
+-		/*
+-		 * We didn't find the necessary control message
+-		 * flag is as an error
+-		 */
+-		result = -1;
+-		errno = EIO;
++			ip6 = (struct ip6_hdr*)buf;
++			udp = (struct udphdr*)(buf + sizeof(struct ip6_hdr));
++			if (result < sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen)) {
++				log_error("Oversized packet, ignoring");
++				return (-1);
++			}
++			/* ignore any extra garbage bytes */
++			result = sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen);
++
++			/* make sure its the right packet for us, and that it passes sanity checks */
++			if (ip6->ip6_nxt != IPPROTO_UDP
++			 || (ip6->ip6_vfc >> 4) != 6
++			 || udp->uh_dport != local_port
++			 || udp->uh_ulen != ip6->ip6_plen
++			) {
++				log_error("Unrelated/bogus packet, ignoring");
++				return (-1);
++			}
++
++			*if_idx = if_nametoindex(interface->name);
++			from->sin6_port = udp->uh_sport;
++			from->sin6_addr = ip6->ip6_src;
++			*to_addr = ip6->ip6_dst;
++			result = result - sizeof(struct ip6_hdr) - sizeof(struct udphdr);
++			memmove(buf, buf + sizeof(struct ip6_hdr) + sizeof(struct udphdr), result);
++			memset(buf + result, 0, 65536 - result);
++		}
+ 	}
+ 
+ 	return (result);
+--- dhcp-4.4.1/common/lpf.c.orig	2022-05-26 11:27:51.824578501 -0700
++++ dhcp-4.4.1/common/lpf.c	2022-05-26 11:27:52.104567054 -0700
+@@ -51,6 +51,8 @@
+ /* Reinitializes the specified interface after an address change.   This
+    is not required for packet-filter APIs. */
+ 
++int dhcp_state = -1;
++
+ #ifdef USE_LPF_SEND
+ void if_reinitialize_send (info)
+ 	struct interface_info *info;
+@@ -383,6 +385,7 @@
+ 	unsigned char ibuf [1536];
+ 	unsigned bufix = 0;
+ 	unsigned paylen;
++	uint32_t to = 0;
+ 	struct iovec iov = {
+ 		.iov_base = ibuf,
+ 		.iov_len = sizeof ibuf,
+@@ -468,7 +471,7 @@
+ 
+ 	/* Decode the IP and UDP headers... */
+ 	offset = decode_udp_ip_header (interface, ibuf, bufix, from,
+-				       (unsigned)length, &paylen, csum_ready);
++				       (unsigned)length, &paylen, csum_ready, &to);
+ 
+ 	/* If the IP or UDP checksum was bad, skip the packet... */
+ 	if (offset < 0)
+@@ -480,6 +483,15 @@
+ 	if (length < paylen)
+ 		log_fatal("Internal inconsistency at %s:%d.", MDL);
+ 
++	if (dhcp_state == DISCOVER_RELAY) {
++		/* skip the unicast packet in relay daemon, please refer RFC2131 */
++		struct dhcp_packet *dhcp_packet = (struct dhcp_packet *)&ibuf[bufix];
++		if (dhcp_packet->op == BOOTREQUEST &&
++		    to != INADDR_BROADCAST) {
++			return 0;
++		}
++	}
++
+ 	/* Copy out the data in the packet... */
+ 	memcpy(buf, &ibuf[bufix], paylen);
+ 	return paylen;
+--- dhcp-4.4.1/common/discover.c.orig	2022-05-26 11:27:51.816578828 -0700
++++ dhcp-4.4.1/common/discover.c	2022-05-26 11:27:52.100567218 -0700
+@@ -86,6 +86,7 @@
+ struct interface_info **interface_vector;
+ int interface_count;
+ int interface_max;
++int use_iface_alias = 0;
+ 
+ OMAPI_OBJECT_ALLOC (interface, struct interface_info, dhcp_type_interface)
+ 
+@@ -132,6 +133,7 @@
+ {
+ 	struct interface_info *ip = (struct interface_info *)ipo;
+ 	ip -> rfdesc = ip -> wfdesc = -1;
++	ip -> servers = NULL;
+ 	return ISC_R_SUCCESS;
+ }
+ 
+@@ -438,6 +440,20 @@
+ next_iface(struct iface_info *info, int *err, struct iface_conf_list *ifaces) {
+ 	size_t sa_len = 0;
+ 
++	/* somtimes ifa_addr is NULL, for example, teql0 interface.
++	skip such interfaces.
++	Also, if there is no ipv4 or ipv6 address, skip the interface.
++	*/
++	while (NULL != ifaces->next) {
++		if (NULL != ifaces->next->ifa_addr) {
++			int family = ifaces->next->ifa_addr->sa_family;
++			if ((AF_INET == family) || (AF_INET6 == family)) {
++				break;
++			}
++		}
++		ifaces->next = ifaces->next->ifa_next;
++	}
++
+ 	if (ifaces->next == NULL) {
+ 		*err = 0;
+ 		return 0;
+@@ -470,6 +486,22 @@
+ 	info->flags = ifaces->next->ifa_flags;
+ 	ifaces->next = ifaces->next->ifa_next;
+ 	*err = 0;
++
++	/* 
++	1. In non-dropin mode;
++	2. Or in dropin mode  only set dhcp setting for secondary IP but do not
++	set dhcp setting for primary IP;
++	dhcp wrapper of watchguard will not start dhcpd daemon with "-a" parameter.
++	Then dhcpd daemon should ignose the secondary IP  :<N> extension.
++	*/
++	if (0 == use_iface_alias) {
++		/* interface aliases look like "eth0:1" or "wlan1:3" */
++		char *s = strchr(info->name, ':');
++		if (s != NULL) {
++			*s = '\0';
++		}
++	}
++
+ 	return 1;
+ }
+ 
+@@ -730,6 +762,23 @@
+ 			if (tif == NULL)
+ 				log_fatal("no space for ifp mockup.");
+ 			strcpy(tif->ifr_name, tmp->name);
++
++			/*In dropin mode , if set dhcp setting for primary IP,
++			no matter if set dhcp setting for secondary IP or not,
++			dhcpd will start with "-a" parameter.
++			Then ignose the secondary IP serial number.
++			*/
++			if (use_iface_alias != 0) {
++				char *s = NULL;
++				/* The interface name as stored here must not
++ 				* be an alias so lop off the :<N> extension.
++ 				*/
++				s = strchr(tif->ifr_name, ':');
++				if (s != NULL) {
++					*s = '\0';
++				}
++			}
++
+ 			tmp->ifp = tif;
+ 		}
+ 	}
+@@ -909,7 +958,7 @@
+ 				   (some code expects it cannot be. */
+ 				get_hw_addr(tmp->name, &tmp->hw_address);
+ 			} else {
+-				if_register_linklocal6(tmp);
++				if_register6(tmp, 0);
+ 			}
+ 			break;
+ #endif /* DHCPv6 */
+@@ -1263,6 +1312,7 @@
+ isc_result_t dhcp_interface_destroy (omapi_object_t *h,
+ 					 const char *file, int line)
+ {
++	struct server_list *sp = NULL;
+ 	struct interface_info *interface;
+ 
+ 	if (h -> type != dhcp_type_interface)
+@@ -1286,6 +1336,12 @@
+ 		omapi_object_dereference ((omapi_object_t **)
+ 					  &interface -> shared_network, MDL);
+ 
++	while (interface -> servers) {
++		sp = interface->servers->next;
++		dfree (interface -> servers, file, line);
++		interface -> servers = sp;
++	}
++
+ 	return ISC_R_SUCCESS;
+ }
+ 
+--- dhcp-4.4.1/omapip/errwarn.c.orig	2022-05-26 11:27:51.888575884 -0700
++++ dhcp-4.4.1/omapip/errwarn.c	2022-05-26 11:27:52.172564274 -0700
+@@ -37,6 +37,8 @@
+ #include <errno.h>
+ #include <syslog.h>
+ 
++#define DEBUG
++
+ #ifdef DEBUG
+ int log_perror = -1;
+ #else
+--- dhcp-4.4.1/bind/version.tmp.orig	1969-12-31 16:00:00.000000000 -0800
++++ dhcp-4.4.1/bind/version.tmp	2022-05-26 11:27:51.724582589 -0700
+@@ -0,0 +1,11 @@
++# This file must follow /bin/sh rules.  It is imported directly via
++# configure.
++#
++PRODUCT=BIND
++DESCRIPTION=
++MAJORVER=9
++MINORVER=11
++PATCHVER=2
++RELEASETYPE=-P
++RELEASEVER=1
++EXTENSIONS=

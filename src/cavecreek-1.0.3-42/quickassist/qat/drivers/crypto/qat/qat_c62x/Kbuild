@@ -1,0 +1,7 @@
+# Kbuild file for out-of-tree driver only !!!DO NOT PUSH UPSTREAM!!!
+include $(src)/Makefile
+ccflags-$(QAT_UIO) += -DQAT_UIO=y -DDEFER_UPSTREAM
+ccflags-y += -DADF_SUPPORT_C62X_A0
+ifdef KPT
+ccflags-$(QAT_UIO) += -DKPT=y
+endif

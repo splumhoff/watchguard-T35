@@ -1,0 +1,46 @@
+/*
+ * Copyright (c) 1988 Regents of the University of California.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms are permitted
+ * provided that the above copyright notice and this paragraph are
+ * duplicated in all such forms and that any documentation,
+ * advertising materials, and other materials related to such
+ * distribution and use acknowledge that the software was developed
+ * by the University of California, Berkeley.  The name of the
+ * University may not be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
+
+/*
+ * PSC Changes Copyright (c) 1992 Pittsburgh Supercomputing Center.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms are permitted
+ * provided that the above copyright notice and this paragraph are
+ * duplicated in all such forms and that any documentation,
+ * advertising materials, and other materials related to such
+ * distribution and use acknowledge that the modifications to this
+ * software were developed by the Pittsburgh Supercomputing Center.
+ * The name of the Center may not be used to endorse or promote
+ * products derived from this software without specific prior written
+ * permission.  THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE
+ * IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE. 
+ *
+ */
+
+/* DNS lookup portions of this code also subject to the following:  */
+/*
+ * Use the domain system to resolve a name.
+ *
+ * Copyright (C) 1988,1990,1992 Dan Nydick, Carnegie-Mellon University
+ * Anyone may use this code for non-commercial purposes as long
+ * as my name and copyright remain attached.
+ */
+

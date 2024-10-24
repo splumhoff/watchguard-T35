@@ -1,0 +1,39 @@
+WatchGuard patches to sources for oprofile-0.9.6 as of
+Thu May 26 11:37:49 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- oprofile-0.9.6/utils/opcontrol.orig	2022-05-26 11:37:46.132246458 -0700
++++ oprofile-0.9.6/utils/opcontrol	2022-05-26 11:37:46.316238918 -0700
+@@ -1301,6 +1301,7 @@
+ 	fi
+ 
+ 	if test "$IS_TIMER" = 1; then
++		OPROFILED_EVENTS=TIMER_INT
+ 		return
+ 	fi
+ 
+--- oprofile-0.9.6/ltmain.sh.orig	2022-05-26 11:37:46.120246949 -0700
++++ oprofile-0.9.6/ltmain.sh	2022-05-26 11:37:46.308239245 -0700
+@@ -2821,7 +2821,8 @@
+ 	      fi
+ 	    else
+ 	      # We cannot seem to hardcode it, guess we'll fake it.
+-	      add_dir="-L$libdir"
++	      # WG: don't fake it this introduces host pollution
++	      # add_dir="-L$libdir"
+ 	      # Try looking first in the location we're being installed to.
+ 	      if test -n "$inst_prefix_dir"; then
+ 		case $libdir in
+--- oprofile-0.9.6/libpp/format_output.h.orig	2022-05-26 11:37:46.100247769 -0700
++++ oprofile-0.9.6/libpp/format_output.h	2022-05-26 11:37:46.288240065 -0700
+@@ -91,7 +91,7 @@
+ 		symbol_entry const & symbol;
+ 		sample_entry const & sample;
+ 		size_t pclass;
+-		mutable counts_t & counts;
++		counts_t & counts;
+ 		extra_images const & extra;
+ 		double diff;
+ 	};

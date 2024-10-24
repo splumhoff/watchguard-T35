@@ -1,0 +1,7 @@
+config CONFIG_FSL_SEC_MON
+	bool "Enable FSL SEC_MON Driver"
+	help
+	  Freescale Security Monitor block is responsible for monitoring
+	  system states.
+	  Security Monitor can be transitioned on any security failures,
+	  like software violations or hardware security violations.

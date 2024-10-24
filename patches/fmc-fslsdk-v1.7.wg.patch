@@ -1,0 +1,82 @@
+WatchGuard patches to sources for fmc-fslsdk-v1.7 as of
+Thu May 26 11:28:30 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- fmc-fslsdk-v1.7/source/FMCPCDModel.cpp.orig	2022-05-26 11:28:29.539036465 -0700
++++ fmc-fslsdk-v1.7/source/FMCPCDModel.cpp	2022-05-26 11:28:29.671031068 -0700
+@@ -2748,6 +2748,8 @@
+     net_types[ "dccp" ]      = HEADER_TYPE_DCCP;
+     net_types[ "ipsec_ah" ]  = HEADER_TYPE_IPSEC_AH;
+     net_types[ "ipsec_esp" ] = HEADER_TYPE_IPSEC_ESP;
++    net_types[ "otherl3" ]   = HEADER_TYPE_USER_DEFINED_L3;
++    net_types[ "otherl4" ]   = HEADER_TYPE_USER_DEFINED_L4;
+     net_types[ "shim1" ]     = HEADER_TYPE_USER_DEFINED_SHIM1;
+     net_types[ "shim2" ]     = HEADER_TYPE_USER_DEFINED_SHIM2;
+ #ifdef FM_SHIM3_SUPPORT
+@@ -2786,6 +2788,8 @@
+     net_types[ "dccp" ]      = "HEADER_TYPE_DCCP";
+     net_types[ "ipsec_ah" ]  = "HEADER_TYPE_IPSEC_AH";
+     net_types[ "ipsec_esp" ] = "HEADER_TYPE_IPSEC_ESP";
++    net_types[ "otherl3" ]   = "HEADER_TYPE_USER_DEFINED_L3";
++    net_types[ "otherl4" ]   = "HEADER_TYPE_USER_DEFINED_L4";
+     net_types[ "shim1" ]     = "HEADER_TYPE_USER_DEFINED_SHIM1";
+     net_types[ "shim2" ]     = "HEADER_TYPE_USER_DEFINED_SHIM2";
+ #ifdef FM_SHIM3_SUPPORT
+@@ -2823,6 +2827,8 @@
+     net_types[ HEADER_TYPE_DCCP ]               = "HEADER_TYPE_DCCP";
+     net_types[ HEADER_TYPE_IPSEC_AH ]           = "HEADER_TYPE_IPSEC_AH";
+     net_types[ HEADER_TYPE_IPSEC_ESP ]          = "HEADER_TYPE_IPSEC_ESP";
++    net_types[ HEADER_TYPE_USER_DEFINED_L3 ]    = "HEADER_TYPE_USER_DEFINED_L3";
++    net_types[ HEADER_TYPE_USER_DEFINED_L4 ]    = "HEADER_TYPE_USER_DEFINED_L4";
+     net_types[ HEADER_TYPE_USER_DEFINED_SHIM1 ] = "HEADER_TYPE_USER_DEFINED_SHIM1";
+     net_types[ HEADER_TYPE_USER_DEFINED_SHIM2 ] = "HEADER_TYPE_USER_DEFINED_SHIM2";
+ #ifdef FM_SHIM3_SUPPORT
+--- fmc-fslsdk-v1.7/0001-ENGR354592-FMC-SoftParser-otherl3-protocol-definitio.patch.orig	1969-12-31 16:00:00.000000000 -0800
++++ fmc-fslsdk-v1.7/0001-ENGR354592-FMC-SoftParser-otherl3-protocol-definitio.patch	2022-05-26 11:28:29.627032866 -0700
+@@ -0,0 +1,44 @@
++From 435d76de4d9139d1754760870993043bd08c1e28 Mon Sep 17 00:00:00 2001
++From: Florin Iordache <r70177@freescale.com>
++Date: Fri, 10 Apr 2015 17:15:23 +0800
++Subject: [PATCH] ENGR354592: FMC SoftParser 'otherl3' protocol definition
++ generates error
++
++---
++ source/FMCPCDModel.cpp | 6 ++++++
++ 1 file changed, 6 insertions(+)
++
++diff --git a/source/FMCPCDModel.cpp b/source/FMCPCDModel.cpp
++index eb1aed8..4aac884 100755
++--- a/source/FMCPCDModel.cpp
+++++ b/source/FMCPCDModel.cpp
++@@ -2756,6 +2756,8 @@ CFMCModel::getNetCommHeaderType( std::string protoname )
++     net_types[ "dccp" ]      = HEADER_TYPE_DCCP;
++     net_types[ "ipsec_ah" ]  = HEADER_TYPE_IPSEC_AH;
++     net_types[ "ipsec_esp" ] = HEADER_TYPE_IPSEC_ESP;
+++	net_types[ "otherl3" ]     = HEADER_TYPE_USER_DEFINED_L3;
+++	net_types[ "otherl4" ]     = HEADER_TYPE_USER_DEFINED_L4;
++     net_types[ "shim1" ]     = HEADER_TYPE_USER_DEFINED_SHIM1;
++     net_types[ "shim2" ]     = HEADER_TYPE_USER_DEFINED_SHIM2;
++ #ifdef FM_SHIM3_SUPPORT
++@@ -2794,6 +2796,8 @@ CFMCModel::getNetCommHeaderTypeStr( std::string protoname )
++     net_types[ "dccp" ]      = "HEADER_TYPE_DCCP";
++     net_types[ "ipsec_ah" ]  = "HEADER_TYPE_IPSEC_AH";
++     net_types[ "ipsec_esp" ] = "HEADER_TYPE_IPSEC_ESP";
+++	net_types[ "otherl3" ]     = "HEADER_TYPE_USER_DEFINED_L3";
+++	net_types[ "otherl4" ]     = "HEADER_TYPE_USER_DEFINED_L4";
++     net_types[ "shim1" ]     = "HEADER_TYPE_USER_DEFINED_SHIM1";
++     net_types[ "shim2" ]     = "HEADER_TYPE_USER_DEFINED_SHIM2";
++ #ifdef FM_SHIM3_SUPPORT
++@@ -2831,6 +2835,8 @@ CFMCModel::getNetCommHeaderTypeStr( e_NetHeaderType proto )
++     net_types[ HEADER_TYPE_DCCP ]               = "HEADER_TYPE_DCCP";
++     net_types[ HEADER_TYPE_IPSEC_AH ]           = "HEADER_TYPE_IPSEC_AH";
++     net_types[ HEADER_TYPE_IPSEC_ESP ]          = "HEADER_TYPE_IPSEC_ESP";
+++	net_types[ HEADER_TYPE_USER_DEFINED_L3 ]          = "HEADER_TYPE_USER_DEFINED_L3";
+++	net_types[ HEADER_TYPE_USER_DEFINED_L4 ]          = "HEADER_TYPE_USER_DEFINED_L4";
++     net_types[ HEADER_TYPE_USER_DEFINED_SHIM1 ] = "HEADER_TYPE_USER_DEFINED_SHIM1";
++     net_types[ HEADER_TYPE_USER_DEFINED_SHIM2 ] = "HEADER_TYPE_USER_DEFINED_SHIM2";
++ #ifdef FM_SHIM3_SUPPORT
++-- 
++1.9.3
++

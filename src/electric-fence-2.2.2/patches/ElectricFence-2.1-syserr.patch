@@ -1,0 +1,26 @@
+--- ElectricFence-2.2.2/page.c~	2004-04-05 13:48:46.000000000 -0700
++++ ElectricFence-2.2.2/page.c	2004-04-05 13:49:00.000000000 -0700
+@@ -31,7 +31,7 @@
+ 
+ #if ( !defined(sgi) && !defined(_AIX) &&!defined(__USE_BSD))
+ extern int	sys_nerr;
+-extern char *	sys_errlist[];
++/* extern char *	sys_errlist[]; */
+ #endif
+ 
+ static const char *
+@@ -39,13 +39,8 @@
+ {
+ #if ( defined(sgi) )
+ 	return strerror(oserror());
+-#elif ( defined(_AIX) )
+-	return strerror(errno);
+ #else
+-	if ( errno > 0 && errno < sys_nerr )
+-		return sys_errlist[errno];
+-	else
+-		return "Unknown error.\n";
++	return strerror(errno);
+ #endif
+ }
+ 

@@ -1,0 +1,234 @@
+/*
+ * P1010 RDB Device Tree Source
+ *
+ * Copyright 2011 Freescale Semiconductor Inc.
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ */
+
+/include/ "fsl/wgdixie-pre.dtsi"
+
+/ {
+	model = "fsl,P1010RDB";
+	compatible = "fsl,P1010RDB";
+
+	/include/ "p1010rdb_32b.dtsi"
+};
+
+/* /include/ "wg_dixie.dtsi" */
+&board_ifc {
+	ifc_nand: nand@1,0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "fsl,ifc-nand";
+		reg = <0x1 0x0 0x10000>;
+	};
+
+	cpld@3,0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "fsl,p1010rdb-cpld";
+		reg = <0x3 0x0 0x0000020>;
+		bank-width = <1>;
+		device-width = <1>;
+	};
+};
+
+&board_soc {
+	i2c@3000 {
+		rtc@30 {
+			compatible = "S35390A,s35390a";
+			reg = <0x30>;
+		};
+	};
+
+	i2c@3100 {
+		eeprom@52 {
+			compatible = "atmel,24c01";
+			reg = <0x52>;
+		};
+	};
+
+	spi@7000 {
+		m25p80@0 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "macronix,mx25l8006e";
+			reg = <0>;
+			linux,modalias = "m25p80";
+			modal = "mx25l8006e";
+			spi-max-frequency = <50000000>;
+			mode = <0>;
+
+			/* **NEW** SPIFlash mapping for Dixie (4 partitions Only) */
+			partition@0 {
+				// 512KB
+				reg = <0x0 0x0090000>;
+				label = "NOR (RW) WG U-Boot Image";
+			};
+			partition@90000 {
+				// 64K
+				reg = <0x0090000 0x00010000>;
+				label = "NOR (RO) WG U-Boot ENV"; 
+			}; 
+			partition@a0000 {
+				// 128KB
+				reg = <0x000a0000 0x00020000>;
+				label = "NOR (RW) WG CFGXXX (unused)";
+			};
+			partition@b0000 {
+				// 256KB
+				reg = <0x000c0000 0x00040000>;
+				label = "NOR (RW) WG CFG0 (DeviceID info + bootopt)";
+			};
+		};
+
+	};
+
+	usb@22000 {
+		phy_type = "utmi";
+		dr_mode = "host";
+	};
+
+	mdio@24000 {
+		phy0: ethernet-phy@0 {
+			reg = <0x1>;
+		};
+
+		phy1: ethernet-phy@1 {
+			reg = <0x2>;
+		};
+
+		phy2: ethernet-phy@2 {
+			reg = <0x3>;
+		};
+
+		tbi-phy@11 {
+			device_type = "tbi-phy";
+			reg = <0x11>;
+		};
+	};
+
+	mdio@25000 {
+		tbi0: tbi-phy@11 {
+			reg = <0x11>;
+			device_type = "tbi-phy";
+		};
+	};
+
+	mdio@26000 {
+		tbi1: tbi-phy@11 {
+			reg = <0x11>;
+			device_type = "tbi-phy";
+		};
+	};
+
+	ptp_timer: ptimer@b0e00 {
+		compatible = "fsl,gianfar-ptp-timer";
+		reg = <0xb0e00 0xb0>;
+		fsl,ts-to-buffer;
+		fsl,tmr-prsc = <0x2>;
+		fsl,clock-source-select = <1>;
+	};
+
+	ptp_clock@b0e00 {
+		compatible = "fsl,etsec-ptp";
+		reg = <0xb0e00 0xb0>;
+		interrupts = <68 2 0 0 69 2 0 0>;
+		fsl,tclk-period	= <10>;
+		fsl,tmr-prsc	= <2>;
+		fsl,tmr-add	= <0x80000016>;
+		fsl,tmr-fiper1	= <0x3b9ac9f6>;
+		fsl,tmr-fiper2	= <0x00018696>;
+		fsl,max-adj	= <199999999>;
+	};
+
+	enet0: ethernet@b0000 {
+		phy-handle = <&phy0>;
+		phy-connection-type = "rgmii-id";
+		ptimer-handle = <&ptp_timer>;
+	};
+
+	enet1: ethernet@b1000 {
+		phy-handle = <&phy1>;
+		tbi-handle = <&tbi0>;
+		phy-connection-type = "sgmii";
+		ptimer-handle = <&ptp_timer>;
+	};
+
+	enet2: ethernet@b2000 {
+		phy-handle = <&phy2>;
+		tbi-handle = <&tbi1>;
+		phy-connection-type = "sgmii";
+		ptimer-handle = <&ptp_timer>;
+	};
+};
+
+/* /include/ "wg_dixie-pa.dtsi" */
+&ifc_nand {
+	partition@00000000 {
+		/* ACTUAL: NAND 128KB for DTB Image partiton */
+		reg = <0x00000000 0x00020000>;
+		label = "NAND (RW) WG DTB Image";
+	};
+
+	/* rest of the NAND partitions */
+	partition@00020000 {
+		/* 5MB for sysa kernel */
+		reg = <0x00020000 0x00500000>;
+		label = "NAND (RW) WG SYSA Kernel";
+	};
+
+	partition@00520000 {
+		/* 121MB for sysa code */
+		reg = <0x00520000 0x079e0000>;
+		label = "NAND (RW) WG SYSA_CODE";
+	};
+
+	partition@07f00000 {
+		/* 5MB for sysb kernel */
+		reg = <0x07f00000 0x00500000>;
+		label = "NAND (RW) WG SYSB Kernel";
+	};
+
+	partition@08400000 {
+		/* 24MB for sysb code */
+		reg = <0x08400000 0x01800000>;
+		label = "NAND (RW) WG SYSB_CODE";
+	};
+
+	partition@09c00000 {
+		/* 5MB for sysa2 kernel */
+		reg = <0x09c00000 0x00500000>;
+		label = "NAND (RW) WG SYSA2 Kernel";
+	};
+
+	partition@0a100000 {
+		/* 121MB for sysa2 code */
+		reg = <0x0a100000 0x079e0000>;
+		label = "NAND (RW) WG SYSA_CODE2";
+	};
+
+	partition@11ae0000 {
+		/* 229MB for sysa data */
+		reg = <0x11ae0000 0x0e520000>;
+		label = "NAND (RW) WG SYSA_DATA";
+	};
+};
+
+&phy0 {
+	interrupts = <0 1 0 0>;
+};
+
+&phy1 {
+	interrupts = <2 1 0 0>;
+};
+
+&phy2 {
+	interrupts = <1 1 0 0>;
+};
+
+/include/ "fsl/wgdixie-post.dtsi"

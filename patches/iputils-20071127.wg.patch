@@ -1,0 +1,80 @@
+WatchGuard patches to sources for iputils-20071127 as of
+Thu May 26 11:33:12 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- iputils-20071127/ping_common.c.orig	2022-05-26 11:33:11.731488068 -0700
++++ iputils-20071127/ping_common.c	2022-05-26 11:33:11.811484792 -0700
+@@ -362,9 +362,14 @@
+ 		return MININTERVAL;
+ 	} else {
+ 		if ((i=receive_error_msg()) > 0) {
+-			/* An ICMP error arrived. */
+-			tokens += interval;
+-			return MININTERVAL;
++			/* An ICMP error arrived. In this case, we've received
++			 * an error from sendto(), but we've also received an
++			 * ICMP message, which means the packet did in fact
++			 * send in some capacity. So, in this odd case, report
++			 * the more specific errno as the error, and treat this
++			 * as a hard local error. */
++			i = 0;
++			goto hard_local_error;
+ 		}
+ 		/* Compatibility with old linuces. */
+ 		if (i == 0 && confirm_flag && errno == EINVAL) {
+@@ -375,6 +380,7 @@
+ 			goto resend;
+ 	}
+ 
++hard_local_error:
+ 	/* Hard local error. Pretend we sent packet. */
+ 	advance_ntransmitted();
+ 
+--- iputils-20071127/rarpd.c.orig	2022-05-26 11:33:11.731488068 -0700
++++ iputils-20071127/rarpd.c	2022-05-26 11:33:11.815484628 -0700
+@@ -29,6 +29,7 @@
+ #include <netinet/in.h>
+ #include <linux/if_packet.h>
+ #include <linux/filter.h>
++#include <linux/if_ether.h>
+ 
+ int do_reload = 1;
+ 
+@@ -42,7 +43,10 @@
+ char *ifname;
+ char *tftp_dir = "/etc/tftpboot";
+ 
++#ifndef __UCLIBC__
+ extern int ether_ntohost(char *name, unsigned char *ea);
++#endif
++
+ void usage(void) __attribute__((noreturn));
+ 
+ struct iflink
+@@ -305,7 +309,11 @@
+ 				6,
+ 			};
+ 
++#ifndef __UCLIBC__
+ 			if (ether_ntohost(ename, lladdr) != 0 ||
++#else
++			if (
++#endif
+ 			    (hp = gethostbyname(ename)) == NULL) {
+ 				if (verbose)
+ 					syslog(LOG_INFO, "not found in /etc/ethers");
+--- iputils-20071127/rdisc.c.orig	2022-05-26 11:33:11.731488068 -0700
++++ iputils-20071127/rdisc.c	2022-05-26 11:33:11.815484628 -0700
+@@ -48,6 +48,10 @@
+ #include <netinet/ip.h>
+ #include <netinet/ip_icmp.h>
+ 
++#ifndef OPEN_MAX
++#  define OPEN_MAX _POSIX_OPEN_MAX
++#endif
++
+ /*
+  * The next include contains all defs and structures for multicast
+  * that are not in SunOS 4.1.x. On a SunOS 4.1.x system none of this code

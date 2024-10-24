@@ -1,0 +1,3 @@
+# Kbuild file for out-of-tree driver only !!!DO NOT PUSH UPSTREAM!!!
+include $(src)/Makefile
+ccflags-$(QAT_UIO) += -DQAT_UIO=y -DDEFER_UPSTREAM

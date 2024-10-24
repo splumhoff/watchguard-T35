@@ -1,0 +1,3747 @@
+WatchGuard patches to sources for grub-0.97 as of
+Thu May 26 11:32:50 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- grub-0.97/stage2/serial.h.orig	2022-05-26 11:32:48.612434754 -0700
++++ grub-0.97/stage2/serial.h	2022-05-26 11:32:48.800427057 -0700
+@@ -68,6 +68,9 @@
+ 
+ /* Function prototypes.  */
+ 
++unsigned char inb (unsigned short port);
++void outb (unsigned short port, unsigned char value);
++
+ /* Fetch a key.  */
+ int serial_hw_fetch (void);
+ 
+@@ -84,6 +87,12 @@
+ int serial_hw_init (unsigned short port, unsigned int speed,
+ 		    int word_len, int parity, int stop_bit_len);
+ 
++/* Set the serial port on which to direct the console */
++void serial_set_consoleport(unsigned short port);
++
++/* Get the console serial port */
++unsigned short serial_get_consoleport(void);
++
+ #ifdef GRUB_UTIL
+ /* Set the file name of a serial device (or a pty device). This is a
+    function specific to the grub shell.  */
+--- grub-0.97/stage2/stage2.c.orig	2022-05-26 11:32:48.612434754 -0700
++++ grub-0.97/stage2/stage2.c	2022-05-26 11:32:48.820426237 -0700
+@@ -19,8 +19,15 @@
+ 
+ #include <shared.h>
+ #include <term.h>
++#include <nar7090.h>
++#include <lcm.h>
++#include <seattle_gpio.h>
++#include <panel.h>
++
+ 
+ grub_jmp_buf restart_env;
++int lcd_module = LCD_MODULE_UNKNOWN;
++int LCDB_filton = 0;
+ 
+ #if defined(PRESET_MENU_STRING) || defined(SUPPORT_DISKLESS)
+ 
+@@ -227,17 +234,193 @@
+     current_term->setcolorstate (COLOR_STATE_STANDARD);
+ }
+ 
++#ifndef GRUB_UTIL
++/* find platfrom based on command-line arguments
++ *  - Mukund Jampala
++ */
++static int get_lcm_by_arg(char *arg)
++{
++  int len;
++
++  len = grub_strlen (arg);
++
++  /* Deal with GNU-style long options.  */
++  while (1)
++    {
++      if (grub_memcmp (arg, "wg_ptfm=", 8) == 0)
++      {
++	    arg += 8;
++
++	    if ((grub_memcmp (arg, "xtm5", 4) == 0) || (grub_memcmp (arg, "xtm8", 4) == 0) || \
++	     (grub_memcmp (arg, "xtm20", 5) == 0) || (grub_memcmp (arg, "xtm850+", 7) == 0)) { /* 'xtm850+' can possibly mean 'multiple platforms' */
++	        lcd_module = LCD_MODULE_B;
++                if (grub_memcmp (arg, "xtm20", 5) == 0) /* Is it a xtm2050 ?? slightly different */
++                    LCDB_filton = 1;
++	    } else if ((grub_memcmp (arg, "xtm10", 5) == 0) || (grub_memcmp (arg, "tacoma", 6) == 0)) {
++	        lcd_module = LCD_MODULE_A;
++	    } else {
++          lcd_module = LCD_MODULE_UNKNOWN;
++	      grub_printf ("unknown platform\n");
++	    }
++        break;
++      } else if(!len) {
++    	break;
++      }
++
++      /* Try the next.  */
++      arg = skip_to (0, arg);
++      len = grub_strlen (arg);
++    }
++
++
++    return lcd_module;
++}
++#endif
++
++/*
++ *  detect_mainboard()
++ *  detects motherboard by reading the smbiosn tables directly and fetch the MB board info.
++ */
++
++void detect_mainboard(void)
++{
++	int mem_address;
++	char bios_seattle_str[]="MB-UP2010W";
++	char bios_kirkland_str[]="MB-WG7585W";
++	char colfax1_bios_str[]="MB-WG-8771W";
++	char colfax2_bios_str[]="MB-WG-8877W";
++	char westport_bios_mb_mf[]="Board Manufacturer";
++	int  westport_bios_mb_mf_len=strlen(westport_bios_mb_mf);
++	unsigned char *bios_end_search_p=(unsigned char *)(0x100000 - westport_bios_mb_mf_len - 1);
++	char westport_bios_mb_str[]="T70";
++	char mukilteo_bios_mb_str[]="T55";
++	char winthrop_bios_str[]="NCB-4210WG"; /* Full text is  "SignOnMessage:NCB-4210WG"  */
++	char twisp_bios_str[] = "NCB-WG2511";
++	unsigned char *bios_mb_str_p=NULL;
++	unsigned char *bios_p;
++	
++	mem_address=0xff000;
++
++	bios_p = mem_address + 0x58b;
++	if (grub_memcmp ((const char *)bios_p, bios_seattle_str, sizeof(bios_seattle_str)-1) == 0)  {
++		/* detected 'seattle' unit with no LCM present */
++		lcd_module = LCD_MODULE_NONE_SEATTLE;
++	} else if (grub_memcmp ((const char *)bios_p, bios_kirkland_str, sizeof(bios_kirkland_str)-1) == 0) {
++		/* detected 'kirkland' unit with no LCM present */
++		lcd_module = LCD_MODULE_NONE_KIRKLAND;
++	} else if (grub_memcmp ((const char *)bios_p, colfax1_bios_str, sizeof(colfax1_bios_str)-1) == 0) {
++		/* detected 'colfax-I' unit with no LCM present */
++		lcd_module = LCD_MODULE_NONE_COLFAX1;
++	} else if (grub_memcmp ((const char *)bios_p, colfax2_bios_str, sizeof(colfax2_bios_str)-1) == 0) {
++		/* detected 'colfax-II' unit with no LCM present */
++		lcd_module = LCD_MODULE_NONE_COLFAX2;
++	} else if (grub_memcmp ((const char *)bios_p + strlen("SignOnMessage:"), winthrop_bios_str, sizeof(winthrop_bios_str)-1) == 0) { 
++		/* bios_p + strlen("SignOnMessage:"): we do this because bios_p does not directly point to the hardware model in case of winthrop */
++		/* detected 'winthrop' unit with no LCM present */
++		lcd_module = LCD_MODULE_NONE_WINTHROP;
++		bios_p += strlen("SignOnMessage:"); /* Full bios version text is "SignOnMessage:NCB-4210WG" at offset 0xff58b, but we only need to read "NCB-4210WG" */
++	} else if (grub_memcmp ((const char *)bios_p, twisp_bios_str, sizeof(twisp_bios_str)-1) == 0) { 
++		/* detected 'twisp' unit with no LCM present */
++		lcd_module = LCD_MODULE_NONE_TWISP;
++	} else {
++		/*bios_p = 0xe692f;*/
++		/* Westport T70 mother board string BIOS address might be changed if BIOS configuration is changed. 
++		   Thus, we need to search T70 MB string from BIOS address 0xc0000 instead of permanent address */
++		for(bios_p = (unsigned char *)0xc0000; bios_p<bios_end_search_p; bios_p++)
++		{
++			if(grub_memcmp ((const char *)bios_p, westport_bios_mb_mf, westport_bios_mb_mf_len) == 0) {
++				bios_mb_str_p = (bios_p + westport_bios_mb_mf_len + 1); /* MB string is located behind "Board Manufacturer" +1 */
++				break;
++			}	
++		}		
++		if(bios_mb_str_p && (grub_memcmp ((const char *)bios_mb_str_p, westport_bios_mb_str, strlen(westport_bios_mb_str)) == 0)) {
++			/* detected 'westport' unit with no LCM present */
++			lcd_module = LCD_MODULE_NONE_WESTPORT;	
++		} else if(bios_mb_str_p && (grub_memcmp ((const char *)bios_mb_str_p, mukilteo_bios_mb_str, strlen(mukilteo_bios_mb_str)) == 0)) {
++			/* detected 'mukilteo' unit with no LCM present */
++			lcd_module = LCD_MODULE_NONE_MUKILTEO;
++		}	
++	}	
++
++	if (lcd_module == LCD_MODULE_NONE_SEATTLE) {
++		printf ("\n\n'seattle' board detected '%s' @ addr=0x%x\n", bios_p, bios_p);
++	} else if (lcd_module == LCD_MODULE_NONE_KIRKLAND) {
++		printf ("\n\n'kirkland' board detected '%s' @ addr=0x%x\n", bios_p, bios_p);
++	} else if (lcd_module == LCD_MODULE_NONE_COLFAX1) {
++		printf ("\n\n'Colfax1' board detected '%s' @ addr=0x%x\n", bios_p, bios_p);
++	} else if (lcd_module == LCD_MODULE_NONE_COLFAX2) {
++		printf ("\n\n'Colfax2' board detected '%s' @ addr=0x%x\n", bios_p, bios_p);
++	} else if (lcd_module == LCD_MODULE_NONE_WINTHROP) {
++		printf ("\n\n'Winthrop' board detected '%s' @ addr=0x%x\n", winthrop_bios_str, bios_p);
++	} else if (lcd_module == LCD_MODULE_NONE_WESTPORT) {
++		printf ("\n\n'Westport' board detected '%s' @ addr=0x%x\n", bios_mb_str_p, bios_mb_str_p);
++	} else if (lcd_module == LCD_MODULE_NONE_MUKILTEO) {
++		printf ("\n\n'Mukilteo' board detected '%s' @ addr=0x%x\n", bios_mb_str_p, bios_mb_str_p);
++	} else if (lcd_module == LCD_MODULE_NONE_TWISP) {
++		printf ("\n\n'Twisp' board detected '%s' @ addr=0x%x\n", twisp_bios_str, bios_p);
++	} else	{
++		printf ("\n\n'could NOT detect a known Board, tag='%s', addr=0x%x\n", bios_p, bios_p);
++	}
++	printf ("\n\n'platform detection complete!\n");
++}
++
++
+ static void
+ run_menu (char *menu_entries, char *config_entries, int num_entries,
+ 	  char *heap, int entryno)
+ {
+   int c, time1, time2 = -1, first_entry = 0;
+   char *cur_entry = 0;
++  int up_count = 0;
++  int down_count = 0;
+ 
+   /*
+    *  Main loop for menu UI.
+    */
+ 
++  /* before anything detect the motherboard */
++  detect_mainboard();
++
++#ifndef GRUB_UTIL
++  if (LCD_MODULE_A == lcd_module)
++  {
++      /* Init the NAR-7090 front panel */
++      ezio_init ();
++      ezio_cmd (CMD_CLS);
++      ezio_putchars ("   WatchGuard");
++  }
++  else if (LCD_MODULE_B == lcd_module)
++  {
++      /* Init lanner lcm */
++      LCM_Init();
++      LCM_Write(1, "   WatchGuard");
++  }
++  else if (LCD_MODULE_NONE_SEATTLE == lcd_module) /* Platforms w.o a LCM */
++  {
++      sled_init();
++  }
++  else if (LCD_MODULE_NONE_KIRKLAND == lcd_module) /* Platforms w.o a LCM */
++  {
++      sled_init();
++  }
++  else if (LCD_MODULE_NONE_COLFAX1 == lcd_module) /* Platforms w.o a LCM */
++  {
++      sled_init();
++  }
++  else if (LCD_MODULE_NONE_COLFAX2 == lcd_module) /* Platforms w.o a LCM */
++  {
++      sled_init();
++  }
++  else if ( (LCD_MODULE_NONE_WESTPORT == lcd_module) || (LCD_MODULE_NONE_MUKILTEO == lcd_module) ) /* Platforms w.o a LCM */
++  {
++      sled_init();
++  }
++  else if ( (LCD_MODULE_NONE_WINTHROP == lcd_module) || (LCD_MODULE_NONE_TWISP == lcd_module) ) /* Platforms w.o a LCM */
++  {
++      sled_init();
++  }
++#endif
++	
+ restart:
+   /* Dumb terminal always use all entries for display 
+      invariant for TERM_DUMB: first_entry == 0  */
+@@ -339,7 +522,77 @@
+ 
+   while (1)
+     {
+-      /* Initialize to NULL just in case...  */
++#ifndef GRUB_UTIL
++        unsigned char buttons = 0;
++        if (LCD_MODULE_A == lcd_module)
++        {
++            buttons = ezio_getbuttons ();
++        }
++        else if (LCD_MODULE_B == lcd_module)
++        {
++            buttons = LCM_GetButtons ();
++        } 
++        else if (LCD_MODULE_NONE_SEATTLE == lcd_module) /* Platforms w.o a LCM */
++        {
++            buttons = get_reset_button ();
++        }
++        else if (LCD_MODULE_NONE_KIRKLAND == lcd_module) /* Platforms w.o a LCM */
++        {
++            buttons = get_reset_button ();
++        }
++        else if (LCD_MODULE_NONE_COLFAX1 == lcd_module) /* Platforms w.o a LCM */
++        {
++            buttons = get_reset_button ();
++        }
++        else if (LCD_MODULE_NONE_COLFAX2 == lcd_module) /* Platforms w.o a LCM */
++        {
++            buttons = get_reset_button ();
++        }
++        else if ( (LCD_MODULE_NONE_WESTPORT == lcd_module) || (LCD_MODULE_NONE_MUKILTEO == lcd_module) ) /* Platforms w.o a LCM */
++        {
++            buttons = get_reset_button ();
++        }
++        else if ( (LCD_MODULE_NONE_WINTHROP == lcd_module) || (LCD_MODULE_NONE_TWISP == lcd_module) ) /* Platforms w.o a LCM */
++        {
++            buttons = get_reset_button ();
++        }
++
++        /*
++         * By WG convention, boot the second entry in menu.lst (SYSB a.k.a.
++         * Recovery Mode) when the user presses UP on the front panel.  Boot the
++         * third entry in menu.lst (SYSA+Safe Mode) when the user presses DOWN on
++         * the front panel.  On some platforms, you can press multiple buttons at
++         * once, but we don't want to deal with that, hence the ``else if``.
++         */
++        if ((buttons && (buttons & BTN_UP)) || (buttons && (buttons & BTN_RESET)))
++        {
++	    /* PLTM NO LCM( i.e.seattle being the first one): BTN_RESET, all other x86 PLTM with LCM: BTN_UP */	
++            ++up_count;
++        }
++        else if (buttons && (buttons & BTN_DOWN))
++        {
++            ++down_count;
++        }
++        /*
++         * Don't just take the first button event.  Look for a sustained button
++         * push to avoid spurious, boot-time, phantom pushes that *really* do
++         * happen.
++         */
++        if (up_count > 10)
++        {
++            entryno = 1;
++            grub_timeout = -1;
++            break;
++        }
++        if (down_count > 10)
++        {
++            entryno = 2;
++            grub_timeout = -1;
++            break;
++        }
++#endif
++
++     /* Initialize to NULL just in case...  */
+       cur_entry = NULL;
+ 
+       if (grub_timeout >= 0 && (time1 = getrtsecs()) != time2 && time1 != 0xFF)
+@@ -381,7 +634,7 @@
+ 	    grub_printf ("\r    Highlighted entry is %d: ", entryno);
+ 
+ 	  c = ASCII_CHAR (getkey ());
+-
++	  
+ 	  if (grub_timeout >= 0)
+ 	    {
+ 	      if (current_term->flags & TERM_DUMB)
+@@ -714,7 +967,18 @@
+   
+   cls ();
+   setcursor (1);
+-  
++#ifndef GRUB_UTIL
++    if (LCD_MODULE_A == lcd_module) 
++    {
++        /* clear the LCD as well */
++        ezio_cmd (CMD_CLS);
++    }
++    else if (LCD_MODULE_B == lcd_module)
++    {
++        LCM_Cls();
++    }
++#endif
++
+   while (1)
+     {
+       if (config_entries)
+@@ -763,8 +1027,9 @@
+     {
+       if (read_from_file)
+ 	{
+-	  if (! grub_read (&c, 1))
++	  if (! grub_read (&c, 1)) {
+ 	    break;
++	  }
+ 	}
+       else
+ 	{
+@@ -823,7 +1088,6 @@
+     }
+ 
+   cmdline[pos] = 0;
+-
+   return pos;
+ }
+ 
+@@ -836,6 +1100,7 @@
+   char *config_entries, *menu_entries;
+   char *kill_buf = (char *) KILL_BUF;
+ 
++  char *arg = NULL;
+   auto void reset (void);
+   void reset (void)
+     {
+@@ -889,6 +1154,7 @@
+ 	      int len;
+ 	      
+ 	      len = grub_read (buf, sizeof (buf));
++
+ 	      if (len > 0)
+ 		{
+ 		  buf[sizeof (buf) - 1] = 0;
+@@ -928,6 +1194,13 @@
+ 		{
+ 		  struct builtin *builtin;
+ 		  
++#ifndef GRUB_UTIL
++		  if (grub_strstr (cmdline, "wg_ptfm"))
++		  {
++			arg = skip_to (1, cmdline);
++			lcd_module = get_lcm_by_arg(arg);
++		  }
++#endif // endof GRUB_UTIL
+ 		  /* Get the pointer to the builtin structure.  */
+ 		  builtin = find_command (cmdline);
+ 		  errnum = 0;
+--- grub-0.97/stage2/Makefile.am.orig	2022-05-26 11:32:48.600435245 -0700
++++ grub-0.97/stage2/Makefile.am	2022-05-26 11:32:48.760428694 -0700
+@@ -6,20 +6,21 @@
+ noinst_HEADERS = apic.h defs.h dir.h disk_inode.h disk_inode_ffs.h \
+         fat.h filesys.h freebsd.h fs.h hercules.h i386-elf.h \
+ 	imgact_aout.h iso9660.h jfs.h mb_header.h mb_info.h md5.h \
+-	nbi.h pc_slice.h serial.h shared.h smp-imps.h term.h \
+-	terminfo.h tparm.h nbi.h ufs2.h vstafs.h xfs.h
++	nbi.h pc_slice.h lcm.h nar7090.h serial.h seattle_gpio.h \
++	panel.h shared.h smp-imps.h term.h terminfo.h tparm.h \
++	nbi.h ufs2.h vstafs.h xfs.h
+ EXTRA_DIST = setjmp.S apm.S $(noinst_SCRIPTS)
+ 
+ # For <stage1.h>.
+-INCLUDES = -I$(top_srcdir)/stage1
++INCLUDES = -I$(top_srcdir)/stage1 -I$(top_srcdir)/netboot
+ 
+ # The library for /sbin/grub.
+ noinst_LIBRARIES = libgrub.a
+ libgrub_a_SOURCES = boot.c builtins.c char_io.c cmdline.c common.c \
+ 	disk_io.c fsys_ext2fs.c fsys_fat.c fsys_ffs.c fsys_iso9660.c \
+ 	fsys_jfs.c fsys_minix.c fsys_reiserfs.c fsys_ufs2.c \
+-	fsys_vstafs.c fsys_xfs.c gunzip.c md5.c serial.c stage2.c \
+-	terminfo.c tparm.c
++	fsys_vstafs.c fsys_xfs.c gunzip.c md5.c lcm.c nar7090.c serial.c stage2.c \
++	seattle_gpio.c terminfo.c tparm.c
+ libgrub_a_CFLAGS = $(GRUB_CFLAGS) -I$(top_srcdir)/lib \
+ 	-DGRUB_UTIL=1 -DFSYS_EXT2FS=1 -DFSYS_FAT=1 -DFSYS_FFS=1 \
+ 	-DFSYS_ISO9660=1 -DFSYS_JFS=1 -DFSYS_MINIX=1 -DFSYS_REISERFS=1 \
+@@ -90,7 +91,8 @@
+ 	cmdline.c common.c console.c disk_io.c fsys_ext2fs.c \
+ 	fsys_fat.c fsys_ffs.c fsys_iso9660.c fsys_jfs.c fsys_minix.c \
+ 	fsys_reiserfs.c fsys_ufs2.c fsys_vstafs.c fsys_xfs.c gunzip.c \
+-	hercules.c md5.c serial.c smp-imps.c stage2.c terminfo.c tparm.c
++	hercules.c md5.c lcm.c nar7090.c serial.c seattle_gpio.c \
++	smp-imps.c stage2.c terminfo.c tparm.c
+ pre_stage2_exec_CFLAGS = $(STAGE2_COMPILE) $(FSYS_CFLAGS)
+ pre_stage2_exec_CCASFLAGS = $(STAGE2_COMPILE) $(FSYS_CFLAGS)
+ pre_stage2_exec_LDFLAGS = $(PRE_STAGE2_LINK)
+--- grub-0.97/stage2/Makefile.in.orig	2022-05-26 11:32:48.604435082 -0700
++++ grub-0.97/stage2/Makefile.in	2022-05-26 11:32:48.768428367 -0700
+@@ -1,8 +1,8 @@
+-# Makefile.in generated by automake 1.9.4 from Makefile.am.
++# Makefile.in generated by automake 1.9.6 from Makefile.am.
+ # @configure_input@
+ 
+ # Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004  Free Software Foundation, Inc.
++# 2003, 2004, 2005  Free Software Foundation, Inc.
+ # This Makefile.in is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -18,8 +18,6 @@
+ 
+ 
+ 
+-SOURCES = $(libgrub_a_SOURCES) $(diskless_exec_SOURCES) $(e2fs_stage1_5_exec_SOURCES) $(fat_stage1_5_exec_SOURCES) $(ffs_stage1_5_exec_SOURCES) $(iso9660_stage1_5_exec_SOURCES) $(jfs_stage1_5_exec_SOURCES) $(minix_stage1_5_exec_SOURCES) $(nbloader_exec_SOURCES) $(pre_stage2_exec_SOURCES) $(pxeloader_exec_SOURCES) $(reiserfs_stage1_5_exec_SOURCES) $(start_exec_SOURCES) $(start_eltorito_exec_SOURCES) $(ufs2_stage1_5_exec_SOURCES) $(vstafs_stage1_5_exec_SOURCES) $(xfs_stage1_5_exec_SOURCES)
+-
+ srcdir = @srcdir@
+ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+@@ -98,9 +96,10 @@
+ 	libgrub_a-fsys_reiserfs.$(OBJEXT) \
+ 	libgrub_a-fsys_ufs2.$(OBJEXT) libgrub_a-fsys_vstafs.$(OBJEXT) \
+ 	libgrub_a-fsys_xfs.$(OBJEXT) libgrub_a-gunzip.$(OBJEXT) \
+-	libgrub_a-md5.$(OBJEXT) libgrub_a-serial.$(OBJEXT) \
+-	libgrub_a-stage2.$(OBJEXT) libgrub_a-terminfo.$(OBJEXT) \
+-	libgrub_a-tparm.$(OBJEXT)
++	libgrub_a-md5.$(OBJEXT) libgrub_a-lcm.$(OBJEXT) \
++	libgrub_a-nar7090.$(OBJEXT) libgrub_a-serial.$(OBJEXT) \
++	libgrub_a-stage2.$(OBJEXT) libgrub_a-seattle_gpio.$(OBJEXT) \
++	libgrub_a-terminfo.$(OBJEXT) libgrub_a-tparm.$(OBJEXT)
+ libgrub_a_OBJECTS = $(am_libgrub_a_OBJECTS)
+ PROGRAMS = $(noinst_PROGRAMS)
+ am__objects_1 = diskless_exec-asm.$(OBJEXT) \
+@@ -122,7 +121,9 @@
+ 	diskless_exec-fsys_xfs.$(OBJEXT) \
+ 	diskless_exec-gunzip.$(OBJEXT) \
+ 	diskless_exec-hercules.$(OBJEXT) diskless_exec-md5.$(OBJEXT) \
++	diskless_exec-lcm.$(OBJEXT) diskless_exec-nar7090.$(OBJEXT) \
+ 	diskless_exec-serial.$(OBJEXT) \
++	diskless_exec-seattle_gpio.$(OBJEXT) \
+ 	diskless_exec-smp-imps.$(OBJEXT) \
+ 	diskless_exec-stage2.$(OBJEXT) \
+ 	diskless_exec-terminfo.$(OBJEXT) diskless_exec-tparm.$(OBJEXT)
+@@ -213,7 +214,10 @@
+ 	pre_stage2_exec-fsys_xfs.$(OBJEXT) \
+ 	pre_stage2_exec-gunzip.$(OBJEXT) \
+ 	pre_stage2_exec-hercules.$(OBJEXT) \
+-	pre_stage2_exec-md5.$(OBJEXT) pre_stage2_exec-serial.$(OBJEXT) \
++	pre_stage2_exec-md5.$(OBJEXT) pre_stage2_exec-lcm.$(OBJEXT) \
++	pre_stage2_exec-nar7090.$(OBJEXT) \
++	pre_stage2_exec-serial.$(OBJEXT) \
++	pre_stage2_exec-seattle_gpio.$(OBJEXT) \
+ 	pre_stage2_exec-smp-imps.$(OBJEXT) \
+ 	pre_stage2_exec-stage2.$(OBJEXT) \
+ 	pre_stage2_exec-terminfo.$(OBJEXT) \
+@@ -344,6 +348,7 @@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ FSYS_CFLAGS = @FSYS_CFLAGS@
++GREP = @GREP@
+ GRUB_CFLAGS = @GRUB_CFLAGS@
+ GRUB_LIBS = @GRUB_LIBS@
+ HERCULES_SUPPORT_FALSE = @HERCULES_SUPPORT_FALSE@
+@@ -372,6 +377,7 @@
+ PACKAGE_NAME = @PACKAGE_NAME@
+ PACKAGE_STRING = @PACKAGE_STRING@
+ PACKAGE_TARNAME = @PACKAGE_TARNAME@
++PACKAGE_URL = @PACKAGE_URL@
+ PACKAGE_VERSION = @PACKAGE_VERSION@
+ PATH_SEPARATOR = @PATH_SEPARATOR@
+ PERL = @PERL@
+@@ -387,9 +393,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ ac_ct_CC = @ac_ct_CC@
+-ac_ct_OBJCOPY = @ac_ct_OBJCOPY@
+-ac_ct_RANLIB = @ac_ct_RANLIB@
+-ac_ct_STRIP = @ac_ct_STRIP@
+ am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+ am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+ am__include = @am__include@
+@@ -404,23 +407,30 @@
+ build_os = @build_os@
+ build_vendor = @build_vendor@
+ datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
+ exec_prefix = @exec_prefix@
+ host = @host@
+ host_alias = @host_alias@
+ host_cpu = @host_cpu@
+ host_os = @host_os@
+ host_vendor = @host_vendor@
++htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_sh = @install_sh@
+ libdir = @libdir@
+ libexecdir = @libexecdir@
++localedir = @localedir@
+ localstatedir = @localstatedir@
+ mandir = @mandir@
+ mkdir_p = @mkdir_p@
+ oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
++psdir = @psdir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ sysconfdir = @sysconfdir@
+@@ -434,21 +444,22 @@
+ noinst_HEADERS = apic.h defs.h dir.h disk_inode.h disk_inode_ffs.h \
+         fat.h filesys.h freebsd.h fs.h hercules.h i386-elf.h \
+ 	imgact_aout.h iso9660.h jfs.h mb_header.h mb_info.h md5.h \
+-	nbi.h pc_slice.h serial.h shared.h smp-imps.h term.h \
+-	terminfo.h tparm.h nbi.h ufs2.h vstafs.h xfs.h
++	nbi.h pc_slice.h lcm.h nar7090.h serial.h seattle_gpio.h \
++	panel.h shared.h smp-imps.h term.h terminfo.h tparm.h \
++	nbi.h ufs2.h vstafs.h xfs.h
+ 
+ EXTRA_DIST = setjmp.S apm.S $(noinst_SCRIPTS)
+ 
+ # For <stage1.h>.
+-INCLUDES = -I$(top_srcdir)/stage1
++INCLUDES = -I$(top_srcdir)/stage1 -I$(top_srcdir)/netboot
+ 
+ # The library for /sbin/grub.
+ noinst_LIBRARIES = libgrub.a
+ libgrub_a_SOURCES = boot.c builtins.c char_io.c cmdline.c common.c \
+ 	disk_io.c fsys_ext2fs.c fsys_fat.c fsys_ffs.c fsys_iso9660.c \
+ 	fsys_jfs.c fsys_minix.c fsys_reiserfs.c fsys_ufs2.c \
+-	fsys_vstafs.c fsys_xfs.c gunzip.c md5.c serial.c stage2.c \
+-	terminfo.c tparm.c
++	fsys_vstafs.c fsys_xfs.c gunzip.c md5.c lcm.c nar7090.c serial.c stage2.c \
++	seattle_gpio.c terminfo.c tparm.c
+ 
+ libgrub_a_CFLAGS = $(GRUB_CFLAGS) -I$(top_srcdir)/lib \
+ 	-DGRUB_UTIL=1 -DFSYS_EXT2FS=1 -DFSYS_FAT=1 -DFSYS_FFS=1 \
+@@ -490,7 +501,8 @@
+ 	cmdline.c common.c console.c disk_io.c fsys_ext2fs.c \
+ 	fsys_fat.c fsys_ffs.c fsys_iso9660.c fsys_jfs.c fsys_minix.c \
+ 	fsys_reiserfs.c fsys_ufs2.c fsys_vstafs.c fsys_xfs.c gunzip.c \
+-	hercules.c md5.c serial.c smp-imps.c stage2.c terminfo.c tparm.c
++	hercules.c md5.c lcm.c nar7090.c serial.c seattle_gpio.c \
++	smp-imps.c stage2.c terminfo.c tparm.c
+ 
+ pre_stage2_exec_CFLAGS = $(STAGE2_COMPILE) $(FSYS_CFLAGS)
+ pre_stage2_exec_CCASFLAGS = $(STAGE2_COMPILE) $(FSYS_CFLAGS)
+@@ -768,7 +780,10 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-fsys_xfs.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-gunzip.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-hercules.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-lcm.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-md5.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-nar7090.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-seattle_gpio.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-serial.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-smp-imps.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diskless_exec-stage2.Po@am__quote@
+@@ -821,7 +836,10 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-fsys_vstafs.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-fsys_xfs.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-gunzip.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-lcm.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-md5.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-nar7090.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-seattle_gpio.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-serial.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-stage2.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libgrub_a-terminfo.Po@am__quote@
+@@ -852,7 +870,10 @@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-fsys_xfs.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-gunzip.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-hercules.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-lcm.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-md5.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-nar7090.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-seattle_gpio.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-serial.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-smp-imps.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre_stage2_exec-stage2.Po@am__quote@
+@@ -1311,6 +1332,34 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -c -o libgrub_a-md5.obj `if test -f 'md5.c'; then $(CYGPATH_W) 'md5.c'; else $(CYGPATH_W) '$(srcdir)/md5.c'; fi`
+ 
++libgrub_a-lcm.o: lcm.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -MT libgrub_a-lcm.o -MD -MP -MF "$(DEPDIR)/libgrub_a-lcm.Tpo" -c -o libgrub_a-lcm.o `test -f 'lcm.c' || echo '$(srcdir)/'`lcm.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libgrub_a-lcm.Tpo" "$(DEPDIR)/libgrub_a-lcm.Po"; else rm -f "$(DEPDIR)/libgrub_a-lcm.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='lcm.c' object='libgrub_a-lcm.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -c -o libgrub_a-lcm.o `test -f 'lcm.c' || echo '$(srcdir)/'`lcm.c
++
++libgrub_a-lcm.obj: lcm.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -MT libgrub_a-lcm.obj -MD -MP -MF "$(DEPDIR)/libgrub_a-lcm.Tpo" -c -o libgrub_a-lcm.obj `if test -f 'lcm.c'; then $(CYGPATH_W) 'lcm.c'; else $(CYGPATH_W) '$(srcdir)/lcm.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libgrub_a-lcm.Tpo" "$(DEPDIR)/libgrub_a-lcm.Po"; else rm -f "$(DEPDIR)/libgrub_a-lcm.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='lcm.c' object='libgrub_a-lcm.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -c -o libgrub_a-lcm.obj `if test -f 'lcm.c'; then $(CYGPATH_W) 'lcm.c'; else $(CYGPATH_W) '$(srcdir)/lcm.c'; fi`
++
++libgrub_a-nar7090.o: nar7090.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -MT libgrub_a-nar7090.o -MD -MP -MF "$(DEPDIR)/libgrub_a-nar7090.Tpo" -c -o libgrub_a-nar7090.o `test -f 'nar7090.c' || echo '$(srcdir)/'`nar7090.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libgrub_a-nar7090.Tpo" "$(DEPDIR)/libgrub_a-nar7090.Po"; else rm -f "$(DEPDIR)/libgrub_a-nar7090.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nar7090.c' object='libgrub_a-nar7090.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -c -o libgrub_a-nar7090.o `test -f 'nar7090.c' || echo '$(srcdir)/'`nar7090.c
++
++libgrub_a-nar7090.obj: nar7090.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -MT libgrub_a-nar7090.obj -MD -MP -MF "$(DEPDIR)/libgrub_a-nar7090.Tpo" -c -o libgrub_a-nar7090.obj `if test -f 'nar7090.c'; then $(CYGPATH_W) 'nar7090.c'; else $(CYGPATH_W) '$(srcdir)/nar7090.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libgrub_a-nar7090.Tpo" "$(DEPDIR)/libgrub_a-nar7090.Po"; else rm -f "$(DEPDIR)/libgrub_a-nar7090.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nar7090.c' object='libgrub_a-nar7090.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -c -o libgrub_a-nar7090.obj `if test -f 'nar7090.c'; then $(CYGPATH_W) 'nar7090.c'; else $(CYGPATH_W) '$(srcdir)/nar7090.c'; fi`
++
+ libgrub_a-serial.o: serial.c
+ @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -MT libgrub_a-serial.o -MD -MP -MF "$(DEPDIR)/libgrub_a-serial.Tpo" -c -o libgrub_a-serial.o `test -f 'serial.c' || echo '$(srcdir)/'`serial.c; \
+ @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libgrub_a-serial.Tpo" "$(DEPDIR)/libgrub_a-serial.Po"; else rm -f "$(DEPDIR)/libgrub_a-serial.Tpo"; exit 1; fi
+@@ -1339,6 +1388,20 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -c -o libgrub_a-stage2.obj `if test -f 'stage2.c'; then $(CYGPATH_W) 'stage2.c'; else $(CYGPATH_W) '$(srcdir)/stage2.c'; fi`
+ 
++libgrub_a-seattle_gpio.o: seattle_gpio.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -MT libgrub_a-seattle_gpio.o -MD -MP -MF "$(DEPDIR)/libgrub_a-seattle_gpio.Tpo" -c -o libgrub_a-seattle_gpio.o `test -f 'seattle_gpio.c' || echo '$(srcdir)/'`seattle_gpio.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libgrub_a-seattle_gpio.Tpo" "$(DEPDIR)/libgrub_a-seattle_gpio.Po"; else rm -f "$(DEPDIR)/libgrub_a-seattle_gpio.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='seattle_gpio.c' object='libgrub_a-seattle_gpio.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -c -o libgrub_a-seattle_gpio.o `test -f 'seattle_gpio.c' || echo '$(srcdir)/'`seattle_gpio.c
++
++libgrub_a-seattle_gpio.obj: seattle_gpio.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -MT libgrub_a-seattle_gpio.obj -MD -MP -MF "$(DEPDIR)/libgrub_a-seattle_gpio.Tpo" -c -o libgrub_a-seattle_gpio.obj `if test -f 'seattle_gpio.c'; then $(CYGPATH_W) 'seattle_gpio.c'; else $(CYGPATH_W) '$(srcdir)/seattle_gpio.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libgrub_a-seattle_gpio.Tpo" "$(DEPDIR)/libgrub_a-seattle_gpio.Po"; else rm -f "$(DEPDIR)/libgrub_a-seattle_gpio.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='seattle_gpio.c' object='libgrub_a-seattle_gpio.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -c -o libgrub_a-seattle_gpio.obj `if test -f 'seattle_gpio.c'; then $(CYGPATH_W) 'seattle_gpio.c'; else $(CYGPATH_W) '$(srcdir)/seattle_gpio.c'; fi`
++
+ libgrub_a-terminfo.o: terminfo.c
+ @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgrub_a_CFLAGS) $(CFLAGS) -MT libgrub_a-terminfo.o -MD -MP -MF "$(DEPDIR)/libgrub_a-terminfo.Tpo" -c -o libgrub_a-terminfo.o `test -f 'terminfo.c' || echo '$(srcdir)/'`terminfo.c; \
+ @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libgrub_a-terminfo.Tpo" "$(DEPDIR)/libgrub_a-terminfo.Po"; else rm -f "$(DEPDIR)/libgrub_a-terminfo.Tpo"; exit 1; fi
+@@ -1661,6 +1724,34 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -c -o diskless_exec-md5.obj `if test -f 'md5.c'; then $(CYGPATH_W) 'md5.c'; else $(CYGPATH_W) '$(srcdir)/md5.c'; fi`
+ 
++diskless_exec-lcm.o: lcm.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -MT diskless_exec-lcm.o -MD -MP -MF "$(DEPDIR)/diskless_exec-lcm.Tpo" -c -o diskless_exec-lcm.o `test -f 'lcm.c' || echo '$(srcdir)/'`lcm.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/diskless_exec-lcm.Tpo" "$(DEPDIR)/diskless_exec-lcm.Po"; else rm -f "$(DEPDIR)/diskless_exec-lcm.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='lcm.c' object='diskless_exec-lcm.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -c -o diskless_exec-lcm.o `test -f 'lcm.c' || echo '$(srcdir)/'`lcm.c
++
++diskless_exec-lcm.obj: lcm.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -MT diskless_exec-lcm.obj -MD -MP -MF "$(DEPDIR)/diskless_exec-lcm.Tpo" -c -o diskless_exec-lcm.obj `if test -f 'lcm.c'; then $(CYGPATH_W) 'lcm.c'; else $(CYGPATH_W) '$(srcdir)/lcm.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/diskless_exec-lcm.Tpo" "$(DEPDIR)/diskless_exec-lcm.Po"; else rm -f "$(DEPDIR)/diskless_exec-lcm.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='lcm.c' object='diskless_exec-lcm.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -c -o diskless_exec-lcm.obj `if test -f 'lcm.c'; then $(CYGPATH_W) 'lcm.c'; else $(CYGPATH_W) '$(srcdir)/lcm.c'; fi`
++
++diskless_exec-nar7090.o: nar7090.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -MT diskless_exec-nar7090.o -MD -MP -MF "$(DEPDIR)/diskless_exec-nar7090.Tpo" -c -o diskless_exec-nar7090.o `test -f 'nar7090.c' || echo '$(srcdir)/'`nar7090.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/diskless_exec-nar7090.Tpo" "$(DEPDIR)/diskless_exec-nar7090.Po"; else rm -f "$(DEPDIR)/diskless_exec-nar7090.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nar7090.c' object='diskless_exec-nar7090.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -c -o diskless_exec-nar7090.o `test -f 'nar7090.c' || echo '$(srcdir)/'`nar7090.c
++
++diskless_exec-nar7090.obj: nar7090.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -MT diskless_exec-nar7090.obj -MD -MP -MF "$(DEPDIR)/diskless_exec-nar7090.Tpo" -c -o diskless_exec-nar7090.obj `if test -f 'nar7090.c'; then $(CYGPATH_W) 'nar7090.c'; else $(CYGPATH_W) '$(srcdir)/nar7090.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/diskless_exec-nar7090.Tpo" "$(DEPDIR)/diskless_exec-nar7090.Po"; else rm -f "$(DEPDIR)/diskless_exec-nar7090.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nar7090.c' object='diskless_exec-nar7090.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -c -o diskless_exec-nar7090.obj `if test -f 'nar7090.c'; then $(CYGPATH_W) 'nar7090.c'; else $(CYGPATH_W) '$(srcdir)/nar7090.c'; fi`
++
+ diskless_exec-serial.o: serial.c
+ @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -MT diskless_exec-serial.o -MD -MP -MF "$(DEPDIR)/diskless_exec-serial.Tpo" -c -o diskless_exec-serial.o `test -f 'serial.c' || echo '$(srcdir)/'`serial.c; \
+ @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/diskless_exec-serial.Tpo" "$(DEPDIR)/diskless_exec-serial.Po"; else rm -f "$(DEPDIR)/diskless_exec-serial.Tpo"; exit 1; fi
+@@ -1675,6 +1766,20 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -c -o diskless_exec-serial.obj `if test -f 'serial.c'; then $(CYGPATH_W) 'serial.c'; else $(CYGPATH_W) '$(srcdir)/serial.c'; fi`
+ 
++diskless_exec-seattle_gpio.o: seattle_gpio.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -MT diskless_exec-seattle_gpio.o -MD -MP -MF "$(DEPDIR)/diskless_exec-seattle_gpio.Tpo" -c -o diskless_exec-seattle_gpio.o `test -f 'seattle_gpio.c' || echo '$(srcdir)/'`seattle_gpio.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/diskless_exec-seattle_gpio.Tpo" "$(DEPDIR)/diskless_exec-seattle_gpio.Po"; else rm -f "$(DEPDIR)/diskless_exec-seattle_gpio.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='seattle_gpio.c' object='diskless_exec-seattle_gpio.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -c -o diskless_exec-seattle_gpio.o `test -f 'seattle_gpio.c' || echo '$(srcdir)/'`seattle_gpio.c
++
++diskless_exec-seattle_gpio.obj: seattle_gpio.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -MT diskless_exec-seattle_gpio.obj -MD -MP -MF "$(DEPDIR)/diskless_exec-seattle_gpio.Tpo" -c -o diskless_exec-seattle_gpio.obj `if test -f 'seattle_gpio.c'; then $(CYGPATH_W) 'seattle_gpio.c'; else $(CYGPATH_W) '$(srcdir)/seattle_gpio.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/diskless_exec-seattle_gpio.Tpo" "$(DEPDIR)/diskless_exec-seattle_gpio.Po"; else rm -f "$(DEPDIR)/diskless_exec-seattle_gpio.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='seattle_gpio.c' object='diskless_exec-seattle_gpio.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -c -o diskless_exec-seattle_gpio.obj `if test -f 'seattle_gpio.c'; then $(CYGPATH_W) 'seattle_gpio.c'; else $(CYGPATH_W) '$(srcdir)/seattle_gpio.c'; fi`
++
+ diskless_exec-smp-imps.o: smp-imps.c
+ @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(diskless_exec_CFLAGS) $(CFLAGS) -MT diskless_exec-smp-imps.o -MD -MP -MF "$(DEPDIR)/diskless_exec-smp-imps.Tpo" -c -o diskless_exec-smp-imps.o `test -f 'smp-imps.c' || echo '$(srcdir)/'`smp-imps.c; \
+ @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/diskless_exec-smp-imps.Tpo" "$(DEPDIR)/diskless_exec-smp-imps.Po"; else rm -f "$(DEPDIR)/diskless_exec-smp-imps.Tpo"; exit 1; fi
+@@ -2529,6 +2634,34 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -c -o pre_stage2_exec-md5.obj `if test -f 'md5.c'; then $(CYGPATH_W) 'md5.c'; else $(CYGPATH_W) '$(srcdir)/md5.c'; fi`
+ 
++pre_stage2_exec-lcm.o: lcm.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -MT pre_stage2_exec-lcm.o -MD -MP -MF "$(DEPDIR)/pre_stage2_exec-lcm.Tpo" -c -o pre_stage2_exec-lcm.o `test -f 'lcm.c' || echo '$(srcdir)/'`lcm.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pre_stage2_exec-lcm.Tpo" "$(DEPDIR)/pre_stage2_exec-lcm.Po"; else rm -f "$(DEPDIR)/pre_stage2_exec-lcm.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='lcm.c' object='pre_stage2_exec-lcm.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -c -o pre_stage2_exec-lcm.o `test -f 'lcm.c' || echo '$(srcdir)/'`lcm.c
++
++pre_stage2_exec-lcm.obj: lcm.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -MT pre_stage2_exec-lcm.obj -MD -MP -MF "$(DEPDIR)/pre_stage2_exec-lcm.Tpo" -c -o pre_stage2_exec-lcm.obj `if test -f 'lcm.c'; then $(CYGPATH_W) 'lcm.c'; else $(CYGPATH_W) '$(srcdir)/lcm.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pre_stage2_exec-lcm.Tpo" "$(DEPDIR)/pre_stage2_exec-lcm.Po"; else rm -f "$(DEPDIR)/pre_stage2_exec-lcm.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='lcm.c' object='pre_stage2_exec-lcm.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -c -o pre_stage2_exec-lcm.obj `if test -f 'lcm.c'; then $(CYGPATH_W) 'lcm.c'; else $(CYGPATH_W) '$(srcdir)/lcm.c'; fi`
++
++pre_stage2_exec-nar7090.o: nar7090.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -MT pre_stage2_exec-nar7090.o -MD -MP -MF "$(DEPDIR)/pre_stage2_exec-nar7090.Tpo" -c -o pre_stage2_exec-nar7090.o `test -f 'nar7090.c' || echo '$(srcdir)/'`nar7090.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pre_stage2_exec-nar7090.Tpo" "$(DEPDIR)/pre_stage2_exec-nar7090.Po"; else rm -f "$(DEPDIR)/pre_stage2_exec-nar7090.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nar7090.c' object='pre_stage2_exec-nar7090.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -c -o pre_stage2_exec-nar7090.o `test -f 'nar7090.c' || echo '$(srcdir)/'`nar7090.c
++
++pre_stage2_exec-nar7090.obj: nar7090.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -MT pre_stage2_exec-nar7090.obj -MD -MP -MF "$(DEPDIR)/pre_stage2_exec-nar7090.Tpo" -c -o pre_stage2_exec-nar7090.obj `if test -f 'nar7090.c'; then $(CYGPATH_W) 'nar7090.c'; else $(CYGPATH_W) '$(srcdir)/nar7090.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pre_stage2_exec-nar7090.Tpo" "$(DEPDIR)/pre_stage2_exec-nar7090.Po"; else rm -f "$(DEPDIR)/pre_stage2_exec-nar7090.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nar7090.c' object='pre_stage2_exec-nar7090.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -c -o pre_stage2_exec-nar7090.obj `if test -f 'nar7090.c'; then $(CYGPATH_W) 'nar7090.c'; else $(CYGPATH_W) '$(srcdir)/nar7090.c'; fi`
++
+ pre_stage2_exec-serial.o: serial.c
+ @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -MT pre_stage2_exec-serial.o -MD -MP -MF "$(DEPDIR)/pre_stage2_exec-serial.Tpo" -c -o pre_stage2_exec-serial.o `test -f 'serial.c' || echo '$(srcdir)/'`serial.c; \
+ @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pre_stage2_exec-serial.Tpo" "$(DEPDIR)/pre_stage2_exec-serial.Po"; else rm -f "$(DEPDIR)/pre_stage2_exec-serial.Tpo"; exit 1; fi
+@@ -2543,6 +2676,20 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -c -o pre_stage2_exec-serial.obj `if test -f 'serial.c'; then $(CYGPATH_W) 'serial.c'; else $(CYGPATH_W) '$(srcdir)/serial.c'; fi`
+ 
++pre_stage2_exec-seattle_gpio.o: seattle_gpio.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -MT pre_stage2_exec-seattle_gpio.o -MD -MP -MF "$(DEPDIR)/pre_stage2_exec-seattle_gpio.Tpo" -c -o pre_stage2_exec-seattle_gpio.o `test -f 'seattle_gpio.c' || echo '$(srcdir)/'`seattle_gpio.c; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pre_stage2_exec-seattle_gpio.Tpo" "$(DEPDIR)/pre_stage2_exec-seattle_gpio.Po"; else rm -f "$(DEPDIR)/pre_stage2_exec-seattle_gpio.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='seattle_gpio.c' object='pre_stage2_exec-seattle_gpio.o' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -c -o pre_stage2_exec-seattle_gpio.o `test -f 'seattle_gpio.c' || echo '$(srcdir)/'`seattle_gpio.c
++
++pre_stage2_exec-seattle_gpio.obj: seattle_gpio.c
++@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -MT pre_stage2_exec-seattle_gpio.obj -MD -MP -MF "$(DEPDIR)/pre_stage2_exec-seattle_gpio.Tpo" -c -o pre_stage2_exec-seattle_gpio.obj `if test -f 'seattle_gpio.c'; then $(CYGPATH_W) 'seattle_gpio.c'; else $(CYGPATH_W) '$(srcdir)/seattle_gpio.c'; fi`; \
++@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pre_stage2_exec-seattle_gpio.Tpo" "$(DEPDIR)/pre_stage2_exec-seattle_gpio.Po"; else rm -f "$(DEPDIR)/pre_stage2_exec-seattle_gpio.Tpo"; exit 1; fi
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='seattle_gpio.c' object='pre_stage2_exec-seattle_gpio.obj' libtool=no @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -c -o pre_stage2_exec-seattle_gpio.obj `if test -f 'seattle_gpio.c'; then $(CYGPATH_W) 'seattle_gpio.c'; else $(CYGPATH_W) '$(srcdir)/seattle_gpio.c'; fi`
++
+ pre_stage2_exec-smp-imps.o: smp-imps.c
+ @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pre_stage2_exec_CFLAGS) $(CFLAGS) -MT pre_stage2_exec-smp-imps.o -MD -MP -MF "$(DEPDIR)/pre_stage2_exec-smp-imps.Tpo" -c -o pre_stage2_exec-smp-imps.o `test -f 'smp-imps.c' || echo '$(srcdir)/'`smp-imps.c; \
+ @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pre_stage2_exec-smp-imps.Tpo" "$(DEPDIR)/pre_stage2_exec-smp-imps.Po"; else rm -f "$(DEPDIR)/pre_stage2_exec-smp-imps.Tpo"; exit 1; fi
+--- grub-0.97/stage2/serial.c.orig	2022-05-26 11:32:48.612434754 -0700
++++ grub-0.97/stage2/serial.c	2022-05-26 11:32:48.800427057 -0700
+@@ -61,7 +61,7 @@
+   };
+ 
+ /* Read a byte from a port.  */
+-static inline unsigned char
++unsigned char
+ inb (unsigned short port)
+ {
+   unsigned char value;
+@@ -73,7 +73,7 @@
+ }
+ 
+ /* Write a byte to a port.  */
+-static inline void
++void
+ outb (unsigned short port, unsigned char value)
+ {
+   asm volatile ("outb	%b0, %w1" : : "a" (value), "Nd" (port));
+@@ -187,6 +187,20 @@
+   
+   return 1;
+ }
++
++/* Set the serial port on which to direct the console */
++void
++serial_set_consoleport(unsigned short port)
++{
++  serial_hw_port = port;
++}
++
++/* Get the console serial port */
++unsigned short
++serial_get_consoleport(void)
++{
++  return serial_hw_port;
++}
+ #endif /* ! GRUB_UTIL */
+ 
+ 
+--- grub-0.97/stage2/builtins.c.orig	2022-05-26 11:32:48.604435082 -0700
++++ grub-0.97/stage2/builtins.c	2022-05-26 11:32:48.772428203 -0700
+@@ -36,6 +36,11 @@
+ #ifdef SUPPORT_SERIAL
+ # include <serial.h>
+ # include <terminfo.h>
++# ifndef GRUB_UTIL
++#  include <nar7090.h>
++#  include <lcm.h>
++#  include <seattle_gpio.h>
++# endif
+ #endif
+ 
+ #ifdef GRUB_UTIL
+@@ -771,6 +776,7 @@
+       default_entry = saved_entryno;
+       return 0;
+     }
++
+ #endif /* SUPPORT_DISKLESS */
+   
+   if (! safe_parse_maxint (&arg, &default_entry))
+@@ -791,7 +797,6 @@
+ #endif
+ };
+ 
+-
+ #ifdef GRUB_UTIL
+ /* device */
+ static int
+@@ -1739,6 +1744,49 @@
+ };
+ 
+ 
++/* lcd */
++static int
++lcd_func (char *arg, int flags)
++{
++  int line_num;
++
++  /* set the line number */
++  if (! safe_parse_maxint (&arg, &line_num))
++    return 1;
++#ifndef GRUB_UTIL
++  if (LCD_MODULE_A == lcd_module)
++  {
++    ezio_cmd (CMD_SETPOS + (line_num == 2 ? LCD_ROW2_OFFSET : 0));
++  } 
++#endif
++  arg = skip_to (0, arg);
++
++  /* display the string */
++#ifndef GRUB_UTIL
++  if (LCD_MODULE_A == lcd_module)
++  {
++    ezio_putchars(arg);
++  }
++  else if (LCD_MODULE_B == lcd_module)
++  {
++    LCM_Write(line_num, arg);
++  }
++#endif
++
++  return 0;
++}
++
++static struct builtin builtin_lcd =
++{
++  "lcd",
++  lcd_func,
++  BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
++  "lcd LINE_NUM [WORD ...]",
++  "Make the LINE_NUMth line on the LCD display the words in [WORD ...]."
++  " LINE_NUM can be 1 or 2."
++};
++
++
+ /* install */
+ static int
+ install_func (char *arg, int flags)
+@@ -4835,6 +4883,9 @@
+   &builtin_install,
+   &builtin_ioprobe,
+   &builtin_kernel,
++#ifndef GRUB_UTIL
++  &builtin_lcd,
++#endif /* GRUB_UTIL */
+   &builtin_lock,
+   &builtin_makeactive,
+   &builtin_map,
+--- grub-0.97/grub/Makefile.in.orig	2022-05-26 11:32:48.580436064 -0700
++++ grub-0.97/grub/Makefile.in	2022-05-26 11:32:48.724430168 -0700
+@@ -1,8 +1,8 @@
+-# Makefile.in generated by automake 1.9.4 from Makefile.am.
++# Makefile.in generated by automake 1.9.6 from Makefile.am.
+ # @configure_input@
+ 
+ # Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004  Free Software Foundation, Inc.
++# 2003, 2004, 2005  Free Software Foundation, Inc.
+ # This Makefile.in is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -14,8 +14,6 @@
+ 
+ @SET_MAKE@
+ 
+-SOURCES = $(grub_SOURCES)
+-
+ srcdir = @srcdir@
+ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+@@ -97,6 +95,7 @@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ FSYS_CFLAGS = @FSYS_CFLAGS@
++GREP = @GREP@
+ GRUB_CFLAGS = @GRUB_CFLAGS@
+ GRUB_LIBS = @GRUB_LIBS@
+ HERCULES_SUPPORT_FALSE = @HERCULES_SUPPORT_FALSE@
+@@ -140,9 +139,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ ac_ct_CC = @ac_ct_CC@
+-ac_ct_OBJCOPY = @ac_ct_OBJCOPY@
+-ac_ct_RANLIB = @ac_ct_RANLIB@
+-ac_ct_STRIP = @ac_ct_STRIP@
+ am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+ am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+ am__include = @am__include@
+@@ -157,23 +153,30 @@
+ build_os = @build_os@
+ build_vendor = @build_vendor@
+ datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
+ exec_prefix = @exec_prefix@
+ host = @host@
+ host_alias = @host_alias@
+ host_cpu = @host_cpu@
+ host_os = @host_os@
+ host_vendor = @host_vendor@
++htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_sh = @install_sh@
+ libdir = @libdir@
+ libexecdir = @libexecdir@
++localedir = @localedir@
+ localstatedir = @localstatedir@
+ mandir = @mandir@
+ mkdir_p = @mkdir_p@
+ oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
++psdir = @psdir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ sysconfdir = @sysconfdir@
+--- grub-0.97/aclocal.m4.orig	2022-05-26 11:32:48.564436720 -0700
++++ grub-0.97/aclocal.m4	2022-05-26 11:32:48.700431151 -0700
+@@ -1,7 +1,7 @@
+-# generated automatically by aclocal 1.9.4 -*- Autoconf -*-
++# generated automatically by aclocal 1.9.6 -*- Autoconf -*-
+ 
+-# Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
+-# Free Software Foundation, Inc.
++# Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
++# 2005  Free Software Foundation, Inc.
+ # This file is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -11,23 +11,11 @@
+ # even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ # PARTICULAR PURPOSE.
+ 
+-#                                                        -*- Autoconf -*-
+-# Copyright (C) 2002, 2003  Free Software Foundation, Inc.
+-# Generated from amversion.in; do not edit by hand.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
++# Copyright (C) 2002, 2003, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+ # AM_AUTOMAKE_VERSION(VERSION)
+ # ----------------------------
+@@ -40,26 +28,15 @@
+ # Call AM_AUTOMAKE_VERSION so it can be traced.
+ # This function is AC_REQUIREd by AC_INIT_AUTOMAKE.
+ AC_DEFUN([AM_SET_CURRENT_AUTOMAKE_VERSION],
+-	 [AM_AUTOMAKE_VERSION([1.9.4])])
+-
+-# AM_AUX_DIR_EXPAND
+-
+-# Copyright (C) 2001, 2003 Free Software Foundation, Inc.
++	 [AM_AUTOMAKE_VERSION([1.9.6])])
+ 
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
++# AM_AUX_DIR_EXPAND                                         -*- Autoconf -*-
+ 
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 2001, 2003, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+ # For projects using AC_CONFIG_AUX_DIR([foo]), Autoconf sets
+ # $ac_aux_dir to `$srcdir/foo'.  In other projects, it is set to
+@@ -106,26 +83,16 @@
+ am_aux_dir=`cd $ac_aux_dir && pwd`
+ ])
+ 
+-# AM_CONDITIONAL                                              -*- Autoconf -*-
++# AM_CONDITIONAL                                            -*- Autoconf -*-
+ 
+-# Copyright (C) 1997, 2000, 2001, 2003, 2004 Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 1997, 2000, 2001, 2003, 2004, 2005
++# Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# serial 6
++# serial 7
+ 
+ # AM_CONDITIONAL(NAME, SHELL-CONDITION)
+ # -------------------------------------
+@@ -149,26 +116,15 @@
+ Usually this means the macro was only invoked conditionally.]])
+ fi])])
+ 
+-# serial 7						-*- Autoconf -*-
+ 
+-# Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004
++# Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005
+ # Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
+-
++# serial 8
+ 
+ # There are a few dirty hacks below to avoid letting `AC_PROG_CC' be
+ # written in clear, in which case automake, when reading aclocal.m4,
+@@ -177,7 +133,6 @@
+ # CC etc. in the Makefile, will ask for an AC_PROG_CC use...
+ 
+ 
+-
+ # _AM_DEPENDENCIES(NAME)
+ # ----------------------
+ # See how the compiler implements dependency checking.
+@@ -317,27 +272,16 @@
+ AC_SUBST([AMDEPBACKSLASH])
+ ])
+ 
+-# Generate code to set up dependency tracking.   -*- Autoconf -*-
+-
+-# Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004
+-#   Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
++# Generate code to set up dependency tracking.              -*- Autoconf -*-
+ 
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005
++# Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-#serial 2
++#serial 3
+ 
+ # _AM_OUTPUT_DEPENDENCY_COMMANDS
+ # ------------------------------
+@@ -396,30 +340,19 @@
+      [AMDEP_TRUE="$AMDEP_TRUE" ac_aux_dir="$ac_aux_dir"])
+ ])
+ 
+-# Do all the work for Automake.                            -*- Autoconf -*-
++# Do all the work for Automake.                             -*- Autoconf -*-
+ 
+-# This macro actually does too much some checks are only needed if
+-# your package does certain things.  But this isn't really a big deal.
+-
+-# Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004
++# Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005
+ # Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# serial 12
+ 
+-# serial 11
++# This macro actually does too much.  Some checks are only needed if
++# your package does certain things.  But this isn't really a big deal.
+ 
+ # AM_INIT_AUTOMAKE(PACKAGE, VERSION, [NO-DEFINE])
+ # AM_INIT_AUTOMAKE([OPTIONS])
+@@ -521,51 +454,27 @@
+ done
+ echo "timestamp for $1" >`AS_DIRNAME([$1])`/stamp-h[]$_am_stamp_count])
+ 
++# Copyright (C) 2001, 2003, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
++
+ # AM_PROG_INSTALL_SH
+ # ------------------
+ # Define $install_sh.
+-
+-# Copyright (C) 2001, 2003 Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
+-
+ AC_DEFUN([AM_PROG_INSTALL_SH],
+ [AC_REQUIRE([AM_AUX_DIR_EXPAND])dnl
+ install_sh=${install_sh-"$am_aux_dir/install-sh"}
+ AC_SUBST(install_sh)])
+ 
+-#                                                          -*- Autoconf -*-
+-# Copyright (C) 2003  Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 2003, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# serial 1
++# serial 2
+ 
+ # Check whether the underlying file-system supports filenames
+ # with a leading dot.  For instance MS-DOS doesn't.
+@@ -580,28 +489,17 @@
+ rmdir .tst 2>/dev/null
+ AC_SUBST([am__leading_dot])])
+ 
+-# Add --enable-maintainer-mode option to configure.
++# Add --enable-maintainer-mode option to configure.         -*- Autoconf -*-
+ # From Jim Meyering
+ 
+-# Copyright (C) 1996, 1998, 2000, 2001, 2002, 2003, 2004
++# Copyright (C) 1996, 1998, 2000, 2001, 2002, 2003, 2004, 2005
+ # Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
+-
+-# serial 3
++# serial 4
+ 
+ AC_DEFUN([AM_MAINTAINER_MODE],
+ [AC_MSG_CHECKING([whether to enable maintainer-specific portions of Makefiles])
+@@ -620,26 +518,15 @@
+ 
+ AU_DEFUN([jm_MAINTAINER_MODE], [AM_MAINTAINER_MODE])
+ 
+-# Check to see how 'make' treats includes.	-*- Autoconf -*-
+-
+-# Copyright (C) 2001, 2002, 2003 Free Software Foundation, Inc.
++# Check to see how 'make' treats includes.	            -*- Autoconf -*-
+ 
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 2001, 2002, 2003, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# serial 2
++# serial 3
+ 
+ # AM_MAKE_INCLUDE()
+ # -----------------
+@@ -683,27 +570,16 @@
+ rm -f confinc confmf
+ ])
+ 
+-#  -*- Autoconf -*-
+-
+-
+-# Copyright (C) 1997, 1999, 2000, 2001, 2003 Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
++# Fake the existence of programs that GNU maintainers use.  -*- Autoconf -*-
+ 
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 1997, 1999, 2000, 2001, 2003, 2005
++# Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# serial 3
++# serial 4
+ 
+ # AM_MISSING_PROG(NAME, PROGRAM)
+ # ------------------------------
+@@ -729,27 +605,16 @@
+ fi
+ ])
+ 
++# Copyright (C) 2003, 2004, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
++
+ # AM_PROG_MKDIR_P
+ # ---------------
+ # Check whether `mkdir -p' is supported, fallback to mkinstalldirs otherwise.
+-
+-# Copyright (C) 2003, 2004 Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
+-
++#
+ # Automake 1.8 used `mkdir -m 0755 -p --' to ensure that directories
+ # created by `make install' are always world readable, even if the
+ # installer happens to have an overly restrictive umask (e.g. 077).
+@@ -803,26 +668,15 @@
+ fi
+ AC_SUBST([mkdir_p])])
+ 
+-# Helper functions for option handling.                    -*- Autoconf -*-
++# Helper functions for option handling.                     -*- Autoconf -*-
+ 
+-# Copyright (C) 2001, 2002, 2003  Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 2001, 2002, 2003, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# serial 2
++# serial 3
+ 
+ # _AM_MANGLE_OPTION(NAME)
+ # -----------------------
+@@ -847,28 +701,16 @@
+ AC_DEFUN([_AM_IF_OPTION],
+ [m4_ifset(_AM_MANGLE_OPTION([$1]), [$2], [$3])])
+ 
+-#
+-# Check to make sure that the build environment is sane.
+-#
+-
+-# Copyright (C) 1996, 1997, 2000, 2001, 2003 Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
++# Check to make sure that the build environment is sane.    -*- Autoconf -*-
+ 
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 1996, 1997, 2000, 2001, 2003, 2005
++# Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
+-# serial 3
++# serial 4
+ 
+ # AM_SANITY_CHECK
+ # ---------------
+@@ -911,25 +753,14 @@
+ fi
+ AC_MSG_RESULT(yes)])
+ 
+-# AM_PROG_INSTALL_STRIP
+-
+-# Copyright (C) 2001, 2003 Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
++# Copyright (C) 2001, 2003, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
++# AM_PROG_INSTALL_STRIP
++# ---------------------
+ # One issue with vendor `install' (even GNU) is that you can't
+ # specify the program used to strip binaries.  This is especially
+ # annoying in cross-compiling environments, where the build's strip
+@@ -952,25 +783,13 @@
+ 
+ # Check how to create a tarball.                            -*- Autoconf -*-
+ 
+-# Copyright (C) 2004  Free Software Foundation, Inc.
+-
+-# This program is free software; you can redistribute it and/or modify
+-# it under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 2, or (at your option)
+-# any later version.
+-
+-# This program is distributed in the hope that it will be useful,
+-# but WITHOUT ANY WARRANTY; without even the implied warranty of
+-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-# GNU General Public License for more details.
+-
+-# You should have received a copy of the GNU General Public License
+-# along with this program; if not, write to the Free Software
+-# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+-# 02111-1307, USA.
+-
+-# serial 1
++# Copyright (C) 2004, 2005  Free Software Foundation, Inc.
++#
++# This file is free software; the Free Software Foundation
++# gives unlimited permission to copy and/or distribute it,
++# with or without modifications, as long as this notice is preserved.
+ 
++# serial 2
+ 
+ # _AM_PROG_TAR(FORMAT)
+ # --------------------
+--- grub-0.97/netboot/Makefile.in.orig	2022-05-26 11:32:48.584435900 -0700
++++ grub-0.97/netboot/Makefile.in	2022-05-26 11:32:48.732429840 -0700
+@@ -1,8 +1,8 @@
+-# Makefile.in generated by automake 1.9.4 from Makefile.am.
++# Makefile.in generated by automake 1.9.6 from Makefile.am.
+ # @configure_input@
+ 
+ # Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004  Free Software Foundation, Inc.
++# 2003, 2004, 2005  Free Software Foundation, Inc.
+ # This Makefile.in is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -14,8 +14,6 @@
+ 
+ @SET_MAKE@
+ 
+-SOURCES = $(libdrivers_a_SOURCES) $(EXTRA_libdrivers_a_SOURCES)
+-
+ srcdir = @srcdir@
+ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+@@ -97,6 +95,7 @@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ FSYS_CFLAGS = @FSYS_CFLAGS@
++GREP = @GREP@
+ GRUB_CFLAGS = @GRUB_CFLAGS@
+ GRUB_LIBS = @GRUB_LIBS@
+ HERCULES_SUPPORT_FALSE = @HERCULES_SUPPORT_FALSE@
+@@ -140,9 +139,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ ac_ct_CC = @ac_ct_CC@
+-ac_ct_OBJCOPY = @ac_ct_OBJCOPY@
+-ac_ct_RANLIB = @ac_ct_RANLIB@
+-ac_ct_STRIP = @ac_ct_STRIP@
+ am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+ am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+ am__include = @am__include@
+@@ -157,23 +153,30 @@
+ build_os = @build_os@
+ build_vendor = @build_vendor@
+ datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
+ exec_prefix = @exec_prefix@
+ host = @host@
+ host_alias = @host_alias@
+ host_cpu = @host_cpu@
+ host_os = @host_os@
+ host_vendor = @host_vendor@
++htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_sh = @install_sh@
+ libdir = @libdir@
+ libexecdir = @libexecdir@
++localedir = @localedir@
+ localstatedir = @localstatedir@
+ mandir = @mandir@
+ mkdir_p = @mkdir_p@
+ oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
++psdir = @psdir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ sysconfdir = @sysconfdir@
+--- grub-0.97/stage1/Makefile.in.orig	2022-05-26 11:32:48.600435245 -0700
++++ grub-0.97/stage1/Makefile.in	2022-05-26 11:32:48.740429513 -0700
+@@ -1,8 +1,8 @@
+-# Makefile.in generated by automake 1.9.4 from Makefile.am.
++# Makefile.in generated by automake 1.9.6 from Makefile.am.
+ # @configure_input@
+ 
+ # Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004  Free Software Foundation, Inc.
++# 2003, 2004, 2005  Free Software Foundation, Inc.
+ # This Makefile.in is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -15,8 +15,6 @@
+ @SET_MAKE@
+ 
+ 
+-SOURCES = $(stage1_exec_SOURCES)
+-
+ srcdir = @srcdir@
+ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+@@ -102,6 +100,7 @@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ FSYS_CFLAGS = @FSYS_CFLAGS@
++GREP = @GREP@
+ GRUB_CFLAGS = @GRUB_CFLAGS@
+ GRUB_LIBS = @GRUB_LIBS@
+ HERCULES_SUPPORT_FALSE = @HERCULES_SUPPORT_FALSE@
+@@ -145,9 +144,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ ac_ct_CC = @ac_ct_CC@
+-ac_ct_OBJCOPY = @ac_ct_OBJCOPY@
+-ac_ct_RANLIB = @ac_ct_RANLIB@
+-ac_ct_STRIP = @ac_ct_STRIP@
+ am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+ am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+ am__include = @am__include@
+@@ -162,23 +158,30 @@
+ build_os = @build_os@
+ build_vendor = @build_vendor@
+ datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
+ exec_prefix = @exec_prefix@
+ host = @host@
+ host_alias = @host_alias@
+ host_cpu = @host_cpu@
+ host_os = @host_os@
+ host_vendor = @host_vendor@
++htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_sh = @install_sh@
+ libdir = @libdir@
+ libexecdir = @libexecdir@
++localedir = @localedir@
+ localstatedir = @localstatedir@
+ mandir = @mandir@
+ mkdir_p = @mkdir_p@
+ oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
++psdir = @psdir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ sysconfdir = @sysconfdir@
+--- grub-0.97/util/Makefile.in.orig	2022-05-26 11:32:48.616434590 -0700
++++ grub-0.97/util/Makefile.in	2022-05-26 11:32:48.820426237 -0700
+@@ -1,8 +1,8 @@
+-# Makefile.in generated by automake 1.9.4 from Makefile.am.
++# Makefile.in generated by automake 1.9.6 from Makefile.am.
+ # @configure_input@
+ 
+ # Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004  Free Software Foundation, Inc.
++# 2003, 2004, 2005  Free Software Foundation, Inc.
+ # This Makefile.in is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -15,8 +15,6 @@
+ @SET_MAKE@
+ 
+ 
+-SOURCES = $(mbchk_SOURCES)
+-
+ srcdir = @srcdir@
+ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+@@ -102,6 +100,7 @@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ FSYS_CFLAGS = @FSYS_CFLAGS@
++GREP = @GREP@
+ GRUB_CFLAGS = @GRUB_CFLAGS@
+ GRUB_LIBS = @GRUB_LIBS@
+ HERCULES_SUPPORT_FALSE = @HERCULES_SUPPORT_FALSE@
+@@ -145,9 +144,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ ac_ct_CC = @ac_ct_CC@
+-ac_ct_OBJCOPY = @ac_ct_OBJCOPY@
+-ac_ct_RANLIB = @ac_ct_RANLIB@
+-ac_ct_STRIP = @ac_ct_STRIP@
+ am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+ am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+ am__include = @am__include@
+@@ -162,23 +158,30 @@
+ build_os = @build_os@
+ build_vendor = @build_vendor@
+ datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
+ exec_prefix = @exec_prefix@
+ host = @host@
+ host_alias = @host_alias@
+ host_cpu = @host_cpu@
+ host_os = @host_os@
+ host_vendor = @host_vendor@
++htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_sh = @install_sh@
+ libdir = @libdir@
+ libexecdir = @libexecdir@
++localedir = @localedir@
+ localstatedir = @localstatedir@
+ mandir = @mandir@
+ mkdir_p = @mkdir_p@
+ oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
++psdir = @psdir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ sysconfdir = @sysconfdir@
+--- grub-0.97/Makefile.in.orig	2022-05-26 11:32:48.560436883 -0700
++++ grub-0.97/Makefile.in	2022-05-26 11:32:48.684431806 -0700
+@@ -1,8 +1,8 @@
+-# Makefile.in generated by automake 1.9.4 from Makefile.am.
++# Makefile.in generated by automake 1.9.6 from Makefile.am.
+ # @configure_input@
+ 
+ # Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004  Free Software Foundation, Inc.
++# 2003, 2004, 2005  Free Software Foundation, Inc.
+ # This Makefile.in is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -101,6 +101,7 @@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ FSYS_CFLAGS = @FSYS_CFLAGS@
++GREP = @GREP@
+ GRUB_CFLAGS = @GRUB_CFLAGS@
+ GRUB_LIBS = @GRUB_LIBS@
+ HERCULES_SUPPORT_FALSE = @HERCULES_SUPPORT_FALSE@
+@@ -144,9 +145,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ ac_ct_CC = @ac_ct_CC@
+-ac_ct_OBJCOPY = @ac_ct_OBJCOPY@
+-ac_ct_RANLIB = @ac_ct_RANLIB@
+-ac_ct_STRIP = @ac_ct_STRIP@
+ am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+ am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+ am__include = @am__include@
+@@ -161,23 +159,30 @@
+ build_os = @build_os@
+ build_vendor = @build_vendor@
+ datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
+ exec_prefix = @exec_prefix@
+ host = @host@
+ host_alias = @host_alias@
+ host_cpu = @host_cpu@
+ host_os = @host_os@
+ host_vendor = @host_vendor@
++htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_sh = @install_sh@
+ libdir = @libdir@
+ libexecdir = @libexecdir@
++localedir = @localedir@
+ localstatedir = @localstatedir@
+ mandir = @mandir@
+ mkdir_p = @mkdir_p@
+ oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
++psdir = @psdir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ sysconfdir = @sysconfdir@
+@@ -250,7 +255,13 @@
+ #     (which will cause the Makefiles to be regenerated when you run `make');
+ # (2) otherwise, pass the desired values on the `make' command line.
+ $(RECURSIVE_TARGETS):
+-	@set fnord $$MAKEFLAGS; amf=$$2; \
++	@failcom='exit 1'; \
++	for f in x $$MAKEFLAGS; do \
++	  case $$f in \
++	    *=* | --[!k]*);; \
++	    *k*) failcom='fail=yes';; \
++	  esac; \
++	done; \
+ 	dot_seen=no; \
+ 	target=`echo $@ | sed s/-recursive//`; \
+ 	list='$(SUBDIRS)'; for subdir in $$list; do \
+@@ -262,7 +273,7 @@
+ 	    local_target="$$target"; \
+ 	  fi; \
+ 	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+-	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
++	  || eval $$failcom; \
+ 	done; \
+ 	if test "$$dot_seen" = "no"; then \
+ 	  $(MAKE) $(AM_MAKEFLAGS) "$$target-am" || exit 1; \
+@@ -270,7 +281,13 @@
+ 
+ mostlyclean-recursive clean-recursive distclean-recursive \
+ maintainer-clean-recursive:
+-	@set fnord $$MAKEFLAGS; amf=$$2; \
++	@failcom='exit 1'; \
++	for f in x $$MAKEFLAGS; do \
++	  case $$f in \
++	    *=* | --[!k]*);; \
++	    *k*) failcom='fail=yes';; \
++	  esac; \
++	done; \
+ 	dot_seen=no; \
+ 	case "$@" in \
+ 	  distclean-* | maintainer-clean-*) list='$(DIST_SUBDIRS)' ;; \
+@@ -291,7 +308,7 @@
+ 	    local_target="$$target"; \
+ 	  fi; \
+ 	  (cd $$subdir && $(MAKE) $(AM_MAKEFLAGS) $$local_target) \
+-	   || case "$$amf" in *=*) exit 1;; *k*) fail=yes;; *) exit 1;; esac; \
++	  || eval $$failcom; \
+ 	done && test -z "$$fail"
+ tags-recursive:
+ 	list='$(SUBDIRS)'; for subdir in $$list; do \
+--- grub-0.97/lib/device.c.orig	2022-05-26 11:32:48.580436064 -0700
++++ grub-0.97/lib/device.c	2022-05-26 11:32:48.724430168 -0700
+@@ -33,7 +33,7 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <errno.h>
+-#include <limits.h>
++#include <linux/limits.h>
+ #include <stdarg.h>
+ 
+ #ifdef __linux__
+--- grub-0.97/lib/Makefile.in.orig	2022-05-26 11:32:48.580436064 -0700
++++ grub-0.97/lib/Makefile.in	2022-05-26 11:32:48.724430168 -0700
+@@ -1,8 +1,8 @@
+-# Makefile.in generated by automake 1.9.4 from Makefile.am.
++# Makefile.in generated by automake 1.9.6 from Makefile.am.
+ # @configure_input@
+ 
+ # Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004  Free Software Foundation, Inc.
++# 2003, 2004, 2005  Free Software Foundation, Inc.
+ # This Makefile.in is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -14,8 +14,6 @@
+ 
+ @SET_MAKE@
+ 
+-SOURCES = $(libcommon_a_SOURCES)
+-
+ srcdir = @srcdir@
+ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+@@ -96,6 +94,7 @@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ FSYS_CFLAGS = @FSYS_CFLAGS@
++GREP = @GREP@
+ GRUB_CFLAGS = @GRUB_CFLAGS@
+ GRUB_LIBS = @GRUB_LIBS@
+ HERCULES_SUPPORT_FALSE = @HERCULES_SUPPORT_FALSE@
+@@ -139,9 +138,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ ac_ct_CC = @ac_ct_CC@
+-ac_ct_OBJCOPY = @ac_ct_OBJCOPY@
+-ac_ct_RANLIB = @ac_ct_RANLIB@
+-ac_ct_STRIP = @ac_ct_STRIP@
+ am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+ am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+ am__include = @am__include@
+@@ -156,23 +152,30 @@
+ build_os = @build_os@
+ build_vendor = @build_vendor@
+ datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
+ exec_prefix = @exec_prefix@
+ host = @host@
+ host_alias = @host_alias@
+ host_cpu = @host_cpu@
+ host_os = @host_os@
+ host_vendor = @host_vendor@
++htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_sh = @install_sh@
+ libdir = @libdir@
+ libexecdir = @libexecdir@
++localedir = @localedir@
+ localstatedir = @localstatedir@
+ mandir = @mandir@
+ mkdir_p = @mkdir_p@
+ oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
++psdir = @psdir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ sysconfdir = @sysconfdir@
+--- grub-0.97/docs/Makefile.in.orig	2022-05-26 11:32:48.568436556 -0700
++++ grub-0.97/docs/Makefile.in	2022-05-26 11:32:48.704430987 -0700
+@@ -1,8 +1,8 @@
+-# Makefile.in generated by automake 1.9.4 from Makefile.am.
++# Makefile.in generated by automake 1.9.6 from Makefile.am.
+ # @configure_input@
+ 
+ # Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+-# 2003, 2004  Free Software Foundation, Inc.
++# 2003, 2004, 2005  Free Software Foundation, Inc.
+ # This Makefile.in is free software; the Free Software Foundation
+ # gives unlimited permission to copy and/or distribute it,
+ # with or without modifications, as long as this notice is preserved.
+@@ -15,8 +15,6 @@
+ @SET_MAKE@
+ 
+ 
+-SOURCES = $(kernel_SOURCES)
+-
+ srcdir = @srcdir@
+ top_srcdir = @top_srcdir@
+ VPATH = @srcdir@
+@@ -120,6 +118,7 @@
+ EGREP = @EGREP@
+ EXEEXT = @EXEEXT@
+ FSYS_CFLAGS = @FSYS_CFLAGS@
++GREP = @GREP@
+ GRUB_CFLAGS = @GRUB_CFLAGS@
+ GRUB_LIBS = @GRUB_LIBS@
+ HERCULES_SUPPORT_FALSE = @HERCULES_SUPPORT_FALSE@
+@@ -163,9 +162,6 @@
+ STRIP = @STRIP@
+ VERSION = @VERSION@
+ ac_ct_CC = @ac_ct_CC@
+-ac_ct_OBJCOPY = @ac_ct_OBJCOPY@
+-ac_ct_RANLIB = @ac_ct_RANLIB@
+-ac_ct_STRIP = @ac_ct_STRIP@
+ am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
+ am__fastdepCC_TRUE = @am__fastdepCC_TRUE@
+ am__include = @am__include@
+@@ -180,23 +176,30 @@
+ build_os = @build_os@
+ build_vendor = @build_vendor@
+ datadir = @datadir@
++datarootdir = @datarootdir@
++docdir = @docdir@
++dvidir = @dvidir@
+ exec_prefix = @exec_prefix@
+ host = @host@
+ host_alias = @host_alias@
+ host_cpu = @host_cpu@
+ host_os = @host_os@
+ host_vendor = @host_vendor@
++htmldir = @htmldir@
+ includedir = @includedir@
+ infodir = @infodir@
+ install_sh = @install_sh@
+ libdir = @libdir@
+ libexecdir = @libexecdir@
++localedir = @localedir@
+ localstatedir = @localstatedir@
+ mandir = @mandir@
+ mkdir_p = @mkdir_p@
+ oldincludedir = @oldincludedir@
++pdfdir = @pdfdir@
+ prefix = @prefix@
+ program_transform_name = @program_transform_name@
++psdir = @psdir@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ sysconfdir = @sysconfdir@
+@@ -304,9 +307,11 @@
+ 	restore=: && backupdir="$(am__leading_dot)am$$$$" && \
+ 	am__cwd=`pwd` && cd $(srcdir) && \
+ 	rm -rf $$backupdir && mkdir $$backupdir && \
+-	for f in $@ $@-[0-9] $@-[0-9][0-9] $(@:.info=).i[0-9] $(@:.info=).i[0-9][0-9]; do \
+-	  if test -f $$f; then mv $$f $$backupdir; restore=mv; else :; fi; \
+-	done; \
++	if ($(MAKEINFO) --version) >/dev/null 2>&1; then \
++	  for f in $@ $@-[0-9] $@-[0-9][0-9] $(@:.info=).i[0-9] $(@:.info=).i[0-9][0-9]; do \
++	    if test -f $$f; then mv $$f $$backupdir; restore=mv; else :; fi; \
++	  done; \
++	else :; fi && \
+ 	cd "$$am__cwd"; \
+ 	if $(MAKEINFO) $(AM_MAKEINFOFLAGS) $(MAKEINFOFLAGS) -I $(srcdir) \
+ 	 -o $@ $<; \
+@@ -371,10 +376,11 @@
+ multiboot.pdf: multiboot.texi $(multiboot_TEXINFOS)
+ multiboot.html: multiboot.texi $(multiboot_TEXINFOS)
+ .dvi.ps:
++	TEXINPUTS="$(am__TEXINFO_TEX_DIR)$(PATH_SEPARATOR)$$TEXINPUTS" \
+ 	$(DVIPS) -o $@ $<
+ 
+ uninstall-info-am:
+-	$(PRE_UNINSTALL)
++	@$(PRE_UNINSTALL)
+ 	@if (install-info --version && \
+ 	     install-info --version 2>&1 | sed 1q | grep -i -v debian) >/dev/null 2>&1; then \
+ 	  list='$(INFO_DEPS)'; \
+@@ -390,7 +396,7 @@
+ 	  relfile=`echo "$$file" | sed 's|^.*/||'`; \
+ 	  relfile_i=`echo "$$relfile" | sed 's|\.info$$||;s|$$|.i|'`; \
+ 	  (if cd "$(DESTDIR)$(infodir)"; then \
+-	     echo " rm -f $$relfile $$relfile-[0-9] $$relfile-[0-9][0-9] $$relfile_i[0-9] $$relfile_i[0-9][0-9])"; \
++	     echo " cd '$(DESTDIR)$(infodir)' && rm -f $$relfile $$relfile-[0-9] $$relfile-[0-9][0-9] $$relfile_i[0-9] $$relfile_i[0-9][0-9]"; \
+ 	     rm -f $$relfile $$relfile-[0-9] $$relfile-[0-9][0-9] $$relfile_i[0-9] $$relfile_i[0-9][0-9]; \
+ 	   else :; fi); \
+ 	done
+@@ -403,10 +409,13 @@
+ 	    $(srcdir)/*) base=`echo "$$base" | sed "s|^$$srcdirstrip/||"`;; \
+ 	  esac; \
+ 	  if test -f $$base; then d=.; else d=$(srcdir); fi; \
+-	  for file in $$d/$$base*; do \
+-	    relfile=`expr "$$file" : "$$d/\(.*\)"`; \
+-	    test -f $(distdir)/$$relfile || \
+-	      cp -p $$file $(distdir)/$$relfile; \
++	  base_i=`echo "$$base" | sed 's|\.info$$||;s|$$|.i|'`; \
++	  for file in $$d/$$base $$d/$$base-[0-9] $$d/$$base-[0-9][0-9] $$d/$$base_i[0-9] $$d/$$base_i[0-9][0-9]; do \
++	    if test -f $$file; then \
++	      relfile=`expr "$$file" : "$$d/\(.*\)"`; \
++	      test -f $(distdir)/$$relfile || \
++		cp -p $$file $(distdir)/$$relfile; \
++	    else :; fi; \
+ 	  done; \
+ 	done
+ 
+Binary files grub-0.97/docs/multiboot.info.orig and grub-0.97/docs/multiboot.info differ
+--- grub-0.97/stage2/seattle_gpio.h.orig	1969-12-31 16:00:00.000000000 -0800
++++ grub-0.97/stage2/seattle_gpio.h	2022-05-26 11:32:48.800427057 -0700
+@@ -0,0 +1,26 @@
++/*
++ * =====================================================================================
++ *
++ *       Filename:  seattle_gpio.h
++ *
++ *    Description:  : header for sharing proto types and extern variables
++ *
++ *        Version:  1.0
++ *        Created:  08/19/2009 05:14:31 PM
++ *       Revision:  none
++ *       Compiler:  gcc
++ *
++ *         Author:  Denny Hu (China), Denny.Hu@watchguard.com
++ *        Company:  watchguard
++ *	    Copyright:  Copyright (c) 2009, Denny Hu
++ *
++ * =====================================================================================
++ */
++
++#ifndef _SEATTLE_GPIO_
++#define _SEATTLE_GPIO_
++
++unsigned char get_reset_button (void);
++int sled_init(void);
++
++#endif // _SEATTLE_GPIO_
+--- grub-0.97/stage2/nar7090.c.orig	1969-12-31 16:00:00.000000000 -0800
++++ grub-0.97/stage2/nar7090.c	2022-05-26 11:32:48.780427875 -0700
+@@ -0,0 +1,149 @@
++/* nar7090.c - Portwell NAR-7090 board support */
++/*
++ *  GRUB  --  GRand Unified Bootloader
++ *  Copyright (C) 2000,2001,2002  Free Software Foundation, Inc.
++ *  Copyright (C) 2008  WatchGuard Technologies, Inc.
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#ifdef SUPPORT_SERIAL
++
++#include <nar7090.h>
++#include <panel.h>
++
++
++/*
++ * Conditional on GRUB_UTIL because this stuff doesn't need to be a part of the
++ * stand-alone ``grub`` utility program.
++ */
++#ifndef GRUB_UTIL
++
++
++static unsigned short ezio_port = 0;
++
++/* Initialize the front panel */
++void
++ezio_init (void)
++{
++  unsigned short orig_port;
++  ezio_port = serial_hw_get_port (EZIO_PORT_INDEX);
++
++  orig_port = serial_get_consoleport ();
++  serial_hw_init (ezio_port, EZIO_PORT_SPEED, EZIO_PORT_WORDLEN,
++      EZIO_PORT_PARITY, EZIO_PORT_STOPBITS);
++  /*
++   * reset the default serial port because serial_hw_init leaves it as
++   * ezio_port and that'll never do.
++   */
++  serial_set_consoleport (orig_port);
++
++  /*
++   * According to the NAR-7090 manual, you have to send the init command
++   * twice before it believes you.
++   * */
++  ezio_cmd (CMD_INIT);
++  ezio_cmd (CMD_INIT);
++
++  /*
++   * Not sure why we need to pass this, but it's in the reference source
++   * code, and it doesn't work without it.
++   */
++  ezio_cmd (CMD_SETDIS);
++}
++
++/* Send an EZIO command */
++void
++ezio_cmd (unsigned char command)
++{
++  ezio_hw_putchar (CMD_PREFIX);
++  ezio_hw_putchar (command);
++}
++
++/* Get a char. */
++unsigned char
++ezio_hw_getchar (void)
++{
++  if (inb (ezio_port + UART_LSR) & UART_DATA_READY)
++    {
++      /* grab the EZIO_READKEY_HDR */
++      inb (ezio_port + UART_RX);
++      /* return the payload */
++      return inb (ezio_port + UART_RX);
++    }
++
++  /* A real EZIO panel is normally high, and won't return 0 */
++  return 0;
++}
++
++/* Put a char. */
++void
++ezio_hw_putchar (char c)
++{
++  int timeout = 100000;
++
++  /* Wait until the transmitter holding register is empty.  */
++  while ((inb (ezio_port + UART_LSR) & UART_EMPTY_TRANSMITTER) == 0)
++    {
++      if (--timeout == 0)
++        {
++          /* There is something wrong. But what can I do?  */
++          return;
++        }
++    }
++
++  outb (ezio_port + UART_TX, c);
++}
++
++/* Write a string to the display */
++void
++ezio_putchars (char *message)
++{
++    char c;
++    while ((c = *(message++)))
++      {
++        ezio_hw_putchar (c);
++      }
++}
++
++/* Find out what buttons are pressed. */
++unsigned char
++ezio_getbuttons (void)
++{
++  unsigned char value;
++  ezio_cmd (CMD_READKEY);
++  value = ezio_hw_getchar ();
++  if (value & BTN_HIGH_NIBBLE)
++    {
++      /*
++       * the front panel uses reverse logic, so negate on the way out,
++       * plus we only care about the low nibble
++       */
++      return (~value) & 0xf;
++    }
++  return 0;
++}
++
++/* Sample LCD display */
++void
++ezio_sample (void)
++{
++  ezio_cmd (CMD_CLS);
++  ezio_putchars ("Hey Everyone");
++}
++
++#endif /* GRUB_UTIL */
++
++#endif /* SUPPORT_SERIAL */
+--- grub-0.97/stage2/lcm.h.orig	1969-12-31 16:00:00.000000000 -0800
++++ grub-0.97/stage2/lcm.h	2022-05-26 11:32:48.776428039 -0700
+@@ -0,0 +1,48 @@
++/*
++ * =====================================================================================
++ *
++ *       Filename:  lcm.h
++ *
++ *    Description:  :s
++ *
++ *        Version:  1.0
++ *        Created:  08/19/2009 05:14:31 PM
++ *       Revision:  none
++ *       Compiler:  gcc
++ *
++ *         Author:  Denny Hu (China), Denny.Hu@watchguard.com
++ *        Company:  watchguard
++ *	    Copyright:  Copyright (c) 2009, Denny Hu
++ *
++ * =====================================================================================
++ */
++
++#ifndef _LCM_H_
++#define _LCM_H_
++
++
++#define LCD_MODULE_UNKNOWN       0   
++#define LCD_MODULE_A             1   /* For Tacoma/Finley */
++#define LCD_MODULE_B             2   /* For Kennewick/Vashon/Filton  */
++#define LCD_MODULE_NONE_SEATTLE  3   /* NO LCM Module present, platform detected as seattle  */
++#define LCD_MODULE_NONE_KIRKLAND 4   /* NO LCM Module present, platform detected as kirkland */
++#define LCD_MODULE_NONE_COLFAX1  5   /* NO LCM Module present, platform detected as colfax-I */
++#define LCD_MODULE_NONE_COLFAX2  6   /* NO LCM Module present, platform detected as colfax-II */
++#define LCD_MODULE_NONE_WESTPORT 7   /* NO LCM Module present, platform detected as westport */
++#define LCD_MODULE_NONE_WINTHROP 8   /* NO LCM Module present, platform detected as winthrop */
++#define LCD_MODULE_NONE_MUKILTEO 9   /* NO LCM Module present, platform detected as mukilteo */
++#define LCD_MODULE_NONE_TWISP    10  /* NO LCM Module present, platform detected as twisp */
++#define LCD_MODULE_NONE          11  /* NO LCM Module present */
++
++extern int lcd_module;
++extern int LCDB_filton;
++
++void load_timer2(unsigned int ticks);
++void LCM_Init(void);
++void LCM_Command(unsigned char RS, unsigned char RWn, unsigned char CMD, unsigned int uDelay, unsigned char *Ret);
++void LCM_Backlight(void);
++void LCM_Write(unsigned char Line, unsigned char *Text);
++void LCM_Cls(void);
++unsigned char LCM_GetButtons();
++
++#endif
+--- grub-0.97/stage2/panel.h.orig	1969-12-31 16:00:00.000000000 -0800
++++ grub-0.97/stage2/panel.h	2022-05-26 11:32:48.780427875 -0700
+@@ -0,0 +1,30 @@
++/*
++ * =====================================================================================
++ *
++ *       Filename:  panel.h
++ *
++ *    Description:  : header for definition of button controls
++ *
++ *        Created:  07/10/2014 03:34:31 PM
++ *       Revision:  none
++ *       Compiler:  gcc
++ *
++ *         Author:  Mukund Jampala
++ *        Company:  watchguard
++ *
++ * =====================================================================================
++ */
++
++/* Front panel button masks */
++/* Mostly for NAR-7090 devices as per NAR-7090 manual and now used as masked values for other LCMs */
++#define BTN_UP      0x1
++#define BTN_DOWN    0x2
++#define BTN_ENTER   0x4
++#define BTN_ESCAPE  0x8
++#define BTN_RESET   BTN_UP  /* Specific to platforms like seattle(NO LCM and only
++			     * one reset BTN) where all you can do is pick a boot
++			     * choice of 1 other system(sysa/sysa/sysa-safe):
++			     * obviously, our choose would be sysb in such situations.
++			     */
++#define BTN_LEFT   BTN_ENTER
++#define BTN_RIGHT  BTN_ESCAPE
+--- grub-0.97/stage2/seattle_gpio.c.orig	1969-12-31 16:00:00.000000000 -0800
++++ grub-0.97/stage2/seattle_gpio.c	2022-05-26 11:32:48.800427057 -0700
+@@ -0,0 +1,1002 @@
++/*
++ * Status LED driver for grub 0.97
++ *
++ * Author: Mukund J
++ * Changes:
++ *      MukundJ: Jul10, 2012	// seattle (extreacted from wglinux)
++ */
++
++#include <seattle_gpio.h>
++#include <linux-asm-io.h>
++#include <panel.h>
++#include <timer.h>
++#include <lcm.h>
++#include <shared.h>
++
++#define udelay(n)       waiton_timer2(((n)*TICKS_PER_MS)/1000)
++
++static unsigned char Driver_Version[] = "0.2 2015-10-05"; 
++extern int lcd_module;
++
++/*
++ *------------------------------------------------------------------------------
++ * MB-UP2010W Version V1.0
++ *
++ * The IO interface for Arm LED is connected to GPIO 37 52:
++ *      GPIO37  GPIO52  LED_STATUS
++ *      0       0       Off
++ *      1       0       Green
++ *      0       1       Red
++ *      1       1       Off
++ * (Two LEDs back-to-back in parallel between the pins.)
++ *
++ * The remainder are single-color, 0 = ON
++ *      GPIO44          ATTN 
++ *      GPIO45          MODE
++ *      GPIO46          STATUS
++ *
++ * The reset button
++ *      GPIO36          RESET 1 = pressed, 0 = released
++ *------------------------------------------------------------------------------
++ */
++
++/*
++ * Device Depend Definition : Winbond 83627 connected to LEDs/Reset button
++*/
++
++/* platform 'Seattle' related GPIO definitions */
++#define INDEX_PORT      0x2e
++#define DATA_PORT       0x2f
++
++#define GPIO44_BIT      (1 << 4)
++#define GPIO45_BIT      (1 << 5)
++#define GPIO46_BIT      (1 << 6)
++#define GPIO_GPIO44_46_MASK     (GPIO44_BIT | GPIO45_BIT | GPIO46_BIT)
++
++#define GPIO3X          (1 << 1)
++#define GPIO36_BIT      (1 << 6)
++#define GPIO37_BIT      (1 << 7)
++#define GPIO52_BIT      (1 << 2)
++
++/* 1 bit sets LED OFF */
++/* ARM LED is two back-to-back diodes between GPIO37 and GPIO52. */
++#define ARM_GREEN       GPIO52_BIT
++#define ARM_RED         GPIO37_BIT
++#define ATTN_LED        GPIO44_BIT
++#define MODE_LED        GPIO45_BIT
++#define STATUS_LED      GPIO46_BIT
++
++/* platform 'Kirkland' related GPIO definitions */
++struct wgpci_device {
++	const char	*name;
++	unsigned short	ioaddr;
++	unsigned char	devfn;
++	unsigned char	slot;
++	unsigned char	bus;
++};
++
++struct wgpci_device pci_lpc;
++#define btn_gpi     17     // GPI 20
++
++#define WESTPORT_MUKILTEO_SUPPORT
++#ifdef WESTPORT_MUKILTEO_SUPPORT
++/* 2016/07/07, Talor Lin */
++/*** Port Westport T70 LED and reset button driver from the following source path ***/
++	//tasks/utm-mainline-westport_mukilteo/components/wg_linux/mainline/src/modules/platform/spokane/sled_drv-t70.c
++/***********************************************************************************************************/	
++/*=========== Hardware-specific code to init/configure GPIO controller, read/write to GPIO devices ===========*/
++/*
++ * Based on pentium-celeron-n-series-datasheet-vol-1.pdf (Volume 1 of 3)
++ * 16.12.5 Register Address Mapping
++ */
++#define WESTPORT_MUKILTEO_FAMILY_PAD_REGS_OFF		0x4400
++#define WESTPORT_MUKILTEO_FAMILY_PAD_REGS_SIZE		0x400
++#define WESTPORT_MUKILTEO_MAX_FAMILY_PAD_GPIO_NO		15
++#define WESTPORT_MUKILTEO_GPIO_REGS_SIZE			    8
++
++/*
++ * Based on pentium-celeron-n-series-datasheet-vol-3.pdf (Volume 3 of 3)
++ * 33.6.54 Pad Control Register 0 (GPIO_DFX0_PAD_CFG0) ...
++ */
++#define BIT(x)              (0x01 << x)
++#define ARRAY_SIZE(arr)     (sizeof(arr) / sizeof(arr[0]))
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL0			0x000
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOEN		BIT(15)
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_SHIFT	8
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_MASK	(7 << WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_SHIFT)
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_GPO	1
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_GPI	2
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOTXSTATE	BIT(1)
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIORXSTATE	BIT(0)
++
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL1			0x004
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL1_CFGLOCK		BIT(31)
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL1_INVRXTX_SHIFT	4
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL1_INVRXTX_MASK	(0xf << WESTPORT_MUKILTEO_GPIO_PADCTRL1_INVRXTX_SHIFT)
++#define WESTPORT_MUKILTEO_GPIO_PADCTRL1_INTWAKECFG_MASK	7
++#define readl(addr) (*(unsigned int *)addr)
++#define writel(value, addr) (*(unsigned int *)addr = value)
++
++#define GPIO_WG_RESET_BTN 		 0
++
++/**
++ * struct gpio_pin_desc - boards/machines provide information on their
++ * pins, pads or other muxable units in this struct
++ * @number: unique pin number from the global pin number space
++ * @name: a name for this pin
++ */
++struct gpio_pin_desc {
++	unsigned number;
++	const char *name;
++};
++
++/**
++ * struct westport_mukilteo_chv_community - A community specific configuration
++ * @uid: ACPI _UID used to match the community
++ * @pins: All pins in this community
++ * @npins: Number of pins
++ * @ngpios: Number of GPIOs in this community
++ */
++struct westport_mukilteo_chv_community {
++	const char *uid;
++	const struct gpio_pin_desc *pins;
++	unsigned npins;
++	unsigned ngpios;
++};
++
++/**
++ * struct westport_mukilteo_chv_pinctrl - CHV pinctrl private structure
++ * @dev: Pointer to the parent device
++ * @regs: MMIO registers
++ * @lock: Lock to serialize register accesses
++ * @community: Community this pinctrl instance represents
++ *
++ * The first group in @groups is expected to contain all pins that can be
++ * used as GPIOs.
++ */
++struct westport_mukilteo_chv_pinctrl {
++	//struct device *dev;
++	char *regs;
++	//spinlock_t lock;
++	const struct westport_mukilteo_chv_community *community;
++};
++
++static const struct gpio_pin_desc westport_mukilteo_north_pins[] = {
++	{0, "GPIO_DFX_0"},
++	{1, "GPIO_DFX_3"},
++	{2, "GPIO_DFX_7"},
++	{3, "GPIO_DFX_1"},
++	{4, "GPIO_DFX_5"},
++	{5, "GPIO_DFX_4"},
++	{6, "GPIO_DFX_8"},
++	{7, "GPIO_DFX_2"},
++	{8, "GPIO_DFX_6"},
++};
++
++static const struct westport_mukilteo_chv_community westport_mukilteo_north_community = {
++	.uid = "2",
++	.pins = westport_mukilteo_north_pins,
++	.npins = ARRAY_SIZE(westport_mukilteo_north_pins),
++	.ngpios = ARRAY_SIZE(westport_mukilteo_north_pins),
++};
++
++static struct westport_mukilteo_chv_pinctrl glb_pctrl = {0xfed88000 /* lpcres start address */, &westport_mukilteo_north_community};
++
++static int *westport_mukilteo_chv_padreg(struct westport_mukilteo_chv_pinctrl *pctrl, unsigned offset,
++				unsigned reg)
++{
++	unsigned family_no = offset / WESTPORT_MUKILTEO_MAX_FAMILY_PAD_GPIO_NO;
++	unsigned pad_no = offset % WESTPORT_MUKILTEO_MAX_FAMILY_PAD_GPIO_NO;
++
++	offset = WESTPORT_MUKILTEO_FAMILY_PAD_REGS_OFF + WESTPORT_MUKILTEO_FAMILY_PAD_REGS_SIZE * family_no +
++		 WESTPORT_MUKILTEO_GPIO_REGS_SIZE * pad_no;
++	
++	return (int *)(pctrl->regs + offset + reg);
++}
++
++static void westport_mukilteo_chv_writel(unsigned int value, int *reg)
++{
++	writel(value, reg);
++	/* simple readback to confirm the bus transferring done */
++	readl(reg);
++}
++
++/* When Pad Cfg is locked, driver can only change GPIOTXState or GPIORXState */
++static int westport_mukilteo_chv_pad_locked(struct westport_mukilteo_chv_pinctrl *pctrl, unsigned offset)
++{
++	int *reg;
++
++	reg = westport_mukilteo_chv_padreg(pctrl, offset, WESTPORT_MUKILTEO_GPIO_PADCTRL1);
++	return readl(reg) & WESTPORT_MUKILTEO_GPIO_PADCTRL1_CFGLOCK;
++}
++
++static int westport_mukilteo_chv_gpio_request_enable(struct westport_mukilteo_chv_pinctrl *pctrl, unsigned offset)
++{
++	unsigned long flags;
++	int *reg;
++	unsigned int value;
++
++	if (westport_mukilteo_chv_pad_locked(pctrl, offset)) {
++		value = readl(westport_mukilteo_chv_padreg(pctrl, offset, WESTPORT_MUKILTEO_GPIO_PADCTRL0));
++		if (!(value & WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOEN)) {
++			return -1/*-EBUSY*/;
++		}
++	} else {
++		/* Disable interrupt generation */
++		reg = westport_mukilteo_chv_padreg(pctrl, offset, WESTPORT_MUKILTEO_GPIO_PADCTRL1);
++		value = readl(reg);
++		value &= ~WESTPORT_MUKILTEO_GPIO_PADCTRL1_INTWAKECFG_MASK;
++		value &= ~WESTPORT_MUKILTEO_GPIO_PADCTRL1_INVRXTX_MASK;
++		westport_mukilteo_chv_writel(value, reg);
++
++		/* Switch to a GPIO mode */
++		reg = westport_mukilteo_chv_padreg(pctrl, offset, WESTPORT_MUKILTEO_GPIO_PADCTRL0);
++		value = readl(reg) | WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOEN;
++		westport_mukilteo_chv_writel(value, reg);
++	}
++
++	return 0;
++}
++
++static int westport_mukilteo_chv_gpio_set_direction(struct westport_mukilteo_chv_pinctrl *pctrl,
++				  unsigned offset, int input)
++{
++	int *reg = westport_mukilteo_chv_padreg(pctrl, offset, WESTPORT_MUKILTEO_GPIO_PADCTRL0);
++	unsigned long flags;
++	unsigned int ctrl0;
++
++	ctrl0 = readl(reg) & ~WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_MASK;
++	if (input)
++		ctrl0 |= WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_GPI << WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_SHIFT;
++	else
++		ctrl0 |= WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_GPO << WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_SHIFT;
++	westport_mukilteo_chv_writel(ctrl0, reg);
++
++	return 0;
++}
++
++static unsigned westport_mukilteo_chv_gpio_offset_to_pin(struct westport_mukilteo_chv_pinctrl *pctrl,
++				       unsigned offset)
++{
++	return pctrl->community->pins[offset].number;
++}
++
++static int westport_mukilteo_chv_gpio_get(struct westport_mukilteo_chv_pinctrl *pctrl, unsigned offset)
++{
++	int pin = westport_mukilteo_chv_gpio_offset_to_pin(pctrl, offset);
++	unsigned int ctrl0, cfg;
++
++	ctrl0 = readl(westport_mukilteo_chv_padreg(pctrl, pin, WESTPORT_MUKILTEO_GPIO_PADCTRL0));
++
++	cfg = ctrl0 & WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_MASK;
++	cfg >>= WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_SHIFT;
++
++	if (cfg == WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_GPO)
++		return !!(ctrl0 & WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOTXSTATE);
++	return !!(ctrl0 & WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIORXSTATE);
++}
++
++static void westport_mukilteo_chv_gpio_set(struct westport_mukilteo_chv_pinctrl *pctrl, unsigned offset, int value)
++{
++	unsigned pin = westport_mukilteo_chv_gpio_offset_to_pin(pctrl, offset);
++	unsigned long flags;
++	int *reg;
++	unsigned int ctrl0;
++
++	reg = westport_mukilteo_chv_padreg(pctrl, pin, WESTPORT_MUKILTEO_GPIO_PADCTRL0);
++	ctrl0 = readl(reg);
++
++	if (value)
++		ctrl0 |= WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOTXSTATE;
++	else
++		ctrl0 &= ~WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOTXSTATE;
++
++	westport_mukilteo_chv_writel(ctrl0, reg);
++}
++
++static int westport_mukilteo_chv_gpio_get_direction(struct westport_mukilteo_chv_pinctrl *pctrl, unsigned offset)
++{
++	unsigned pin = westport_mukilteo_chv_gpio_offset_to_pin(pctrl, offset);
++	unsigned int ctrl0, direction;
++
++	ctrl0 = readl(westport_mukilteo_chv_padreg(pctrl, pin, WESTPORT_MUKILTEO_GPIO_PADCTRL0));
++
++	direction = ctrl0 & WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_MASK;
++	direction >>= WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_SHIFT;
++
++	return direction != WESTPORT_MUKILTEO_GPIO_PADCTRL0_GPIOCFG_GPO;
++}
++
++/*=========== Code for exposing the IOCTL interface ============*/
++/*
++ * GPIO init:
++ * initialize the default state of the GPIO pins
++ */
++static void westport_mukilteo_gpio_init(struct westport_mukilteo_chv_pinctrl *pctrl)
++{
++	// 1 X
++	// X 0 			0 	(amber/yellow) Attn-LED
++	/* none needed */
++	// echo 456 > export equivalant
++	westport_mukilteo_chv_gpio_request_enable(pctrl, 3);
++	westport_mukilteo_chv_gpio_get_direction(pctrl, 3);
++
++	// echo "out" > gpio456/direction
++	westport_mukilteo_chv_gpio_set_direction(pctrl, 3, 0);
++
++	// 0 1
++	// X 0  		0 	(Red) Status-LED
++	// echo 500 > export equivalant
++	westport_mukilteo_chv_gpio_request_enable(pctrl, 7);
++	westport_mukilteo_chv_gpio_get_direction(pctrl, 7);
++
++	// echo "out" > gpio500/direction
++	westport_mukilteo_chv_gpio_set_direction(pctrl, 7, 0);
++
++	// 0 X
++	// X 1			0 	(green) Mode-LED
++	// echo 454 > export equivalant
++	westport_mukilteo_chv_gpio_request_enable(pctrl, 1);
++	westport_mukilteo_chv_gpio_get_direction(pctrl, 1);
++
++	// echo "out" > gpio454/direction
++	westport_mukilteo_chv_gpio_set_direction(pctrl, 1, 0);
++
++	// 0 X
++	// X 0			1	(green)	FailOver-LED
++	// echo 458 > export equivalant
++	westport_mukilteo_chv_gpio_request_enable(pctrl, 5);
++	westport_mukilteo_chv_gpio_get_direction(pctrl, 5);
++
++	// echo "out" > gpio458/direction
++	westport_mukilteo_chv_gpio_set_direction(pctrl, 5, 0);
++
++	// 0 X
++	// X 0			1	(reset) button
++	// echo 453 > export equivalant
++	westport_mukilteo_chv_gpio_request_enable(pctrl, 0);
++	westport_mukilteo_chv_gpio_get_direction(pctrl, 0);
++
++	// echo "out" > gpio458/direction
++	westport_mukilteo_chv_gpio_set_direction(pctrl, 0, 1);
++
++	return;
++}
++#endif /* End of #ifdef WESTPORT_MUKILTEO_SUPPORT */
++
++static void enter_w83627_config(void)
++{
++	outb_p(0x87, INDEX_PORT); // Lanner says we must write this twice
++	outb_p(0x87, INDEX_PORT);
++	return;
++}
++
++static void exit_w83627_config(void)
++{
++	outb_p(0xaa, INDEX_PORT);
++	return;
++}
++
++static unsigned char read_w83627_reg(int ldn, int reg)
++{
++	unsigned char tmp = 0;
++
++	enter_w83627_config();
++	outb_p(0x07, INDEX_PORT); // LDN Register
++	outb_p(ldn, DATA_PORT);   // Select LDNx
++	outb_p(reg, INDEX_PORT);  // Select Register
++	tmp = inb(DATA_PORT);     // Read Register
++	exit_w83627_config();
++	return tmp;
++}
++
++static void write_w83627_reg(int ldn, int reg, int value)
++{
++	enter_w83627_config();
++	outb_p(0x07, INDEX_PORT); // LDN Register
++	outb_p(ldn, DATA_PORT);   // Select LDNx
++	outb_p(reg, INDEX_PORT);  // Select Register
++	outb_p(value, DATA_PORT); // Write Register
++	exit_w83627_config();
++	return;
++}
++
++/*
++ * Set ARM LED red
++ */
++void set_led_red(void)
++{
++	unsigned char tmp;
++
++	grub_printf("set_led_red called\n");
++	/* RED lo */
++	tmp = read_w83627_reg(0x09, 0xf1);
++	tmp &= ~ARM_RED;
++	write_w83627_reg(0x09, 0xf1, tmp);
++
++	/* GREEN hi */
++	tmp = read_w83627_reg(0x09, 0xe1);
++	tmp |= ARM_GREEN;
++	write_w83627_reg(0x09, 0xe1, tmp);
++
++    return;
++}
++
++#define BUTTON_DEPRESSED     1
++#define BUTTON_NOT_DEPRESSED 0
++
++static unsigned char get_seattle_reset_button_status(void)
++{
++	int btn_status;
++
++	/* Bit clear means button is pressed */
++	if ( read_w83627_reg(0x09, 0xf1) & GPIO36_BIT ) {
++		btn_status = BUTTON_NOT_DEPRESSED; 
++	} else {
++		btn_status = BUTTON_DEPRESSED; 
++	}
++
++	/* convert the captured data into what makes sense for caller */
++	if (btn_status == BUTTON_DEPRESSED)
++		return BTN_RESET;
++	else
++		return 0;
++}
++
++/*
++ * Functions for accessing PCI configuration space with type 1 accesses
++ */
++#define PCI_SUCCESSFUL	0x00
++#define CONFIG_CMD(bus, slot, device_fn, where)   (0x8000f800 | (where & ~3))
++#define LPC_GPIOBASE	0x48
++
++int pci_read_config_dword (unsigned int bus, unsigned int slot, unsigned int device_fn,
++				 unsigned int where, unsigned int *value)
++{
++	outl(CONFIG_CMD(bus, slot, device_fn, where), 0xCF8);
++	*value = inl(0xCFC);
++	return PCI_SUCCESSFUL;
++}
++
++static unsigned int kirkland_getgpio_base(void)
++{
++	unsigned int tmp;
++	pci_read_config_dword(pci_lpc.bus, pci_lpc.slot, pci_lpc.devfn,
++		(0x48), &tmp);
++	return tmp;
++
++}
++
++static unsigned int colfax1_getgpio_base(void)
++{
++	unsigned int tmp;
++	pci_read_config_dword(pci_lpc.bus, pci_lpc.slot, pci_lpc.devfn,
++		(0x48), &tmp);
++	return tmp;
++
++}
++
++static unsigned char get_kirkland_reset_button_status(void)
++{
++	unsigned int gpiobase;
++	unsigned int reg;
++	int btn_status;
++
++	gpiobase = (kirkland_getgpio_base() & 0x0000fffe);
++	reg = inl_p(gpiobase+0x0c);
++
++	/* Bit clear means button is pressed */
++	if ((reg)>>btn_gpi & 0x01){
++		btn_status = BUTTON_NOT_DEPRESSED; 
++	} else {
++		btn_status = BUTTON_DEPRESSED; 
++	}
++
++	/* convert the captured data into what makes sense for caller */
++	if (btn_status == BUTTON_DEPRESSED)
++		return BTN_RESET;
++	else
++		return 0;
++}
++
++// Colfax-I/II  reset fetch begins
++static unsigned char get_colfax1_reset_button_status(void)
++{
++	unsigned int gpiobase;
++	unsigned int reg;
++	int btn_status;
++
++	gpiobase = (colfax1_getgpio_base() & 0x0000fffe);
++	reg = inl_p(gpiobase+0x0c);
++
++	/* Bit clear means button is pressed */
++	if ((reg)>>btn_gpi & 0x01){
++		btn_status = BUTTON_NOT_DEPRESSED; 
++	} else {
++		btn_status = BUTTON_DEPRESSED; 
++	}
++
++	/* convert the captured data into what makes sense for caller */
++	if (btn_status == BUTTON_DEPRESSED)
++		return BTN_RESET;
++	else
++		return 0;
++}
++
++/* Button */
++#define CFXII_PCH_BASE           0x500
++
++#define CFXII_PCH_BTN_USE_SEL    0x02
++#define CFXII_PCH_BTN_IO_SEL     0x06
++#define CFXII_PCH_BTN_OFFSET     0x0e
++#define CFXII_PCH_BTN_REG        (CFXII_PCH_BASE+CFXII_PCH_BTN_OFFSET)
++
++#define CFXII_RESET_BIT          (1 << 0)
++#define CFXII_STATUS_BITMASK     CFXII_RESET_BIT
++
++static unsigned char get_colfax2_reset_button_status(void)
++{
++	int btn_status;
++
++	/* Bit clear means button is pressed */
++	if ( inb_p(CFXII_PCH_BTN_REG) & CFXII_STATUS_BITMASK ) {
++		btn_status = BUTTON_NOT_DEPRESSED; 
++	} else {
++		btn_status = BUTTON_DEPRESSED; 
++	}
++
++	/* convert the captured data into what makes sense for caller */
++	if (btn_status == BUTTON_DEPRESSED)
++		return BTN_RESET;
++	else
++		return 0;
++}
++// Colfax-I/II  reset fetch ends
++
++static unsigned char get_westport_mukilteo_reset_button_status(void)
++{
++	int btn_status;
++
++	/* Bit clear means button is pressed */
++	if (westport_mukilteo_chv_gpio_get(&glb_pctrl, GPIO_WG_RESET_BTN) ) {
++		btn_status = BUTTON_NOT_DEPRESSED;
++	} else {
++		btn_status = BUTTON_DEPRESSED;
++	}
++
++	/* convert the captured data into what makes sense for caller */
++	if (btn_status == BUTTON_DEPRESSED)
++		return BTN_RESET;
++	else
++		return 0;
++}
++
++static void seattle_gpio_init(void)
++{
++	unsigned char tmp;
++
++	/* set multi-function for pin 73 gpio52*/
++	tmp = read_w83627_reg(0x09, 0x2d);
++	tmp |= 0x04;
++	write_w83627_reg(0x09, 0x2d, tmp);
++
++	/* set GPIO37/52 as Output function and enable GPIO3X */
++
++	/* GPIO37 */
++	tmp = read_w83627_reg(0x09, 0x30);
++	tmp |= 0x0e|GPIO3X;  /* Yes we know 0x0e already contains 0x02 */
++	write_w83627_reg(0x09, 0x30, tmp);
++
++	/* GPIO52 */
++	tmp = read_w83627_reg(0x09, 0xe0);
++	tmp &= ~ARM_GREEN;
++	write_w83627_reg(0x09, 0xe0, tmp);
++
++	/* Set GPIO37 as output, GPIO36 as input */
++	tmp = read_w83627_reg(0x09, 0xf0);
++	tmp &= ~ARM_RED;
++	tmp |= GPIO36_BIT;
++	write_w83627_reg(0x09, 0xf0, tmp);
++
++	/* ARM the device by turning it red */
++	set_led_red();
++	return;
++}
++
++static void kirkland_gpio_init(void)
++{
++	unsigned int gpiobase;
++	gpiobase = (kirkland_getgpio_base() & 0x0000fffe);
++
++	outl_p((inl_p(gpiobase+0x03))|0x00020000, (gpiobase+0x00));//set GP17 GPIO 
++	outl_p((inl_p(gpiobase+0x04))|0x00020000, (gpiobase+0x04));//set GP17 Input 
++
++	return;
++}
++
++
++// Colfax-I setup begins
++static void colfax1_gpio_init(void)
++{
++	unsigned char tmp;
++	unsigned int gpiobase;
++
++	/* Button ======================= */
++	gpiobase = (colfax1_getgpio_base() & 0x0000fffe);
++	outl_p((inl_p(gpiobase+0x03))|0x00020000, (gpiobase+0x00));//set GP17 GPIO 
++	outl_p((inl_p(gpiobase+0x04))|0x00020000, (gpiobase+0x04));//set GP17 Input 
++
++        /* LED ========================== */
++        tmp = read_w83627_reg(0x00, 0x27);
++        tmp &= 0xff;
++        tmp |= 0x80;
++        write_w83627_reg(0x00, 0x27, tmp);
++
++        tmp = read_w83627_reg(0x09, 0x30);
++        tmp &= 0xff;
++        tmp |= 0x80;
++        write_w83627_reg(0x09, 0x30, tmp);
++
++        tmp = read_w83627_reg(0x07, 0xe0);
++        tmp &= 0xf3;
++        tmp |= 0x00;
++        write_w83627_reg(0x07, 0xe0, tmp);
++
++	return;
++}
++// Colfax-I setup ends
++
++// Colfax-II setup begins
++
++/* LED */
++#define CFXII_PCH_LED_USE_SEL     0x00
++#define CFXII_PCH_LED_IO_SEL      0x04
++#define CFXII_PCH_LED_OFFSET      0x0c
++#define CFXII_PCH_LED_REG         (CFXII_CFXII_PCH_BASE+CFXII_PCH_LED_OFFSET)
++
++/* Outputs active low.
++ * Bits defined here are INACTIVE sense for LED.  */
++#define CFXII_ARM_GREEN          (1<<4)
++#define CFXII_ARM_RED            (1<<5)
++#define CFXII_ARM_MASK           (CFXII_ARM_RED|CFXII_ARM_GREEN)
++
++
++/*
++ * Set ARM LED red
++ */
++static void colfax2_set_led_red()
++{
++	unsigned int tmp;
++
++	/* RED lo, GREEN hi */
++	tmp = inl_p(CFXII_PCH_BASE+CFXII_PCH_LED_OFFSET);
++	tmp &= ~CFXII_ARM_RED;
++	tmp |= CFXII_ARM_GREEN;
++	outl_p(tmp, CFXII_PCH_BASE+CFXII_PCH_LED_OFFSET);
++
++	udelay(1000);
++
++	return;
++}
++
++static void colfax2_gpio_init(void)
++{
++	unsigned int tmp;
++
++	/* Button ======================= */
++	/* Select GPIO function */
++	tmp = inl_p(CFXII_PCH_BASE+CFXII_PCH_BTN_USE_SEL);
++	tmp |= CFXII_RESET_BIT;
++	outl_p(tmp, CFXII_PCH_BASE+CFXII_PCH_BTN_USE_SEL);
++
++	/* Set input mode */
++	tmp = inl_p(CFXII_PCH_BASE+CFXII_PCH_BTN_IO_SEL);
++	tmp |= CFXII_RESET_BIT;
++	outl_p(tmp, CFXII_PCH_BASE+CFXII_PCH_BTN_IO_SEL);
++
++	/* LED ========================== */
++	/* Select GPIO function */
++	tmp = inl_p(CFXII_PCH_BASE+CFXII_PCH_LED_USE_SEL);
++	tmp |= CFXII_ARM_MASK;
++	outl_p(tmp, CFXII_PCH_BASE+CFXII_PCH_LED_USE_SEL);
++
++	/* Set output mode */
++	tmp = inl_p(CFXII_PCH_BASE+CFXII_PCH_LED_IO_SEL);
++	tmp &= ~(CFXII_ARM_MASK);
++	outl_p(tmp, CFXII_PCH_BASE+CFXII_PCH_LED_IO_SEL);
++
++	/* ARM the device by turning it red */
++	colfax2_set_led_red();
++}
++
++// Colfax-II setup ends
++
++#define WINTHROP_SUPPORT
++#define TWISP_SUPPORT
++#if defined(WINTHROP_SUPPORT) || defined(TWISP_SUPPORT)
++/***************************************************************************************************************************************/
++/* Winthrop M370/M470/M570/M670 GPIO definitions and functions */
++/* This part is a fork of //tasks/utm-mainline-winthrop/components/wg_linux/mainline/src/modules/platform/spokane/sled_drv-m370-670.c  */
++/*
++ *  Platform Depend GPIOs for Reset Button and Status LEDs
++ *
++ *  The reset button on Intel PCH
++ *      PCH GPP_G10      RESET 0 = pressed, 1 = released
++ *
++ *  Nuvoton NCT6776 SIO definitions for Arm LED
++ *      GPIO#  I/O   Notes
++ *      -------------------------------------------------
++ *      GP72    O    LED_Green (Status LED Green Color)
++ *      GP73    O    LED_Red   (Status LED Red Color)
++ */
++
++#define WG_ARM_LED                              1     /* ARM */
++
++///////////////////SKYLAKE-PCH////////////////////////
++//
++//PCH GPIO definition
++//
++#define PCH_PCR_BASE_ADDRESS                    0xfd000000      // SBREG MMIO base address
++#define SB_PCR_ADDRESS(Pid, Offset)             ( ((unsigned int)(Pid) << 16) | ((unsigned short)(Offset)) )
++#define GPIOCOM1                                0xae
++// GPIO Community 1 Private Configuration Registers
++// SKL PCH-H
++#define PCH_H_PCR_GPIO_GPP_G_PADCFG_OFFSET      0x6a8           // Reset Button uses GPIO G Group */
++
++#define PADCFG_SET_MODE                         0x1c00          // bit10,11,12 set 0 ,enable GPIO control the pad
++#define PADCFG_SET_OUTPUT                       0x100           // bit8 set 0, enable output buffer
++#define PADCFG_SET_INPUT                        0x200           // bit9 set 0, enable input buffer
++
++/* Reset Button uses GPIO pin GPP_G10 */
++#define SWBTN_GPIO1_NUM                         10
++
++unsigned int gpio_gpp_g_offset(unsigned char gpio_num)
++{
++    return (SB_PCR_ADDRESS(GPIOCOM1, PCH_H_PCR_GPIO_GPP_G_PADCFG_OFFSET + (8 * gpio_num)));
++}
++
++unsigned int read_pch_gpio_reg(unsigned int offset)
++{
++    unsigned int reg;
++    unsigned int addr_base;
++    unsigned int *gpio_oe_addr =NULL;
++    
++    addr_base = PCH_PCR_BASE_ADDRESS;
++    gpio_oe_addr = (addr_base + offset);
++    reg = *gpio_oe_addr;
++    
++    return reg;
++}
++
++void write_pch_gpio_reg(unsigned int offset, unsigned int value)
++{
++    unsigned int addr_base;
++    unsigned int *gpio_oe_addr =NULL;
++    
++    addr_base = PCH_PCR_BASE_ADDRESS;
++    gpio_oe_addr = (addr_base + offset);
++    *gpio_oe_addr = value;
++    
++    return;
++}
++
++void winthrop_btn_gpio_init(void)
++{
++    unsigned int tmp = 0;
++    unsigned int addr;
++
++    addr = gpio_gpp_g_offset(SWBTN_GPIO1_NUM);
++    tmp = read_pch_gpio_reg(addr);
++    tmp &= ~(PADCFG_SET_MODE);  //enable GPIO pad mode
++    tmp |= (PADCFG_SET_OUTPUT | PADCFG_SET_INPUT);//disable output and input
++    tmp &= ~PADCFG_SET_INPUT;  //enable input or output
++    write_pch_gpio_reg(addr, tmp);
++   
++    return;
++}
++
++unsigned char get_winthrop_reset_button_status(void)
++{
++    unsigned int btn_status = 0;
++    unsigned int addr;
++    
++    addr = gpio_gpp_g_offset(SWBTN_GPIO1_NUM);
++    btn_status = read_pch_gpio_reg(addr);  
++    btn_status &= 0x02;
++    btn_status = btn_status/0x02; 
++    if (btn_status) {
++        btn_status = BUTTON_NOT_DEPRESSED;
++    } else {
++        btn_status = BUTTON_DEPRESSED;
++	}
++
++	/* convert the captured data into what makes sense for caller */
++    if (btn_status == BUTTON_DEPRESSED) {
++        return BTN_RESET;
++    } else {
++        return 0;
++    }	
++}
++
++/* Winbond GPIO or something that looks sort of like it */
++
++static void enter_io_config(void)
++{
++    outb_p(0x87, INDEX_PORT); // Lanner says we must write this twice
++    outb_p(0x87, INDEX_PORT);
++    return;
++}
++
++static void exit_io_config(void)
++{
++    outb_p(0xaa, INDEX_PORT);
++    return;
++}
++
++static unsigned char read_io_reg(unsigned char ldn, unsigned char reg)
++{
++    outb_p(0x07, INDEX_PORT); // LDN Register
++    outb_p(ldn, DATA_PORT);   // Select LDNx
++    outb_p(reg, INDEX_PORT);  // Select Register
++    return inb_p(DATA_PORT);  // Read Register
++}
++
++static void write_io_reg(unsigned char ldn, unsigned char reg, unsigned char value)
++{
++    outb_p(0x07, INDEX_PORT); // LDN Register
++    outb_p(ldn, DATA_PORT);   // Select LDNx
++    outb_p(reg, INDEX_PORT);  // Select Register
++    outb_p(value, DATA_PORT); // Write Register
++    return;
++}
++
++static void winthrop_sio_init(void)
++{
++    unsigned char tmp;
++
++    enter_io_config();
++
++    tmp = (read_io_reg(0x00, 0x27) & 0xff) | 0x80;
++    write_io_reg(      0x00, 0x27, tmp);
++
++    tmp = (read_io_reg(0x09, 0x30) & 0xff) | 0x80;
++    write_io_reg(      0x09, 0x30, tmp);
++
++    tmp = (read_io_reg(0x07, 0xe0) & 0xf3) | 0x00;
++    write_io_reg(      0x07, 0xe0, tmp);
++
++    exit_io_config();
++}
++
++static void winthrop_gpio_init(void)
++{
++    winthrop_btn_gpio_init();    /* Reset button GPIO initialization */
++    winthrop_sio_init();         /* LED GPIO initialization */
++}
++#endif /* End of #if defined(WINTHROP_SUPPORT) || defined(TWISP_SUPPORT) */
++
++#ifdef TWISP_SUPPORT
++/*
++ *  Platform Depend GPIOs for Reset Button and Status LEDs
++ *
++ *  Nuvoton NCT6776 SIO definitions for Arm LED
++ *      GPIO#  I/O   Notes
++ *      -------------------------------------------------
++ *      GP72    O    LED_Green       (Status LED Green Color)
++ *      GP73    O    LED_Red         (Status LED Red Color)
++ *      GP74    I    Reset Button    RESET 0 = pressed, 1 = released
++ */
++
++static void twisp_gpio_init(void)
++{
++    unsigned char tmp;
++
++    enter_io_config();
++
++    tmp = (read_io_reg(0x00, 0x27) & 0xff) | 0x80;
++    write_io_reg(      0x00, 0x27, tmp);
++
++    tmp = (read_io_reg(0x09, 0x30) & 0xff) | 0x80;
++    write_io_reg(      0x09, 0x30, tmp);
++
++    tmp = (read_io_reg(0x07, 0xe0) & 0xf3) | 0x10; /* 0x10: M270 Reset GPIO pin GP74 is set as input */
++    write_io_reg(      0x07, 0xe0, tmp);
++    
++    exit_io_config();
++}
++
++unsigned char get_twisp_reset_button_status(void)
++{
++    unsigned btn_status = 0;
++    
++    enter_io_config();
++    btn_status = (read_io_reg(0x7, 0xe1) & 0x10) / 0x10;  
++    exit_io_config();
++    
++    if (btn_status) {
++        btn_status = BUTTON_NOT_DEPRESSED;
++    } else {
++        btn_status = BUTTON_DEPRESSED;
++	}
++
++	/* convert the captured data into what makes sense for caller */
++    if (btn_status == BUTTON_DEPRESSED) {
++        return BTN_RESET;
++    } else {
++        return 0;
++    }	
++}
++#endif /* End of #ifdef TWISP_SUPPORT */
++
++/* Find out if the reset button was pressed. */
++unsigned char
++get_reset_button (void)
++{
++	if (lcd_module == LCD_MODULE_NONE_SEATTLE) {
++            return get_seattle_reset_button_status ();
++	} else if (lcd_module == LCD_MODULE_NONE_KIRKLAND) {
++            return get_kirkland_reset_button_status ();
++	} else if (lcd_module == LCD_MODULE_NONE_COLFAX1) {
++            return get_colfax1_reset_button_status ();
++	} else if (lcd_module == LCD_MODULE_NONE_COLFAX2) {
++            return get_colfax2_reset_button_status ();
++	} else if ( (lcd_module == LCD_MODULE_NONE_WESTPORT) || (lcd_module == LCD_MODULE_NONE_MUKILTEO) ) {
++            return get_westport_mukilteo_reset_button_status ();
++	} else if (lcd_module == LCD_MODULE_NONE_WINTHROP) {
++            return get_winthrop_reset_button_status ();
++	} else if (lcd_module == LCD_MODULE_NONE_TWISP) {
++            return get_twisp_reset_button_status ();
++	}
++	
++	/* Should never be here: incase we are, return err(-1) */
++	return -1;
++}
++
++int sled_init(void)
++{
++	if (lcd_module == LCD_MODULE_NONE_SEATTLE) {
++	    seattle_gpio_init();
++  	    // grub_print("LED/Reset Button Driver %s ready\n", Driver_Version);
++	} else if (lcd_module == LCD_MODULE_NONE_KIRKLAND) {
++	    /*
++   	     * create configuration address as per Intel ® I/O
++	     * Controller Hub 7 (ICH7) Family LPC (D31:F0)) is at
++	     * bus0 dev31 fun3 Get SMBUS Port Address
++  	     */
++	    pci_lpc.name = "lpc";
++	    pci_lpc.bus = 0x0;
++	    pci_lpc.slot = 0x31;
++	    pci_lpc.devfn = 0x0;
++
++	    kirkland_gpio_init();
++	    udelay(300);
++	} else if (lcd_module == LCD_MODULE_NONE_COLFAX1) {
++	    /*
++   	     * create configuration address as per Intel ® I/O
++	     * Controller Hub 7 (ICH7) Family LPC (D31:F0)) is at
++	     * bus0 dev31 fun3 Get SMBUS Port Address
++  	     */
++	    pci_lpc.name = "lpc";
++	    pci_lpc.bus = 0x0;
++	    pci_lpc.slot = 0x31;
++	    pci_lpc.devfn = 0x0;
++
++	    colfax1_gpio_init();
++	    udelay(300);
++	} else if (lcd_module == LCD_MODULE_NONE_COLFAX2) {
++	    colfax2_gpio_init();
++	    udelay(300);
++	} else if ( (lcd_module == LCD_MODULE_NONE_WESTPORT) || (lcd_module == LCD_MODULE_NONE_MUKILTEO) ) {
++	    westport_mukilteo_gpio_init(&glb_pctrl);
++	    udelay(300);
++	} else if (lcd_module == LCD_MODULE_NONE_WINTHROP) {
++	    winthrop_gpio_init();
++	    udelay(300);
++	} else if (lcd_module == LCD_MODULE_NONE_TWISP) {
++	    twisp_gpio_init();
++	    udelay(300);
++	}
++	
++	return 0;
++}
++// vim: ai noet sw=4 ts=4
+--- grub-0.97/stage2/nar7090.h.orig	1969-12-31 16:00:00.000000000 -0800
++++ grub-0.97/stage2/nar7090.h	2022-05-26 11:32:48.780427875 -0700
+@@ -0,0 +1,83 @@
++/* nar7090.h - Portwell NAR-7090 board support */
++/*
++ *  GRUB  --  GRand Unified Bootloader
++ *  Copyright (C) 2000,2001,2002  Free Software Foundation, Inc.
++ *  Copyright (C) 2008  WatchGuard Technologies, Inc.
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++/* This header depends on macros in "serial.h" */
++#include <serial.h>
++
++/*
++ * The NAR-7090 has the front panel LCD and control buttons hooked up to
++ * ttyS1, a.k.a. its EZIO port.
++ */
++#define EZIO_PORT_INDEX     1
++#define EZIO_PORT_SPEED     2400
++#define EZIO_PORT_WORDLEN   UART_8BITS_WORD
++#define EZIO_PORT_PARITY    UART_NO_PARITY
++#define EZIO_PORT_STOPBITS  UART_1_STOP_BIT
++
++
++/*
++ * Each front panel button-press is prefixed by the following magic byte.
++ */
++#define EZIO_READKEY_HDR  0xFD
++
++
++/* EZIO command values */
++#define CMD_PREFIX            0xFE
++#define CMD_INIT              0x28
++#define CMD_END               0x37
++#define CMD_CLS               0x01
++#define CMD_HOME              0x02
++#define CMD_READKEY           0x06
++#define CMD_HIDE_CHARS        0x08
++#define CMD_SHOW_CHARS        0x0C
++#define CMD_CURSOR_BLINK      0x0D
++#define CMD_CURSOR_UNDERLINE  0x0E
++#define CMD_MOVE_LEFT         0x10
++#define CMD_MOVE_RIGHT        0x14
++#define CMD_SCROLL_LEFT       0x18
++#define CMD_SCROLL_RIGHT      0x1C
++#define CMD_SETPOS            0x80
++#define CMD_SETDIS            0x40
++
++#define LCD_ROW2_OFFSET  0x40
++
++#define BTN_HIGH_NIBBLE  0xB0
++/*
++ * The NAR-7090 manual uses the following low nibbles to describe the
++ * button values:
++ *
++ *     BTN_UP      0xE
++ *     BTN_DOWN    0xD
++ *     BTN_ENTER   0xB
++ *     BTN_ESCAPE  0x7
++ *
++ * Basically, when a bit is zero/low/off, it means that button is
++ * depressed.  To make it more intuitive in the code, we negate and use
++ * the mask values defined below.
++ */
++
++void ezio_init (void);
++void ezio_cmd (unsigned char command);
++unsigned char ezio_hw_getchar (void);
++void ezio_hw_putchar (char c);
++void ezio_putchars (char *message);
++unsigned char ezio_getbuttons (void);
++void ezio_sample (void);
+--- grub-0.97/stage2/lcm.c.orig	1969-12-31 16:00:00.000000000 -0800
++++ grub-0.97/stage2/lcm.c	2022-05-26 11:32:48.776428039 -0700
+@@ -0,0 +1,292 @@
++/*
++ * Lanner Parallel LCM driver 
++ */
++#include "lcm.h"
++#include <linux-asm-io.h>
++#include <shared.h>
++#include <timer.h>
++#include <panel.h>
++
++#ifndef NULL
++#define NULL 0
++#endif
++
++/*
++ * Device Depend Function Prototypes
++ */
++
++/*
++ * Device Depend Definition
++ */
++#define LPT1 0x378
++#define LPT2 0x278
++#define LPT3 0x3BC
++
++#define ENABLE 0x02
++
++#if 0
++#define udelay(n)   {int xloop = n; do {outb(80, 0) }while(xloop--);}
++#else
++#define udelay(n)   waiton_timer2(((n)*TICKS_PER_MS)/1000)
++#endif
++/*
++ * Device Depend Variables
++ */
++static unsigned int  Port_Addr = 0; // LPTx Port Address
++static unsigned int  DataPort = 0;
++static unsigned int  StatusPort = 0;
++static unsigned int  ControlPort = 0;
++static unsigned char Backlight = 0; // Backlight ON
++
++void load_timer2(unsigned int ticks)
++{
++    /* Set up the timer gate, turn off the speaker */
++    outb((inb(PPC_PORTB) & ~PPCB_SPKR) | PPCB_T2GATE, PPC_PORTB);
++    outb(TIMER2_SEL|WORD_ACCESS|MODE0|BINARY_COUNT, TIMER_MODE_PORT);
++    outb(ticks & 0xFF, TIMER2_PORT);
++    outb(ticks >> 8, TIMER2_PORT);
++}
++
++void LCM_Init(void)
++{
++//    unsigned int i = 0;
++    Port_Addr = LPT1;
++#if 0
++    if(inb(LPT1) != 0xFF)
++    {
++        Port_Addr = LPT1;
++    }
++    else if(inb(LPT2) != 0xFF)
++    {
++        Port_Addr = LPT2;
++    }
++    else if(inb(LPT3) != 0xFF)
++    {
++        Port_Addr = LPT3;
++    }
++    else
++    {
++        return;
++    }
++#endif
++
++    DataPort = Port_Addr;
++    StatusPort = Port_Addr + 1;
++    ControlPort = Port_Addr + 2;
++
++
++    if (LCDB_filton == 1) {
++
++        LCM_Command(0, 0, 0x30, 300, NULL); // Function Set
++        LCM_Command(0, 0, 0x30,  100, NULL);
++    } else {
++        LCM_Command(0, 0, 0x38, 8000, NULL); // Function Set
++        LCM_Command(0, 0, 0x38,  300, NULL);
++    }
++
++    LCM_Command(0, 0, 0x38,  300, NULL);
++    LCM_Command(0, 0, 0x38,  300, NULL);
++    LCM_Command(0, 0, 0x0F,  300, NULL); // Display On/OFF,  display=ON,cursor=ON,blink=ON
++    LCM_Command(0, 0, 0x01, 3000, NULL); // Display Clear
++
++    LCM_Command(0, 0, 0x0C,  300, NULL); // Set No Cursor
++    LCM_Command(1, 0, 0x00,  300, NULL);    // Set No Cursor
++
++    LCM_Command(0, 0, 0x06,  300, NULL); // Entry Mode Set
++    LCM_Command(0, 0, 0x80,  300, NULL); // Set DDRAM Address  
++
++#if 0
++    LCM_Command(0, 0, 0x06,  300, NULL); // Entry Mode Set
++    LCM_Command(0, 0, 0x0C,  300, NULL); // Set No Cursor
++    LCM_Command(1, 0, 0,  300, NULL);    // Set No Cursor
++    LCM_Cls();
++#endif
++
++#if 0
++    LCM_Command(0, 0, 0x80,  300, NULL); // Set DDRAM Address   
++    for(i = 0; i < 40; i++) // Range: 0x00~0x27
++    {
++        LCM_Command(1, 0, ' ', 300, NULL); // Write Data
++    }
++
++    LCM_Command(0, 0, 0xC0, 300, NULL); // Set DDRAM Address
++    for(i = 0; i < 40; i++) // Range: 0x40~0x67
++    {
++        LCM_Command(1, 0, ' ', 300, NULL); // Write Data
++    }
++    // Add character in CGRAM as below.
++    /*
++    // 11111 
++    // 10001
++    // 10101
++    // 10101
++    // 10101
++    // 10001
++    // 11111
++    // 00000
++    */
++    for(i = 0; i < 8; i++)
++    {
++        LCM_Command(0, 0, 0x40+i*8+0, 300, NULL);
++        LCM_Command(1, 0, 0x1F, 300, NULL);
++        LCM_Command(0, 0, 0x40+i*8+1, 300, NULL);
++        LCM_Command(1, 0, 0x11, 300, NULL);
++        LCM_Command(0, 0, 0x40+i*8+2, 300, NULL);
++        LCM_Command(1, 0, 0x15, 300, NULL);
++        LCM_Command(0, 0, 0x40+i*8+3, 300, NULL);
++        LCM_Command(1, 0, 0x15, 300, NULL);
++        LCM_Command(0, 0, 0x40+i*8+4, 300, NULL);
++        LCM_Command(1, 0, 0x15, 300, NULL);
++        LCM_Command(0, 0, 0x40+i*8+5, 300, NULL);
++        LCM_Command(1, 0, 0x11, 300, NULL);
++        LCM_Command(0, 0, 0x40+i*8+6, 300, NULL);
++        LCM_Command(1, 0, 0x1F, 300, NULL);
++        LCM_Command(0, 0, 0x40+i*8+7, 300, NULL);
++        LCM_Command(1, 0, 0x00, 300, NULL);
++    }
++#endif
++
++    return;
++}
++
++void LCM_Write(unsigned char Line, unsigned char *Text)
++{
++    unsigned char LCM_Message[40];
++    int i = 0;
++    int length = strlen(Text);
++
++    for(i = 0; i < 40; i++)
++    {
++        LCM_Message[i] = ' ';
++    }
++
++    if(length > 40)
++    {
++        return;
++    }
++
++    if(Line == 1)
++    {
++        LCM_Command(0, 0, 0x80, 300, NULL);
++    }
++    else if(Line == 2)
++    {
++        if (LCDB_filton == 1)
++            LCM_Command(0, 0, 0x90, 300, NULL);
++        else
++            LCM_Command(0, 0, 0xC0, 300, NULL);
++    }
++    for(i = 0; i < 40; i++)
++    {
++        if((length - i) > 0)
++        {
++            LCM_Message[i] = Text[i];
++            if(LCM_Message[i] == 0)
++            {
++                LCM_Message[i] = ' ';
++            }
++        }
++        LCM_Command(1, 0, LCM_Message[i], 300, NULL);
++    }
++
++    return;
++}
++
++void LCM_Cls()
++{
++    LCM_Write(1, "");
++    LCM_Write(2, "");
++
++    return;
++}
++
++unsigned char LCM_GetButtons()
++{
++    unsigned char btn;
++    btn = inb(StatusPort);
++    if (LCDB_filton == 1) {	/* so, filton, do it filton way */
++        switch (btn)
++        {
++            /* down button */
++            case 0xC7:
++                return BTN_DOWN;
++            /* left */
++            case 0xE7:
++                return BTN_LEFT;
++            /* up */
++            case 0xCF:
++                return BTN_UP;
++            /* right */
++            case 0xEF:
++                return BTN_RIGHT;
++            default:
++                return 0;
++        }
++    } else { 			/* all other plcm based platfroms <vashon/kennewick> */
++        switch (btn)
++        {
++            /* down button */
++            case 0xC7:
++                return BTN_DOWN;
++            /* left */
++            case 0xCF:
++                return BTN_LEFT;
++            /* up */
++            case 0xE7:
++                return BTN_UP;
++            /* right */
++            case 0xEF:
++                return BTN_RIGHT;
++            default:
++                return 0;
++        }
++    }
++}
++
++void LCM_Command(unsigned char RS, unsigned char RWn, unsigned char CMD, unsigned int uDelay, unsigned char *Ret)
++{
++    unsigned char Ctrl = 0;
++
++    Ctrl |= Backlight;
++    if(RS == 0)
++    {
++        Ctrl |= 0x08; // RS: Real RS = ~RS
++    }
++    if(RWn == 1)
++    {
++        Ctrl |= 0x24; // RWn: Read = 1, Write = 0
++    }
++    outb(Ctrl | ENABLE, ControlPort); // Set RS and RWn, E = 0
++    udelay(40);
++    outb(Ctrl & ~ENABLE, ControlPort); // E = 1 
++    udelay(10);
++    if(RWn == 0)
++    {
++        outb(CMD, DataPort); // LCM Data Write 
++    }
++    if((RWn == 1) && (Ret != NULL))
++    {
++        *Ret = inb(DataPort); // LCM Data Read  
++    }
++    udelay(300);
++    outb(Ctrl | ENABLE, ControlPort); // E = 0
++    udelay(uDelay + 1);
++    return;
++}
++
++void LCM_Backlight(void)
++{
++    unsigned char Ctrl = inb(ControlPort);
++
++    if(Backlight == 1)
++    {
++        Ctrl |= 0x01;
++    }
++    else
++    {
++        Ctrl &= ~0x01;
++    }
++    outb(Ctrl, ControlPort);
++    return;
++}
++

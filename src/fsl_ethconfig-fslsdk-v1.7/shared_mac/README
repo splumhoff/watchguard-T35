@@ -1,0 +1,16 @@
+To achieve Shared-MAC functionality in HV2p scenario (Linux-to-Linux),
+apply the PCD files in the first partition.
+
+1. Edit /etc/fmc/config/shared_mac/hv2p_config_p4_shared_mac.xml and
+make sure the interface is either fm1-gb1 or fm1-gb3 (depending on
+the platform).
+
+2. Edit /etc/fmc/config/shared_mac/hv2p_policy_shared_mac.xml and make
+sure the MAC address corresponding to 0x210 FQID matches the address of
+the shared interface in the first partition (fm1-gb1 or fm1-gb3). Also
+make sure the MAC address corresponding to FQID 0x220 matches the
+address of the interface eth1 in the second partition.
+
+3. Apply the PCD rules with fmc:
+# fmc -c hv2p_config_p4_shared_mac.xml -p hv2p_policy_shared_mac.xml -s
+hv2p_swparser_shared_mac.xml -a

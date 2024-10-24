@@ -1,0 +1,68 @@
+WatchGuard patches to sources for vmware-tools-10.0.0 as of
+Thu May 26 11:52:39 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- vmware-tools-10.0.0/caf/etc/vmware-caf/pme/config/cafenv.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ vmware-tools-10.0.0/caf/etc/vmware-caf/pme/config/cafenv.config	2022-05-26 11:51:57.745873524 -0700
+@@ -0,0 +1,59 @@
++#!/bin/sh
++
++#######################################################
++#
++#  Purpose:     Sets install variables.
++#
++#######################################################
++
++
++# Specifies the PME ID (UUID) of this machine.
++tunnelPort=$(netstat -ldn | egrep ":6672 ")
++if [ -f /etc/vmware-tools/GuestProxyData/VmVcUuid/vm.vc.uuid -a "$tunnelPort" != "" ]; then
++   export CAF_REACTIVE_REQUEST_AMQP_QUEUEID=$(cat /etc/vmware-tools/GuestProxyData/VmVcUuid/vm.vc.uuid)-agentId1
++   export CAF_PME_ID=$CAF_REACTIVE_REQUEST_AMQP_QUEUEID
++   export CAF_COMMAMQPLISTENER_CONTEXT=@configDir@/CommAmqpListener-context-tunnel.xml
++   export CAF_BROKER_ADDRESS=localhost
++else
++   export CAF_REACTIVE_REQUEST_AMQP_QUEUEID=@pmeId@
++   export CAF_PME_ID=$CAF_REACTIVE_REQUEST_AMQP_QUEUEID
++   export CAF_COMMAMQPLISTENER_CONTEXT=@configDir@/CommAmqpListener-context-amqp.xml
++   # Specifies the hostname or IP4 address of the RabbitMQ broker handling
++   # communication between the application server and this PME.
++   export CAF_BROKER_ADDRESS=@brokerAddr@
++fi
++
++# Specifies where python is located.
++export CAF_PYTHON_DIR=/opt/vmware/caf/python
++
++# Substitute @binDir@ for the value passed in during install
++# Maps to 'bin' in the build output
++export CAF_BIN_DIR="@binDir@"
++
++# Substitute @libDir@ for the value passed in during install
++# Maps to 'lib' in the build output
++export CAF_LIB_DIR="@libDir@"
++
++# Substitute @configDir@ for the value passed in during install
++# Maps to 'config' in the build output
++export CAF_CONFIG_DIR="@configDir@"
++
++# Substitute @inputDir@ for the value passed in during install
++# Maps to 'data/input' in the build output
++export CAF_INPUT_DIR="@inputDir@"
++
++# Substitute @outputDir@ for the value passed in during install
++# No mapping in the build output since the output files are created at run-time
++export CAF_OUTPUT_DIR="@outputDir@"
++
++# Substitute @invokersDir@ for the value passed in during install
++# Maps to 'invokers' in the build output - Used by the internal providers
++export CAF_INVOKERS_DIR="@invokersDir@"
++
++# Substitute @providersDir@ for the value passed in during install
++# Maps to 'providers' in the build output - Used by the internal providers
++export CAF_PROVIDERS_DIR="@providersDir@"
++
++# Substitute @logDir@ for the value passed in during install
++# No mapping in the build output since the log files are created at run-time
++export CAF_LOG_DIR="@logDir@"

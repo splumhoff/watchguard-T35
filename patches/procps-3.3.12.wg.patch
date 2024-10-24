@@ -1,0 +1,18 @@
+WatchGuard patches to sources for procps-3.3.12 as of
+Thu May 26 11:38:31 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- procps-3.3.12/ltmain.sh.orig	2022-05-26 11:38:29.038487964 -0700
++++ procps-3.3.12/ltmain.sh	2022-05-26 11:38:29.190481734 -0700
+@@ -8367,7 +8367,8 @@
+ 	      fi
+ 	    else
+ 	      # We cannot seem to hardcode it, guess we'll fake it.
+-	      add_dir=-L$libdir
++          # WG: do not fake it, this introduces host pollution
++	      # add_dir=-L$libdir
+ 	      # Try looking first in the location we're being installed to.
+ 	      if test -n "$inst_prefix_dir"; then
+ 		case $libdir in

@@ -1,0 +1,38 @@
+WatchGuard patches to sources for ksymoops-2.4.11 as of
+Thu May 26 11:33:25 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- ksymoops-2.4.11/Makefile.orig	2022-05-26 11:33:24.866950157 -0700
++++ ksymoops-2.4.11/Makefile	2022-05-26 11:33:24.942947044 -0700
+@@ -56,6 +56,9 @@
+ 
+ PROGS := ksymoops
+ 
++CFLAGS  += $(MYCFLAGS)
++LDFLAGS += $(MYLDFLAGS)
++
+ CC := gcc
+ CFLAGS += -Dlinux \
+ 	 -Wall \
+--- ksymoops-2.4.11/ksymoops.8.orig	2022-05-26 11:33:24.870949993 -0700
++++ ksymoops-2.4.11/ksymoops.8	2022-05-26 11:33:24.946946880 -0700
+@@ -460,7 +460,7 @@
+ the line but ignore during analysis.  A prefix can be from syslogd(8)
+ (consisting of date, time, hostname, 'kernel:'), from syslog-ng
+ (numbers and three other strings separated by '|'), it can be
+-'<\fIn\fR>' from /proc/kmsg or the prefix can just be leading spaces.
++\&'<\fIn\fR>' from /proc/kmsg or the prefix can just be leading spaces.
+ "start of line" means the first character after skipping all prefixes,
+ including all leading space.
+ .P
+@@ -800,7 +800,7 @@
+ variables above.  To use different versions of libbfd and libiberty,
+ use the --rpath option when linking ksymoops or the LD_LIBRARY_PATH
+ environment variable when running ksymoops.  See the info pages for ld
+-and /usr/doc/glibc*/FAQ.
++and /usr/share/doc/libc6/FAQ.gz.
+ You can also build a version of ksymoops that is dedicated to the cross
+ compile environment by using the BFD_PREFIX, DEF_TARGET, DEF_ARCH and
+ CROSS options at build time.

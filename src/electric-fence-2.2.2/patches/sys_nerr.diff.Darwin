@@ -1,0 +1,51 @@
+--- ElectricFence-2.2.2/page.c	Fri Aug 19 22:39:28 2005
++++ page.c	Fri Aug 19 22:39:49 2005
+@@ -30,7 +30,7 @@
+ static caddr_t	startAddr = (caddr_t) 0;
+ 
+ #if ( !defined(sgi) && !defined(_AIX) &&!defined(__USE_BSD))
+-extern int	sys_nerr;
++extern __const int	sys_nerr;
+ /* extern char *	sys_errlist[]; */
+ #endif
+ 
+--- ElectricFence-2.2.2/Makefile	Tue Apr 13 10:22:49 1999
++++ Makefile	Fri Aug 19 22:41:32 2005
+@@ -54,7 +54,7 @@
+ 	$(AR) crv libefence.a $(OBJECTS)
+ 
+ libefence.so.0.0: $(OBJECTS)
+-	gcc -g -shared -Wl,-soname,libefence.so.0 -o libefence.so.0.0 \
++	gcc -g -Wl,-soname,libefence.so.0 -o libefence.so.0.0 \
+ 		$(OBJECTS) -lpthread -lc 
+ 
+ tstheap: libefence.a tstheap.o
+--- ElectricFence-2.2.2/Makefile	Fri Aug 19 22:56:01 2005
++++ Makefile	Fri Aug 19 22:57:11 2005
+@@ -16,7 +16,7 @@
+ 
+ OBJECTS= efence.o page.o print.o
+ 
+-all:	libefence.a libefence.so.0.0 tstheap eftest
++all:	libefence.a tstheap eftest
+ 	@ echo
+ 	@ echo "Testing Electric Fence."
+ 	@ echo "After the last test, it should print that the test has PASSED."
+@@ -29,16 +29,11 @@
+ install: libefence.a efence.3 libefence.so.0.0
+ 	$(INSTALL) -m 755 ef.sh $(BIN_INSTALL_DIR)/ef
+ 	$(INSTALL) -m 644 libefence.a $(LIB_INSTALL_DIR)
+-	$(INSTALL) -m 755 libefence.so.0.0 $(LIB_INSTALL_DIR)
+-	- rm -f $(LIB_INSTALL_DIR)/libefence.so.0
+-	ln -s libefence.so.0.0 $(LIB_INSTALL_DIR)/libefence.so.0
+-	- rm -f $(LIB_INSTALL_DIR)/libefence.so
+-	ln -s libefence.so.0.0 $(LIB_INSTALL_DIR)/libefence.so
+ 	$(INSTALL) -m 644 efence.3 $(MAN_INSTALL_DIR)/efence.3
+ 
+ clean:
+ 	- rm -f $(OBJECTS) tstheap.o eftest.o tstheap eftest \
+-	 libefence.a libefence.so.0.0 libefence.cat ElectricFence.shar
++	 libefence.a libefence.cat ElectricFence.shar
+ 
+ roff:
+ 	nroff -man < efence.3 > efence.cat

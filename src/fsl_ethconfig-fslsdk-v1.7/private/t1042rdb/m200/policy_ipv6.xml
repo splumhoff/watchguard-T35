@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ FMAN0/1 FMC policy file
+
+ Copyright (C) 2014 Freescale Semiconductor, Inc.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+	   documentation and/or other materials provided with the distribution.
+     * Neither the name of Freescale Semiconductor nor the
+	   names of its contributors may be used to endorse or promote products
+	   derived from this software without specific prior written permission.
+
+
+ ALTERNATIVELY, this software may be distributed under the terms of the
+ GNU General Public License ("GPL") as published by the Free Software
+ Foundation, either version 2 of that License or (at your option) any
+ later version.
+
+ THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
+ EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
+ DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<netpcd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="xmlProject/pcd.xsd" name="example"
+	description="FMAN Tester configuration">
+
+	<distribution name="ipv6eth1">
+		<queue count="128" base="0x3800"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth2">
+		<queue count="128" base="0x3880"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth3">
+		<queue count="128" base="0x3900"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth4">
+		<queue count="128" base="0x3980"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth5">
+		<queue count="128" base="0x3a00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth6">
+		<queue count="128" base="0x3a80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth7">
+		<queue count="128" base="0x3c00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth8">
+		<queue count="128" base="0x3c80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth9">
+		<queue count="128" base="0x7800"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth10">
+		<queue count="128" base="0x7880"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth11">
+		<queue count="128" base="0x7900"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth12">
+		<queue count="128" base="0x7980"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth13">
+		<queue count="128" base="0x7a00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth14">
+		<queue count="128" base="0x7a80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth15">
+		<queue count="128" base="0x7c00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="ipv6eth16">
+		<queue count="128" base="0x7c80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth1">
+		<queue count="128" base="0x3800"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth2">
+		<queue count="128" base="0x3880"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth3">
+		<queue count="128" base="0x3900"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth4">
+		<queue count="128" base="0x3980"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth5">
+		<queue count="128" base="0x3a00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth6">
+		<queue count="128" base="0x3a80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth7">
+		<queue count="128" base="0x3c00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth8">
+		<queue count="128" base="0x3c80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth9">
+		<queue count="128" base="0x7800"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth10">
+		<queue count="128" base="0x7880"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth11">
+		<queue count="128" base="0x7900"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth12">
+		<queue count="128" base="0x7980"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth13">
+		<queue count="128" base="0x7a00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth14">
+		<queue count="128" base="0x7a80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth15">
+		<queue count="128" base="0x7c00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="tcpeth16">
+		<queue count="128" base="0x7c80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="tcp.sport"/>
+			<fieldref name="tcp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth1">
+		<queue count="128" base="0x3800"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth2">
+		<queue count="128" base="0x3880"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth3">
+		<queue count="128" base="0x3900"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth4">
+		<queue count="128" base="0x3980"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth5">
+		<queue count="128" base="0x3a00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth6">
+		<queue count="128" base="0x3a80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth7">
+		<queue count="128" base="0x3c00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth8">
+		<queue count="128" base="0x3c80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth9">
+		<queue count="128" base="0x7800"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth10">
+		<queue count="128" base="0x7880"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth11">
+		<queue count="128" base="0x7900"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth12">
+		<queue count="128" base="0x7980"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth13">
+		<queue count="128" base="0x7a00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth14">
+		<queue count="128" base="0x7a80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth15">
+		<queue count="128" base="0x7c00"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="udpeth16">
+		<queue count="128" base="0x7c80"/>
+		<key>
+			<fieldref name="ipv6.src"/>
+			<fieldref name="ipv6.dst"/>
+			<fieldref name="ipv6.nexthdr"/>
+			<fieldref name="udp.sport"/>
+			<fieldref name="udp.dport"/>
+		</key>
+	</distribution>
+
+	<distribution name="garbage_dist_1">
+		<queue count="1" base="0x3800"/>
+	</distribution>
+
+	<distribution name="garbage_dist_2">
+		<queue count="1" base="0x3880"/>
+	</distribution>
+
+	<distribution name="garbage_dist_3">
+		<queue count="1" base="0x3900"/>
+	</distribution>
+
+	<distribution name="garbage_dist_4">
+		<queue count="1" base="0x3980"/>
+	</distribution>
+
+	<distribution name="garbage_dist_5">
+		<queue count="1" base="0x3a00"/>
+	</distribution>
+
+	<distribution name="garbage_dist_6">
+		<queue count="1" base="0x3a80"/>
+	</distribution>
+
+	<distribution name="garbage_dist_7">
+		<queue count="1" base="0x3c00"/>
+	</distribution>
+
+	<distribution name="garbage_dist_8">
+		<queue count="1" base="0x3c80"/>
+	</distribution>
+
+	<distribution name="garbage_dist_9">
+		<queue count="1" base="0x7800"/>
+	</distribution>
+
+	<distribution name="garbage_dist_10">
+		<queue count="1" base="0x7880"/>
+	</distribution>
+
+	<distribution name="garbage_dist_11">
+		<queue count="1" base="0x7900"/>
+	</distribution>
+
+	<distribution name="garbage_dist_12">
+		<queue count="1" base="0x7980"/>
+	</distribution>
+
+	<distribution name="garbage_dist_13">
+		<queue count="1" base="0x7a00"/>
+	</distribution>
+
+	<distribution name="garbage_dist_14">
+		<queue count="1" base="0x7a80"/>
+	</distribution>
+
+	<distribution name="garbage_dist_15">
+		<queue count="1" base="0x7c00"/>
+	</distribution>
+
+	<distribution name="garbage_dist_16">
+		<queue count="1" base="0x7c80"/>
+	</distribution>
+
+	<policy name="fm_policy_1">
+		<dist_order>
+			<distributionref name="udpeth1"/>
+			<distributionref name="tcpeth1"/>
+			<distributionref name="ipv6eth1"/>
+			<distributionref name="garbage_dist_1"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_2">
+		<dist_order>
+			<distributionref name="udpeth2"/>
+			<distributionref name="tcpeth2"/>
+			<distributionref name="ipv6eth2"/>
+			<distributionref name="garbage_dist_2"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_3">
+		<dist_order>
+			<distributionref name="udpeth3"/>
+			<distributionref name="tcpeth3"/>
+			<distributionref name="ipv6eth3"/>
+			<distributionref name="garbage_dist_3"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_4">
+		<dist_order>
+			<distributionref name="udpeth4"/>
+			<distributionref name="tcpeth4"/>
+			<distributionref name="ipv6eth4"/>
+			<distributionref name="garbage_dist_4"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_5">
+		<dist_order>
+			<distributionref name="udpeth5"/>
+			<distributionref name="tcpeth5"/>
+			<distributionref name="ipv6eth5"/>
+			<distributionref name="garbage_dist_5"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_6">
+		<dist_order>
+			<distributionref name="udpeth6"/>
+			<distributionref name="tcpeth6"/>
+			<distributionref name="ipv6eth6"/>
+			<distributionref name="garbage_dist_6"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_7">
+		<dist_order>
+			<distributionref name="udpeth7"/>
+			<distributionref name="tcpeth7"/>
+			<distributionref name="ipv6eth7"/>
+			<distributionref name="garbage_dist_7"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_8">
+		<dist_order>
+			<distributionref name="udpeth8"/>
+			<distributionref name="tcpeth8"/>
+			<distributionref name="ipv6eth8"/>
+			<distributionref name="garbage_dist_8"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_9">
+		<dist_order>
+			<distributionref name="udpeth9"/>
+			<distributionref name="tcpeth9"/>
+			<distributionref name="ipv6eth9"/>
+			<distributionref name="garbage_dist_9"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_10">
+		<dist_order>
+			<distributionref name="udpeth10"/>
+			<distributionref name="tcpeth10"/>
+			<distributionref name="ipv6eth10"/>
+			<distributionref name="garbage_dist_10"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_11">
+		<dist_order>
+			<distributionref name="udpeth11"/>
+			<distributionref name="tcpeth11"/>
+			<distributionref name="ipv6eth11"/>
+			<distributionref name="garbage_dist_11"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_12">
+		<dist_order>
+			<distributionref name="udpeth12"/>
+			<distributionref name="tcpeth12"/>
+			<distributionref name="ipv6eth12"/>
+			<distributionref name="garbage_dist_12"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_13">
+		<dist_order>
+			<distributionref name="udpeth13"/>
+			<distributionref name="tcpeth13"/>
+			<distributionref name="ipv6eth13"/>
+			<distributionref name="garbage_dist_13"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_14">
+		<dist_order>
+			<distributionref name="udpeth14"/>
+			<distributionref name="tcpeth14"/>
+			<distributionref name="ipv6eth14"/>
+			<distributionref name="garbage_dist_14"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_15">
+		<dist_order>
+			<distributionref name="udpeth15"/>
+			<distributionref name="tcpeth15"/>
+			<distributionref name="ipv6eth15"/>
+			<distributionref name="garbage_dist_15"/>
+		</dist_order>
+	</policy>
+
+	<policy name="fm_policy_16">
+		<dist_order>
+			<distributionref name="udpeth16"/>
+			<distributionref name="tcpeth16"/>
+			<distributionref name="ipv6eth16"/>
+			<distributionref name="garbage_dist_16"/>
+		</dist_order>
+	</policy>
+</netpcd>

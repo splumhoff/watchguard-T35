@@ -1,0 +1,33 @@
+--- ElectricFence-2/efence.c.orig	Mon Jan 13 17:24:08 2003
++++ ElectricFence-2/efence.c	Mon Jan 13 17:22:50 2003
+@@ -271,7 +271,9 @@
+ 	char *	string;
+ 	Slot *	slot;
+ 
++#if 0
+ 	EF_Print(version);
++#endif
+ 
+ #ifdef USE_SEMAPHORE
+ 	if (sem_init(&EF_sem, 0, 1) >= 0) {
+--- ElectricFence-2/page.c.orig	Sun Apr 11 14:45:26 1999
++++ ElectricFence-2/page.c	Sat Aug 26 18:19:58 2000
+@@ -29,7 +29,7 @@
+ 
+ static caddr_t	startAddr = (caddr_t) 0;
+ 
+-#if ( !defined(sgi) && !defined(_AIX) )
++#if ( !defined(sgi) && !defined(_AIX) && !(defined(BSD) && (BSD >= 199103)) )
+ extern int	sys_nerr;
+ /* extern char *	sys_errlist[]; */
+ #endif
+--- ElectricFence-2.1/Makefile.ori	Wed Nov 12 23:48:25 2003
++++ ElectricFence-2.1/Makefile	Wed Nov 12 23:48:50 2003
+@@ -5,6 +5,7 @@
+ MV= mv
+ CHMOD= chmod
+ CFLAGS= -g
++CFLAGS+=-DPAGE_PROTECTION_VIOLATED_SIGNAL=SIGBUS -pthread
+ LIB_INSTALL_DIR= /usr/lib
+ MAN_INSTALL_DIR= /usr/man/man3
+ 

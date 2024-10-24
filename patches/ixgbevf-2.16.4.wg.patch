@@ -1,0 +1,928 @@
+WatchGuard patches to sources for ixgbevf-2.16.4 as of
+Thu May 26 11:33:16 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- ixgbevf-2.16.4/pci.updates.orig	2022-05-26 11:33:16.223304126 -0700
++++ ixgbevf-2.16.4/pci.updates	1969-12-31 16:00:00.000000000 -0800
+@@ -1,13 +0,0 @@
+-# updates for the system pci.ids file
+-#
+-# IMPORTANT!  Entries in this list must be sorted as they
+-#             would appear in the system pci.ids file.  Entries
+-#             are sorted by ven, dev, subven, subdev
+-#             (numerical order).
+-#
+-8086  Intel Corporation
+-	10ed  82599 Virtual Function
+-	1515  X540 Virtual Function
+-	1565  X550 Virtual Function
+-	15A8  X550EM Virtual Function
+-	15A9  X550EM Virtual Function
+--- ixgbevf-2.16.4/ixgbevf.7.orig	2022-05-26 11:33:16.223304126 -0700
++++ ixgbevf-2.16.4/ixgbevf.7	1969-12-31 16:00:00.000000000 -0800
+@@ -1,58 +0,0 @@
+-.\" LICENSE
+-.\"
+-.\" This software program is released under the terms of a license agreement between you ('Licensee') and Intel.  Do not use or load this software or any associated materials (collectively, the 'Software') until you have carefully read the full terms and conditions of the LICENSE located in this software package.  By loading or using the Software, you agree to the terms of this Agreement.  If you do not agree with the terms of this Agreement, do not install or use the Software.
+-.\"
+-.\" * Other names and brands may be claimed as the property of others.
+-.\"
+-.TH ixgbevf 1 "January 5, 2012"
+-
+-.SH NAME
+-ixgbevf \-This file describes the Linux* Base Driver for the Gigabit Family of Adapters.
+-.SH SYNOPSIS
+-.PD 0.4v
+-modprobe ixgbevf [<option>=<VAL1>,<VAL2>,...]
+-.PD 1v
+-.SH DESCRIPTION
+-This driver is intended for \fB2.6.18\fR or later kernels.  This driver includes support for Intel(R) Itanium(R)2-based systems.
+-.LP
+-This driver is only supported as a loadable module at this time.  Intel is not supplying patches against the kernel source to allow for static linking of the driver.  For questions related to hardware requirements, refer to the documentation supplied with your Intel adapter.  All hardware requirements listed apply to use with Linux.
+-.SH OPTIONS
+-The following optional parameters are used by entering them on the command line with the modprobe command.  
+-For example:
+-.IP
+-modprobe ixgbevf InterruptThrottleRate=16000,16000
+-.IP
+-.B InterruptThrottleRate
+-.IP
+-.B Valid Range: 
+-0,1,956-488281 (0=off, 1=dynamic)
+-.IP
+-.B Default Value: 
+-8000
+-This represents the maximum number of interrupts per second the controller generates.  InterruptThrottleRate is another setting used in interrupt moderation.  Dynamic mode uses a heuristic algorithm to adjust InterruptThrottleRate based on the current traffic load.
+-.IP
+-The default setting is configured to optimize interrupts for bulk 
+-throughput while keeping CPU utilization low.  However this setting may 
+-result in slower overall transfer speeds if network traffic consists 
+-mostly of small packets.  If this is the case, change this value to 0. 
+-.IP
+-Un-supported Adapters: InterruptThrottleRate is NOT supported by 82542, 82543 or 82544-based adapters.
+-.IP
+-.B NOTE: 
+-InterruptThrottleRate takes precedence over the TxAbsIntDelay and RxAbsIntDelay parameters.  In other words, minimizing the receive and/or transmit absolute delays does not force the controller to generate more interrupts than what the Interrupt Throttle Rate allows.
+-.IP
+-See the section "InterruptThrottleRate" in README.
+-.LP
+-.SH ethtool
+-The driver utilizes the ethtool interface for driver configuration and diagnostics, as well as displaying statistical information.  ethtool version 1.8.1 or later is required for this functionality.
+-.LP
+-The latest release of ethtool can be found from http://ftp.kernel.org/pub/software/network/ethtool/.  The driver then must be recompiled in order to take advantage of the latest ethtool features.
+-.LP
+-ethtool 1.6 only supports a limited set of ethtool options.  Support for a more complete ethtool feature set can be enabled by upgrading ethtool to ethtool-1.8.1.  
+-.SH SUPPORT
+-For additional information, including supported adapters, building, and installation, see the README file included with the driver.
+-.LP
+-For general information, go to the Intel support website at:
+-.IP
+-.B http://support.intel.com
+-.LP
+--- ixgbevf-2.16.4/README.orig	2022-05-26 11:33:16.203304945 -0700
++++ ixgbevf-2.16.4/README	1969-12-31 16:00:00.000000000 -0800
+@@ -1,402 +0,0 @@
+-
+-
+-ixgbevf Linux* Virtual Function (VF) Driver for Intel® Ethernet Network Connection
+-=================================================================
+-
+-
+-================================================================================
+-
+-November 24, 2014
+-
+-================================================================================
+-
+-
+-Contents
+---------
+-
+-- Overview
+-- Building and Installation
+-- Command Line Parameters
+-- Additional Configurations
+-- Known Issues
+-- Support
+-- License
+-
+-================================================================================
+-
+-
+-Overview
+---------
+-
+-
+-The ixgbevf driver supports 82599, X540, X550, and X552-based virtual
+-function devices that can only be activated on kernels that support SR-IOV.
+-SR-IOV requires the correct platform and OS support.
+-
+-This file describes the ixgbevf Linux* Virtual Function Driver for the 
+-10 Gigabit PCI Express Family of Adapters. The driver supports kernel versions 
+-2.6.x and 3.x.
+-
+-The ixgbevf driver requires the ixgbe driver, version 2.0 or later. The
+-ixgbevf driver supports virtual functions generated by the ixgbe driver with a
+-max_vfs value of 1 or greater. For more information on the max_vfs parameter
+-refer to the section section of the ixgbe driver.
+-
+-The guest OS loading the ixgbevf driver must support MSI-X interrupts.
+-
+-This driver is only supported as a loadable module at this time. Intel is not
+-supplying patches against the kernel source to allow for static linking of the
+-driver. For questions related to hardware requirements, refer to the
+-documentation supplied with your Intel Gigabit adapter. All hardware
+-requirements listed apply to use with Linux.
+-
+-Instructions on updating ethtool can be found in the section "Additional
+-Configurations" later in this document.
+-
+-VLANs: There is a limit of a total of 64 shared VLANs to 1 or more VFs.
+-
+-
+-Identifying Your Adapter
+-------------------------
+-
+-For more information on how to identify your adapter, go to the Adapter &
+-Driver ID Guide at:
+-http://support.intel.com/support/go/network/adapter/proidguide.htm
+-
+-For the latest Intel network drivers for Linux, refer to the following
+-website. Select the link for your adapter.
+-http://support.intel.com/support/go/network/adapter/home.htm
+-================================================================================
+-
+-
+-Building and Installation
+--------------------------
+-
+-
+-To build a binary RPM* package of this driver, run 'rpmbuild -tb
+-<filename.tar.gz>'. Replace <filename.tar.gz> with the specific filename of
+-the driver.
+-
+-NOTES:
+-
+-- For the build to work properly, the currently running kernel MUST match
+-  the version and configuration of the installed kernel sources. If you have
+-  just recompiled the kernel reboot the system now.
+-- RPM functionality has only been tested in Red Hat distributions.
+-
+-1. Move the virtual function driver tar file to the directory of your 
+-   choice. For example, use '/home/username/ixgbevf' or 
+-   '/usr/local/src/ixgbevf'.
+-
+-2. Untar/unzip the archive, where <x.x.x> is the version number for the
+-   driver tar file:
+-   tar zxf ixgbevf-<x.x.x>.tar.gz
+-3. Change to the driver src directory, where <x.x.x> is the version number
+-   for the driver tar:
+-   cd ixgbevf-<x.x.x>/src/
+-4. Compile the driver module:
+-   # make install
+-
+-   The binary will be installed as:
+-   /lib/modules/<KERNEL VERSION>/kernel/drivers/net/ixgbevf/ixgbevf.[k]o
+-
+-   The install location listed above is the default location. This may differ
+-   for various Linux distributions.
+-
+-5. Load the module using the modprobe command:
+-   modprobe ixgbevf
+-
+-   With 2.6 based kernels also make sure that older ixgbevf drivers are
+-   removed from the kernel, before loading the new module:
+-   rmmod ixgbevf; modprobe ixgbevf
+-6. Assign an IP address to the interface by entering the following, where x
+-   is the interface number:
+-   ifconfig eth <x> <IP_address>
+-7. Verify that the interface works. Enter the following, where IP_address
+-   is the IP address for another machine on the same subnet as the interface
+-   that is being tested:
+-   ping <IP_address>
+-
+-================================================================================
+-
+-
+-Command Line Parameters
+------------------------
+-
+-
+-If the driver is built as a module, the following optional parameters are used
+-by entering them on the command line with the modprobe command using this
+-syntax:
+-modprobe ixgbevf [<option>=<VAL1>,<VAL2>,...]
+-
+-There needs to be a <VAL#> for each network port in the system supported by
+-this driver. The values will be applied to each instance, in function order.
+-For example:
+-modprobe ixgbevf InterruptThrottleRate=16000,16000
+-
+-In this case, there are two network ports supported by ixgbevf in the system.
+-The default value for each parameter is generally the recommended setting,
+-unless otherwise noted.
+-
+-NOTES:
+-
+-- For more information about the AutoNeg, Duplex, and Speed parameters, see
+-  the "Speed and Duplex Configuration" section in this document.
+-- For more information about the InterruptThrottleRate parameter, see the
+-  application note at: http://www.intel.com/design/network/applnots/ap450.htm
+-- A descriptor describes a data buffer and attributes related to the data
+-  buffer. This information is accessed by the hardware.
+-
+-
+-InterruptThrottleRate
+----------------------
+-
+-
+-Valid Range:  0, 1, 956-488281 (0=off, 1=dynamic)
+-
+-Default Value:  1
+-
+-The InterruptThrottleRate (ITR) parameter controls how many interrupts each 
+-vector can generate per second. Increasing ITR lowers latency at the cost of 
+-increased CPU utilization. Although, increasing ITR may help throughput 
+-in some circumstances.
+-
+-The driver has an adaptive mode (setting 1) in which it dynamically adjusts
+-the InterruptThrottleRate based on receive traffic. After determining the 
+-incoming traffic in the last timeframe, it adjusts the InterruptThrottleRate 
+-to suit that traffic type the best. There are three classes defined:
+-
+-- Bulk traffic. Large amounts of packets of a normal size.
+-
+-- Low latency. Small amounts of traffic and/or significant percentage of
+-  small packets.
+-
+-- Lowest latency. Almost completely small packets or minimal traffic.
+-
+-Setting InterruptThrottleRate to 0 turns off any interrupt moderation and may
+-improve small packet latency, but it is generally not suitable for bulk 
+-throughput traffic.
+-
+-
+-================================================================================
+-
+-
+-Additional Configurations
+--------------------------
+-
+-
+-
+-Configuring the Driver on Different Distributions
+--------------------------------------------------
+-
+-
+-Configuring a network driver to load properly when the system is started is
+-distribution dependent. Typically, the configuration process involves adding
+-an alias line to /etc/modules.conf or /etc/modprobe.conf as well as editing
+-other system startup scripts and/or configuration files. Many popular Linux
+-distributions ship with tools to make these changes for you. To learn the
+-proper way to configure a network device for your system, refer to your
+-distribution documentation. If during this process you are asked for the
+-driver or module name, the name for the Linux Virtual Functioin Driver for 
+-the Gigabit Family of Adapters is ixgbevf.
+-
+-As an example, if you install the ixgbevf driver for two adapters (eth0 and
+-eth1) and want to set the interrupt mode to MSI-X and MSI respectively, add
+-the following to modules.conf or /etc/modprobe.conf:
+-alias eth0 ixgbevf
+-alias eth1 ixgbevf
+-options ixgbevf InterruptThrottleRate=3,1
+-
+-Viewing Link Messages
+----------------------
+-
+-
+-Link messages will not be displayed to the console if the distribution is
+-restricting system messages. In order to see network driver link messages on
+-your console, set dmesg to eight by entering the following: dmesg -n 8
+-
+-NOTES: This setting is not saved across reboots.
+-
+-
+-ethtool
+--------
+-
+-
+-The driver utilizes the ethtool interface for driver configuration and
+-diagnostics, as well as displaying statistical information. ethtool version 3
+-or later is required for this functionality, although we strongly recommend
+-downloading the latest version at:
+-http://ftp.kernel.org/pub/software/network/ethtool/.
+-
+-MACVLAN
+--------
+-
+-
+-ixgbevf supports MACVLAN on kernels that have the feature included. Kernel
+-support for MACVLAN can be tested by checking if the MACVLAN driver is loaded.
+-The user can run 'lsmod | grep macvlan' to see if the MACVLAN driver is loaded
+-or run 'modprobe macvlan' to try to load the MACVLAN driver.
+-
+-It may be necessary to update to a recent release of the iproute2 package to
+-get support of MACVLAN via the 'ip' command.
+-
+-
+-NAPI
+-----
+-
+-
+-NAPI (Rx polling mode) is supported in the ixgbevf driver and is always
+-enabled. For more information on NAPI, go to:
+-ftp://robur.slu.se/pub/Linux/net-development/NAPI/usenix-paper.tgz
+-================================================================================
+-
+-
+-Known Issues/Troubleshooting
+-----------------------------
+-
+-
+-
+-Hardware Issues
+----------------
+-
+-
+-For known hardware and troubleshooting issues, either refer to the "Release
+-Notes" in your User Guide, or for more detailed information, go to
+-http://www.intel.com.
+-
+-In the search box enter your devices controller ID followed by "spec update"
+-(i.e., 82599 spec update). The specification update file has complete
+-information on known hardware issues.
+-
+-
+-Software Issues
+----------------
+-
+-
+-NOTE: After installing the driver, if your Intel Ethernet Network Connection
+-is not working, verify that you have installed the correct driver.
+-
+-
+-Compiling the Driver
+---------------------
+-
+-
+-When trying to compile the driver by running make install, the following error
+-may occur:  "Linux kernel source not configured - missing version.h"
+-
+-To solve this issue, create the version.h file by going to the Linux source
+-tree and entering:
+-# make include/linux/version.h
+-
+-Multiple Interfaces on Same Ethernet Broadcast Network
+-------------------------------------------------------
+-
+-
+-Due to the default ARP behavior on Linux, it is not possible to have one
+-system on two IP networks in the same Ethernet broadcast domain
+-(non-partitioned switch) behave as expected. All Ethernet interfaces will
+-respond to IP traffic for any IP address assigned to the system. This results
+-in unbalanced receive traffic.
+-
+-If you have multiple interfaces in a server, either turn on ARP filtering by
+-entering: echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
+-
+-This only works if your kernel's version is higher than 2.4.5.
+-
+-NOTE: This setting is not saved across reboots. The configuration change can
+-be made permanent by adding the following line to the /etc/sysctl.conf file:
+-net.ipv4.conf.all.arp_filter = 1
+-
+-or,
+-install the interfaces in separate broadcast domains (either in different
+-switches or in a switch partitioned to VLANs)
+-
+-Build Error with Asianux 3.0 - Redefinition of typedef 'irq_handler_t'
+-----------------------------------------------------------------------
+-
+-
+-Some systems may experience build issues due to the redefinition of
+-irq_handler_t. To resolve this issue, build the driver (step 4 above) using
+-the command:
+-# make CFLAGS_EXTRA=-DAX_RELEASE_CODE=1 install
+-
+-MSI-X Issues with Kernels between 2.6.19 and 2.6.21 (inclusive)
+----------------------------------------------------------------
+-
+-
+-Kernel panics and instability may be observed on any MSI-X hardware if you use
+-irqbalance with kernels between 2.6.19 and 2.6.21. If such problems are
+-encountered, you may disable the irqbalance daemon or upgrade to a newer
+-kernel.
+-
+-
+-Rx Page Allocation Errors
+--------------------------
+-
+-
+-"order:0" errors may occur under stress with kernels 2.6.25 and newer. This is
+-caused by the way the Linux kernel reports this stressed condition.
+-
+-
+-Host May Reboot after Removing PF when VF is Active in Guest
+-------------------------------------------------------------
+-
+-
+-Using kernel versions earlier than 3.2, do not unload the PF driver with
+-active VFs. Doing this will cause your VFs to stop working until you reload
+-the PF driver and may cause a spontaneous reboot of your system.
+-
+-================================================================================
+-
+-
+-Support
+--------
+-
+-
+-For general information, go to the Intel support website at:
+-www.intel.com/support/
+-
+-or the Intel Wired Networking project hosted by Sourceforge at:
+-http://sourceforge.net/projects/e1000
+-
+-If an issue is identified with the released source code on the supported
+-kernel with a supported adapter, email the specific information related to the
+-issue to e1000-devel@lists.sf.net.
+-
+-================================================================================
+-
+-
+-License
+--------
+-
+-
+-Intel 10 Gigabit Linux driver.
+-Copyright(c) 1999 - 2014 Intel Corporation.
+-
+-This program is free software; you can redistribute it and/or modify it under
+-the terms and conditions of the GNU General Public License, version 2, as
+-published by the Free Software Foundation.
+-
+-This program is distributed in the hope it will be useful, but WITHOUT ANY
+-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+-A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+-
+-You should have received a copy of the GNU General Public License along with
+-this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
+-St - Fifth Floor, Boston, MA 02110-1301 USA.
+-
+-The full GNU General Public License is included in this distribution in the
+-file called "COPYING".
+-
+-================================================================================
+-
+-
+-Trademarks
+-----------
+-
+-
+-Intel, Itanium, and Pentium are trademarks or registered trademarks of Intel
+-Corporation or its subsidiaries in the United States and other countries.
+-
+-* Other names and brands may be claimed as the property of others.
+-
+--- ixgbevf-2.16.4/src/ixgbevf_main.c.orig	2022-05-26 11:33:16.235303635 -0700
++++ ixgbevf-2.16.4/src/ixgbevf_main.c	2022-05-26 11:33:16.315300359 -0700
+@@ -52,6 +52,11 @@
+ 
+ #include "ixgbevf.h"
+ 
++#ifdef	CONFIG_WG_KERNEL_4_14
++#undef	CONFIG_NET_RX_BUSY_POLL
++#undef	HAVE_NDO_GET_STATS64
++#endif
++
+ char ixgbevf_driver_name[] = "ixgbevf";
+ static const char ixgbevf_driver_string[] =
+ 	"Intel(R) 10 Gigabit PCI Express Virtual Function Network Driver";
+--- ixgbevf-2.16.4/SUMS.orig	2022-05-26 11:33:16.203304945 -0700
++++ ixgbevf-2.16.4/SUMS	1969-12-31 16:00:00.000000000 -0800
+@@ -1,22 +0,0 @@
+-01165    10 ixgbevf-2.16.4/ixgbevf.spec
+-42571    18 ixgbevf-2.16.4/COPYING
+-03191    45 ixgbevf-2.16.4/src/kcompat.c
+-27856    11 ixgbevf-2.16.4/src/Makefile
+-56542     7 ixgbevf-2.16.4/src/ixgbe_vf.h
+-22147   135 ixgbevf-2.16.4/src/kcompat.h
+-54189     7 ixgbevf-2.16.4/src/ixgbe_common.h
+-57353    29 ixgbevf-2.16.4/src/ixgbevf_ethtool.c
+-24371    16 ixgbevf-2.16.4/src/ixgbe_mbx.c
+-32648     3 ixgbevf-2.16.4/src/ixgbevf_osdep2.h
+-31440   128 ixgbevf-2.16.4/src/ixgbe_type.h
+-05441    29 ixgbevf-2.16.4/src/kcompat_ethtool.c
+-57333   129 ixgbevf-2.16.4/src/ixgbevf_main.c
+-32734    20 ixgbevf-2.16.4/src/ixgbe_vf.c
+-42145     6 ixgbevf-2.16.4/src/ixgbe_mbx.h
+-46853     5 ixgbevf-2.16.4/src/ixgbevf_osdep.h
+-18981     6 ixgbevf-2.16.4/src/ixgbevf_param.c
+-20486     1 ixgbevf-2.16.4/src/Module.supported
+-33203    15 ixgbevf-2.16.4/src/ixgbevf.h
+-54208     4 ixgbevf-2.16.4/ixgbevf.7
+-35101     1 ixgbevf-2.16.4/pci.updates
+-21691    14 ixgbevf-2.16.4/README
+--- ixgbevf-2.16.4/ixgbevf.spec.orig	2022-05-26 11:33:16.223304126 -0700
++++ ixgbevf-2.16.4/ixgbevf.spec	1969-12-31 16:00:00.000000000 -0800
+@@ -1,398 +0,0 @@
+-Name: ixgbevf
+-Summary: Intel(R) 82599 Virtual Function
+-Version: 2.16.4
+-Release: 1
+-Source: %{name}-%{version}.tar.gz
+-Vendor: Intel Corporation
+-License: GPL
+-ExclusiveOS: linux
+-Group: System Environment/Kernel
+-Provides: %{name}
+-URL: http://www.intel.com/network/connectivity/products/server_adapters.htm
+-BuildRoot: %{_tmppath}/%{name}-%{version}-root
+-# do not generate debugging packages by default - newer versions of rpmbuild
+-# may instead need:
+-#%define debug_package %{nil}
+-%debug_package %{nil}
+-# macros for finding system files to update at install time (pci.ids, pcitable)
+-%define find() %(for f in %*; do if [ -e $f ]; then echo $f; break; fi; done)
+-%define _pciids   /usr/share/pci.ids        /usr/share/hwdata/pci.ids
+-%define _pcitable /usr/share/kudzu/pcitable /usr/share/hwdata/pcitable /dev/null
+-%define pciids    %find %{_pciids}
+-%define pcitable  %find %{_pcitable}
+-Requires: kernel, fileutils, findutils, gawk, bash
+-
+-%description
+-This package contains the Linux driver for the Intel(R) 82599 Virtual Function devices.
+-
+-%prep
+-%setup
+-
+-%build
+-make -C src clean
+-make -C src
+-
+-%install
+-make -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} install
+-# Append .new to driver name to avoid conflict with kernel RPM
+-cd %{buildroot}
+-find lib -name "ixgbevf.*o" -exec mv {} {}.new \; \
+-         -fprintf %{_builddir}/%{name}-%{version}/file.list "/%p.new\n"
+-
+-
+-%clean
+-rm -rf %{buildroot}
+-
+-%files -f file.list
+-%defattr(-,root,root)
+-%{_mandir}/man7/ixgbevf.7.gz
+-%doc COPYING
+-%doc README
+-%doc file.list
+-%doc pci.updates
+-
+-%post
+-FL="%{_docdir}/%{name}-%{version}/file.list
+-    %{_docdir}/%{name}/file.list"
+-FL=$(for d in $FL ; do if [ -e $d ]; then echo $d; break; fi;  done)
+-
+-if [ -d /usr/local/lib/%{name} ]; then
+-	rm -rf /usr/local/lib/%{name}
+-fi
+-if [ -d /usr/local/share/%{name} ]; then
+-	rm -rf /usr/local/share/%{name}
+-fi
+-
+-# Save old drivers (aka .o and .o.gz)
+-echo "original pci.ids saved in /usr/local/share/%{name}";
+-if [ "%{pcitable}" != "/dev/null" ]; then
+-	echo "original pcitable saved in /usr/local/share/%{name}";
+-fi
+-for k in $(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-]*\).*/\1/' $FL) ; 
+-do
+-	d_drivers=/lib/modules/$k
+-	d_usr=/usr/local/share/%{name}/$k
+-	mkdir -p $d_usr
+-	cd $d_drivers; find . -name %{name}.*o -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}_*.*o -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}.*o.gz -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}_*.*o.gz -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cp --parents %{pciids} /usr/local/share/%{name}/
+-	if [ "%{pcitable}" != "/dev/null" ]; then
+-		cp --parents %{pcitable} /usr/local/share/%{name}/
+-	fi
+-done
+-
+-# Add driver link
+-for f in $(sed 's/\.new$//' $FL) ; do
+-	ln -f $f.new $f 
+-done
+-
+-# Check if kernel version rpm was built on IS the same as running kernel
+-BK_LIST=$(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-]*\).*/\1/' $FL)
+-MATCH=no
+-for i in $BK_LIST
+-do
+-	if [ $(uname -r) == $i ] ; then
+-		MATCH=yes
+-		break
+-	fi
+-done
+-if [ $MATCH == no ] ; then
+-	echo -n "WARNING: Running kernel is $(uname -r).  "
+-	echo -n "RPM supports kernels (  "
+-	for i in $BK_LIST
+-	do
+-		echo -n "$i  "
+-	done
+-	echo ")"
+-fi
+-
+-LD="%{_docdir}/%{name}";
+-if [ -d %{_docdir}/%{name}-%{version} ]; then
+-	LD="%{_docdir}/%{name}-%{version}";
+-fi
+-
+-#Yes, this really needs bash
+-bash -s %{pciids} \
+-	%{pcitable} \
+-	$LD/pci.updates \
+-	$LD/pci.ids.new \
+-	$LD/pcitable.new \
+-	%{name} \
+-<<"END"
+-#! /bin/bash
+-# $1 = system pci.ids file to update
+-# $2 = system pcitable file to update
+-# $3 = file with new entries in pci.ids file format
+-# $4 = pci.ids output file
+-# $5 = pcitable output file
+-# $6 = driver name for use in pcitable file
+-
+-exec 3<$1
+-exec 4<$2
+-exec 5<$3
+-exec 6>$4
+-exec 7>$5
+-driver=$6
+-IFS=
+-
+-# pattern matching strings
+-ID="[[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]]"
+-VEN="${ID}*"
+-DEV="	${ID}*"
+-SUB="		${ID}*"
+-TABLE_DEV="0x${ID}	0x${ID}	\"*"
+-TABLE_SUB="0x${ID}	0x${ID}	0x${ID}	0x${ID}	\"*"
+-
+-line=
+-table_line=
+-ids_in=
+-table_in=
+-vendor=
+-device=
+-ids_device=
+-table_device=
+-subven=
+-ids_subven=
+-table_subven=
+-subdev=
+-ids_subdev=
+-table_subdev=
+-ven_str=
+-dev_str=
+-sub_str=
+-
+-# force a sub-shell to fork with a new stdin
+-# this is needed if the shell is reading these instructions from stdin
+-while true
+-do
+-	# get the first line of each data file to jump start things
+-	exec 0<&3
+-	read -r ids_in
+-	if [ "$2" != "/dev/null" ];then
+-	exec 0<&4
+-	read -r table_in
+-	fi
+-
+-	# outer loop reads lines from the updates file
+-	exec 0<&5
+-	while read -r line
+-	do
+-		# vendor entry
+-		if [[ $line == $VEN ]]
+-		then
+-			vendor=0x${line:0:4}
+-			ven_str=${line#${line:0:6}}
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $VEN ||
+-				 0x${ids_in:0:4} < $vendor ]]
+-			do
+-				echo "$ids_in"
+-				read -r ids_in
+-			done
+-			echo "$line"
+-			if [[ 0x${ids_in:0:4} == $vendor ]]
+-			then
+-				read -r ids_in
+-			fi
+-
+-		# device entry
+-		elif [[ $line == $DEV ]]
+-		then
+-			device=`echo ${line:1:4} | tr "[:upper:]" "[:lower:]"`
+-			table_device=0x${line:1:4}
+-			dev_str=${line#${line:0:7}}
+-			ids_device=`echo ${ids_in:1:4} | tr "[:upper:]" "[:lower:]"`
+-			table_line="$vendor	$table_device	\"$driver\"	\"$ven_str|$dev_str\""
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $DEV ||
+-				 $ids_device < $device ]]
+-			do
+-				if [[ $ids_in == $VEN ]]
+-				then
+-					break
+-				fi
+-				if [[ $ids_device != ${ids_in:1:4} ]]
+-				then
+-					echo "${ids_in:0:1}$ids_device${ids_in#${ids_in:0:5}}"
+-				else
+-					echo "$ids_in"
+-				fi
+-				read -r ids_in
+-				ids_device=`echo ${ids_in:1:4} | tr "[:upper:]" "[:lower:]"`
+-			done
+-			if [[ $device != ${line:1:4} ]]
+-			then
+-				echo "${line:0:1}$device${line#${line:0:5}}"
+-			else
+-				echo "$line"
+-			fi
+-			if [[ $ids_device == $device ]]
+-			then
+-				read -r ids_in
+-			fi
+-			# add entry to pcitable
+-			if [ "$2" != "/dev/null" ];then
+-			exec 0<&4
+-			exec 1>&7
+-			while [[ $table_in != $TABLE_DEV ||
+-				 ${table_in:0:6} < $vendor ||
+-				 ( ${table_in:0:6} == $vendor &&
+-				   ${table_in:7:6} < $table_device ) ]]
+-			do
+-				echo "$table_in"
+-				read -r table_in
+-			done
+-			echo "$table_line"
+-			if [[ ${table_in:0:6} == $vendor &&
+-			      ${table_in:7:6} == $table_device ]]
+-			then
+-				read -r table_in
+-			fi
+-			fi
+-		# subsystem entry
+-		elif [[ $line == $SUB ]]
+-		then
+-			subven=`echo ${line:2:4} | tr "[:upper:]" "[:lower:]"`
+-			subdev=`echo ${line:7:4} | tr "[:upper:]" "[:lower:]"`
+-			table_subven=0x${line:2:4}
+-			table_subdev=0x${line:7:4}
+-			sub_str=${line#${line:0:13}}
+-			ids_subven=`echo ${ids_in:2:4} | tr "[:upper:]" "[:lower:]"`
+-			ids_subdev=`echo ${ids_in:7:4} | tr "[:upper:]" "[:lower:]"`
+-			table_line="$vendor	$table_device	$table_subven	$table_subdev	\"$driver\"	\"$ven_str|$sub_str\""
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $SUB ||
+-				 $ids_subven < $subven ||
+-				 ( $ids_subven == $subven && 
+-				   $ids_subdev < $subdev ) ]]
+-			do
+-				if [[ $ids_in == $VEN ||
+-				      $ids_in == $DEV ]]
+-				then
+-					break
+-				fi
+-				if [[ ! (${ids_in:2:4} == "1014" &&
+-					 ${ids_in:7:4} == "052C") ]]
+-				then
+-					if [[ $ids_subven != ${ids_in:2:4} || $ids_subdev != ${ids_in:7:4} ]]
+-					then
+-						echo "${ids_in:0:2}$ids_subven $ids_subdev${ids_in#${ids_in:0:11}}"
+-					else
+-						echo "$ids_in"
+-					fi
+-				fi
+-				read -r ids_in
+-				ids_subven=`echo ${ids_in:2:4} | tr "[:upper:]" "[:lower:]"`
+-				ids_subdev=`echo ${ids_in:7:4} | tr "[:upper:]" "[:lower:]"`
+-			done
+-			if [[ $subven != ${line:2:4} || $subdev != ${line:7:4} ]]
+-			then
+-				echo "${line:0:2}$subven $subdev${line#${line:0:11}}"
+-			else
+-				echo "$line"
+-			fi
+-			if [[ $ids_subven == $subven  &&
+-			      $ids_subdev == $subdev ]]
+-			then
+-				read -r ids_in
+-			fi
+-			# add entry to pcitable
+-			if [ "$2" != "/dev/null" ];then
+-			exec 0<&4
+-			exec 1>&7
+-			while [[ $table_in != $TABLE_SUB ||
+-				 ${table_in:14:6} < $table_subven ||
+-				 ( ${table_in:14:6} == $table_subven &&
+-				   ${table_in:21:6} < $table_subdev ) ]]
+-			do
+-				if [[ $table_in == $TABLE_DEV ]]
+-				then
+-					break
+-				fi
+-				if [[ ! (${table_in:14:6} == "0x1014" &&
+-					 ${table_in:21:6} == "0x052C") ]]
+-				then
+-					echo "$table_in"
+-				fi
+-				read -r table_in
+-			done
+-			echo "$table_line"
+-			if [[ ${table_in:14:6} == $table_subven &&
+-			      ${table_in:21:6} == $table_subdev ]]
+-			then
+-				read -r table_in
+-			fi
+-			fi
+-		fi
+-
+-		exec 0<&5
+-	done
+-
+-	# print the remainder of the original files
+-	exec 0<&3
+-	exec 1>&6
+-	echo "$ids_in"
+-	while read -r ids_in
+-	do
+-		echo "$ids_in"
+-	done
+-
+-	if [ "$2" != "/dev/null" ];then
+-	exec 0>&4
+-	exec 1>&7
+-	echo "$table_in"
+-	while read -r table_in
+-	do
+-		echo "$table_in"
+-	done
+-	fi
+-
+-	break
+-done <&5
+-
+-exec 3<&-
+-exec 4<&-
+-exec 5<&-
+-exec 6>&-
+-exec 7>&-
+-
+-END
+-
+-mv -f $LD/pci.ids.new  %{pciids}
+-if [ "%{pcitable}" != "/dev/null" ]; then
+-mv -f $LD/pcitable.new %{pcitable}
+-fi
+-
+-uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+-
+-%preun
+-# If doing RPM un-install
+-if [ $1 -eq 0 ] ; then
+-	FL="%{_docdir}/%{name}-%{version}/file.list
+-    		%{_docdir}/%{name}/file.list"
+-	FL=$(for d in $FL ; do if [ -e $d ]; then echo $d; break; fi;  done)
+-
+-	# Remove driver link
+-	for f in $(sed 's/\.new$//' $FL) ; do
+-		rm -f $f
+-	done
+-
+-	# Restore old drivers
+-	if [ -d /usr/local/share/%{name} ]; then
+-		cd /usr/local/share/%{name}; find . -name '%{name}.*o*' -exec cp --parents {} /lib/modules/ \;
+-		cd /usr/local/share/%{name}; find . -name '%{name}_*.*o*' -exec cp --parents {} /lib/modules/ \;
+-		rm -rf /usr/local/share/%{name}
+-	fi
+-fi
+-
+-%postun
+-uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+-

@@ -1,0 +1,18 @@
+WatchGuard patches to sources for iperf3-3.6 as of
+Thu May 26 11:33:01 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- iperf3-3.6/config/ltmain.sh.orig	2022-05-26 11:32:59.935971085 -0700
++++ iperf3-3.6/config/ltmain.sh	2022-05-26 11:33:00.459949629 -0700
+@@ -8361,7 +8361,8 @@
+ 	      fi
+ 	    else
+ 	      # We cannot seem to hardcode it, guess we'll fake it.
+-	      add_dir=-L$libdir
++	      # WG: don't fake it this introduces host pollution
++	      # add_dir="-L$libdir"
+ 	      # Try looking first in the location we're being installed to.
+ 	      if test -n "$inst_prefix_dir"; then
+ 		case $libdir in

@@ -1,0 +1,75 @@
+Unpack the ksymoops tar.gz file (silly me, you already did that :).
+
+Edit the Makefile to set any defaults you want.
+
+make
+as root, make install
+
+To compile and link ksymoops, you need bfd.h, libbfd and libiberty.  On
+most systems, these are all part of the binutils package so installing
+binutils is all that is required.  On Debian systems, bfd.h (at least)
+is in a separate package, binutils-dev.
+
+Some people have reported problems building ksymoops, with unresolved
+references in libbfd (htab_create, htab_find_slot_with_hash).  Try
+http://www.cs.helsinki.fi/linux/linux-kernel/2002-13/0196.html first,
+if that does not work, contact the binutils maintainers.  This is not a
+ksymoops problem, ksymoops only uses libbfd.  Any unresolved references
+from libbfd are a binutils problem.
+
+Some distributions get binutils and libbfd/libiberty out of sync during
+the upgrade, and break the link of ksymoops.  This has been reported on
+Slackware 8.[01] but other distributions may get it wrong as well.  Try
+installing a clean binutils.
+
+
+Building ksymoops for cross compile and debugging
+=================================================
+
+When you are building a kernel using a cross compiler, it may be useful to
+build a dedicated version of ksymoops for this cross compile environment.
+It is not necessary to do so, you can always use the native ksymoops with
+suitable options (e.g. the e, t and a flags), together with environment
+variables KSYMOOPS_NM and KSYMOOPS_OBJDUMP.  It may be more convenient to
+build a special version of ksymoops and install it along with the other cross
+compile tools.
+
+At build time you can specify the CROSS, BFD_PREFIX, DEF_TARGET and DEF_ARCH
+options to make.  For example,
+
+  make BFD_PREFIX=/usr/mips64-linux \
+       DEF_TARGET='\"elf64-bigmips\"' \
+       DEF_ARCH='\"mips:8000\"' \
+       CROSS=mips64-linux-
+
+will build ksymoops -
+
+* using bfd files from /usr/mips64-linux/include and /usr/mips64-linux/lib
+  (BFD_PREFIX)
+* the default value for -t will be "elf64-bigmips" (DEF_TARGET)
+* the default value for -a will be "mips:8000" (DEF_ARCH)
+* the result will be installed as /usr/bin/mips64-linux-ksymoops (CROSS)
+* it will default to using /usr/bin/mips64-linux-{nm,objdump} (INSTALL_PREFIX,
+  /bin and CROSS).
+
+Any variable starting with DEF_ takes a string value.  These variables go
+through two levels of expansion, shell (use '...' to avoid shell expansion),
+and make commands (prefix " with \ to preserve " characters).
+
+Building ksymoops for cross-debugging only
+==========================================
+(Or how to get to get away with not having a cross-compiler and still use
+ksymoops on a non-native kernel/crashfile).
+
+When building and installing your host binutils, pass '--enable-targets=all' to
+configure or at least enable the targets you want to debug in addition to your
+host target.  Using the 'all' route means you only need a single binutils on
+your system to debug targets supported by binutils.  To check that you have
+this done right, run nm or objdump with '-H' and look for 'supported targets'.
+It should list the targets that you are interested in.
+
+After this, build ksymoops as you would normally.
+As an example of usage:
+ksymoops -v vmlinux -K -L -O -m System.map -t elf32-tradlittlemips -a mips <input
+Where vmlinux and System.map are from your cross-compiled kernel tree, and your
+-t/-a options are set appropriately.

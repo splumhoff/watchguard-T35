@@ -1,0 +1,17 @@
+WatchGuard patches to sources for traceroute-6.1.3 as of
+Thu May 26 11:39:54 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- traceroute-6.1.3/traceroute.c.orig	2022-05-26 11:39:54.230995945 -0700
++++ traceroute-6.1.3/traceroute.c	2022-05-26 11:39:54.302992994 -0700
+@@ -2492,7 +2492,7 @@
+     int len = ntohs(getshort(ans+off));
+     int retval = off+len+2;
+     int i,j;
+-    char name[256];
++    static char name[256];
+ 
+     off += 2;
+     switch (typ) {

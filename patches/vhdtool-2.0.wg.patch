@@ -1,0 +1,2896 @@
+WatchGuard patches to sources for vhdtool-2.0 as of
+Thu May 26 11:51:57 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- vhdtool-2.0/VhdTool.c.orig	1969-12-31 16:00:00.000000000 -0800
++++ vhdtool-2.0/VhdTool.c	2022-05-26 11:51:57.185895738 -0700
+@@ -0,0 +1,2127 @@
++// MICROSOFT PUBLIC LICENSE (Ms-PL)
++//
++// This license governs use of the accompanying software. If you use the
++// software, you accept this license. If you do not accept the license, do not
++// use the software.
++//
++// 1. Definitions
++//
++// The terms "reproduce," "reproduction," "derivative works," and
++// "distribution" have the same meaning here as under U.S. copyright law.
++//
++// A "contribution" is the original software, or any additions or changes to
++// the software.
++//
++// A "contributor" is any person that distributes its contribution under this
++// license.  "Licensed patents" are a contributor's patent claims that read
++// directly on its contribution. 
++//
++// 2. Grant of Rights
++//
++// (A) Copyright Grant- Subject to the terms of this license, including the
++// license conditions and limitations in section 3, each contributor grants
++// you a non-exclusive, worldwide, royalty-free copyright license to reproduce
++// its contribution, prepare derivative works of its contribution, and
++// distribute its contribution or any derivative works that you create.
++//
++// (B) Patent Grant- Subject to the terms of this license, including the
++// license conditions and limitations in section 3, each contributor grants
++// you a non-exclusive, worldwide, royalty-free license under its licensed
++// patents to make, have made, use, sell, offer for sale, import, and/or
++// otherwise dispose of its contribution in the software or derivative works
++// of the contribution in the software. 
++//
++// 3. Conditions and Limitations
++//
++// (A) No Trademark License- This license does not grant you rights to use any
++// contributors' name, logo, or trademarks.
++//
++// (B) If you bring a patent claim against any contributor over patents that
++// you claim are infringed by the software, your patent license from such
++// contributor to the software ends automatically.
++//
++// (C) If you distribute any portion of the software, you must retain all
++// copyright, patent, trademark, and attribution notices that are present in
++// the software.
++//
++// (D) If you distribute any portion of the software in source code form, you
++// may do so only under this license by including a complete copy of this
++// license with your distribution. If you distribute any portion of the
++// software in compiled or object code form, you may only do so under a
++// license that complies with this license.
++//
++// (E) The software is licensed "as-is." You bear the risk of using it. The
++// contributors give no express warranties, guarantees or conditions. You may
++// have additional consumer rights under your local laws which this license
++// cannot change. To the extent permitted under your local laws, the
++// contributors exclude the implied warranties of merchantability, fitness for
++// a particular purpose and non-infringement. 
++//
++
++/*++
++
++Module Name:
++
++    VhdTool.c -- Linux port, derived from VhdTool.cpp
++
++Abstract:
++
++    This file implements the VhdTool functionality
++
++Author:
++
++    Christopher Eck - 23-Mar-2009
++
++Contributors:
++
++    Dan Wilder - 22-Feb-2012 (Linux build, adapt for XtmV) 
++
++--*/
++
++#include "wg_vhdtool.h"
++
++//
++// VHD definitions.
++// Taken from the public VHD spec, current link is
++// http://technet.microsoft.com/en-us/virtualserver/bb676673.aspx
++//
++
++#define VHD_CURRENT_FILE_FORMAT_VERSION    0x00010000
++#define VHD_TYPE_BIG_FIXED                 0x02000000
++#define VHD_TYPE_BIG_SPARSE                0x03000000
++#define VHD_TYPE_BIG_DIFF                  0x04000000
++#define VHD_SECTOR_SIZE                    0x00000200ULL
++
++//
++// Other constants added by WatchGuard. 
++//
++
++#define	KB		(1024L)
++#define	MB		(1024L*KB)
++#define	GB		(1024L*MB)
++
++#define	DISK_SECTORS	(63L)
++#define	DISK_HEADS	(255L)
++#define	SECTOR_SIZE	(512L)
++#define	TRACK_SIZE	(DISK_HEADS * DISK_SECTORS * SECTOR_SIZE)
++
++#define	MAX_BLOCK_SIZE	(2*MB)
++#define	MIN_BLOCK_SIZE	(1*MB)
++
++// Data structures
++
++static union {
++    CHAR data[4];
++    ULONG result;
++} vhd_host_os = {{ 'W', 'i', '2', 'k' }};
++
++typedef struct
++{
++    UCHAR   Cookie[8];
++    ULONG   Features;
++    ULONG   FileFormatVersion;
++    ULONG64 DataOffset;
++    ULONG   TimeStamp;
++    UCHAR   CreatorApplication[4];
++    ULONG   CreatorVersion;
++    ULONG   CreatorHostOS;
++    ULONG64 OriginalSize;
++    ULONG64 CurrentSize;
++
++    struct
++    {
++        USHORT Cylinders;
++        UCHAR  Heads;
++        UCHAR  SectorsPerTrack;
++    } Geometry;
++
++    ULONG   DiskType;
++    ULONG   Checksum;
++    UCHAR   UniqueId[16];
++    UCHAR   SavedState;
++    UCHAR   Reserved[427];
++} VHD_DISK_FOOTER;
++
++
++typedef struct
++{
++    ULONG PlatformCode;
++    ULONG PlatformDataAllocatedSpace;
++    ULONG PlatformDataLength;
++    ULONG Reserved;
++    ULONGLONG PlatformDataOffset;
++} PARENT_DRIVE_LOCATOR;
++
++
++typedef struct
++{
++    ULONGLONG Signature;
++    ULONGLONG Reserved1;
++    ULONGLONG TableOffset;
++    ULONG HeaderVersion;
++    ULONG MaxTableEntries;
++    ULONG BlockSize;
++    ULONG CheckSum;
++
++    UCHAR ParentUniqueId[16];
++    ULONG ParentTimeStamp;
++    ULONG Reserved2;
++    USHORT ParentName[256];
++    PARENT_DRIVE_LOCATOR ParentLocatorTable[8];
++    UCHAR Reserved3[256];
++} VHD_SPARSE_HEADER;
++
++
++//
++// Tool definitions
++//
++
++/* Seconds from start of UNIX epoch 1970-01-01 00:00:00 UTC 
++ * to start of VHD epoch 2000-01-01 00:00:00 UTC
++ */
++
++const LARGE_INTEGER SecondsToStartOf2000    = 946684800L;
++
++const int           VHD_CREATE_TOOL_VERSION = 0x00020000;
++
++enum PROGRAM_MODE
++{
++    ProgramModeUnspecified = 0,
++    ProgramModeCreate      = 1,
++    ProgramModeConvert     = 2,
++    ProgramModeExtend      = 3,
++    ProgramModeRepair      = 4
++};
++
++
++//
++// Global state
++//
++BOOL g_QuietMode = FALSE;
++
++
++//
++// Input/Output handlers
++//
++
++
++VOID
++PrintUsage()
++/*++
++
++Routine Description:
++
++    Prints the command line usage to the console.
++
++Arguments:
++
++    None.
++
++Return Value:
++
++    None.
++
++--*/
++{
++    if (g_QuietMode)
++    {
++        goto Cleanup;
++    }
++
++    printf("\n");
++    printf("VhdTool create <FileName> <Size> [-quiet]\n");
++    printf("VhdTool convert <FileName> [-quiet]\n");
++    printf("VhdTool extend <FileName> <NewSize> [-quiet]\n");
++    printf("VhdTool repair <BaseVhdFileName> <FirstSnapshotAVhdFileName> [-quiet]\n");
++    printf("\n");
++    printf("create: Creates a new fixed format VHD of size <Size>.\n");
++    printf("        WARNING - this function is admin only and bypasses\n");
++    printf("        file system security.  The resulting VHD file will\n");
++    printf("        contain data which currently exists on the physical disk.\n");
++    printf("\n");
++    printf("convert: Converts an existing file to a fixed-format VHD.\n");
++    printf("         The existing file length, rounded up, will contain block data\n");
++    printf("         A VHD footer is appended to the current end of file.\n");
++    printf("\n");
++    printf("extend: Extends an existing fixed format VHD to a larger size <Size>.\n");
++    printf("        WARNING - this function is admin only and bypasses\n");
++    printf("        file system security.  The resulting VHD file will\n");
++    printf("        contain data which currently exists on the physical disk.\n");
++    printf("\n");
++    printf("repair: Repairs a broken Hyper-V snapshot chain where an administrator\n");
++    printf("        has expanded the size of the root VHD.  The base VHD will be\n");
++    printf("        returned to its original size. THIS MAY CAUSE DATA LOSS if the\n");
++    printf("        contents of the base VHD were changed after expansion.\n");
++    printf("\n");
++
++Cleanup:
++    return;
++}
++
++
++BOOL
++ParseCommandLine(
++    __in  int           ArgCount,
++    __in  _TCHAR*       ArgArray[],
++    __out enum PROGRAM_MODE* ProgramMode,
++    __out LPTSTR*       Filename,
++    __out UINT64*       Filesize,
++    __out LPTSTR*       ChildFilename
++    )
++/*++
++
++Routine Description:
++
++    Parses the command line
++
++Arguments:
++
++    ArgCount - Number of command line arguments
++
++    ArgArray - Array of command line arguments
++
++    ProgramMode - Mode the program should run in.
++
++    Filename - Name of the file to take action upon.
++
++    Filesize - Desired size of the file.
++
++    ChildFilename - Name of the child VHD if present.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    LPTSTR  tempString        = NULL;
++    UINT64  filenameLength    = 0;
++    BOOL    status            = FALSE;
++    int     currentArg        = 1;
++
++    //
++    // Initialize out params
++    //
++    *ProgramMode = ProgramModeUnspecified;
++    *Filename = NULL;
++    *Filesize = 0;
++
++    //
++    // Validate the command line arguments
++    //
++    if (ArgCount < 3)
++    {
++        PrintUsage();
++        goto Cleanup;
++    }
++
++    //
++    // Retrieve mode
++    //
++    tempString = ArgArray[currentArg];
++    currentArg++;
++
++    if (_tcsicmp(tempString, TEXT("create")) == 0)
++    {
++        *ProgramMode = ProgramModeCreate;
++    }
++    else if (_tcsicmp(tempString, TEXT("convert")) == 0)
++    {
++        *ProgramMode = ProgramModeConvert;
++    }
++    else if (_tcsicmp(tempString, TEXT("extend")) == 0)
++    {
++        *ProgramMode = ProgramModeExtend;
++    }
++    else if (_tcsicmp(tempString, TEXT("repair")) == 0)
++    {
++        *ProgramMode = ProgramModeRepair;
++    }
++    else
++    {
++        PrintUsage();
++        goto Cleanup;
++    }
++
++    //
++    // Retrieve file name
++    //
++    tempString = ArgArray[currentArg];
++    currentArg++;
++
++    // Add space for the null-terminating character
++    filenameLength = _tcslen(tempString) + 1;
++
++    *Filename = (LPTSTR)malloc(filenameLength * sizeof(TCHAR));
++    _tcscpy_s(*Filename, filenameLength, tempString);
++
++    //
++    // Retrieve file size if in create or extend mode.
++    //
++    if ((*ProgramMode == ProgramModeCreate) ||
++        (*ProgramMode == ProgramModeExtend))
++    {
++        if ((currentArg + 1) > ArgCount)
++        {
++            PrintUsage();
++            goto Cleanup;
++        }
++
++        tempString = ArgArray[currentArg];
++        currentArg++;
++
++        *Filesize = _ttoi64(tempString);
++        if (*Filesize == 0)
++        {
++            PrintUsage();
++            goto Cleanup;
++        }
++    }
++
++    //
++    // Retrieve child VHD name if in repair mode.
++    //
++    if (*ProgramMode == ProgramModeRepair)
++    {
++        if ((currentArg + 1) > ArgCount)
++        {
++            PrintUsage();
++            goto Cleanup;
++        }
++
++        tempString = ArgArray[currentArg];
++        currentArg++;
++
++        filenameLength = _tcslen(tempString) + 1;
++
++        *ChildFilename = (LPTSTR)malloc(filenameLength * sizeof(TCHAR));
++        _tcscpy_s(*ChildFilename, filenameLength, tempString);
++    }
++
++
++    //
++    // Retrieve quiet mode if present
++    //
++    if ((currentArg + 1) <= ArgCount)
++    {
++        tempString = ArgArray[currentArg];
++        currentArg++;
++
++        if (_tcsicmp(tempString, TEXT("-quiet")) == 0)
++        {
++            g_QuietMode = TRUE;
++        }
++        else
++        {
++            PrintUsage();
++            goto Cleanup;
++        }
++    }
++
++    status = TRUE;
++
++Cleanup:
++    return status;
++}
++
++
++VOID
++PrintError(
++    DWORD LastErrorValue,
++    __in_z const char* FormatString,
++    ...
++    )
++/*++
++
++Routine Description:
++
++    Prints tool errors.
++
++Arguments:
++    
++    LastErrorValue - error code returned from a system call.
++
++    FormatString - the printf format string.
++
++    ... - VarArgs passed to printf.
++
++Return Value:
++
++    None.
++
++--*/
++{
++    va_list argumentPointer;
++    LPTSTR  errorMessage    = NULL;
++
++    if (g_QuietMode)
++    {
++        goto Cleanup;
++    }
++
++    va_start(argumentPointer, FormatString);
++
++    printf("\tError: ");
++    vprintf(FormatString, argumentPointer);
++    va_end(argumentPointer);
++
++
++    errorMessage = strerror(LastErrorValue);
++    if (errorMessage == NULL)
++    {
++        printf(" with error: %d", LastErrorValue);
++    }
++    else
++    {
++        printf(" with error: %s", errorMessage);
++    }
++
++    printf("\n");
++
++Cleanup:
++    return;
++}
++
++
++VOID
++PrintStatus(
++    __in_z const char* FormatString,
++    ...
++    )
++/*++
++
++Routine Description:
++
++    Prints tool status.
++
++Arguments:
++
++    FormatString - the printf format string.
++
++    ... - VarArgs passed to printf.
++
++Return Value:
++
++    None.
++
++--*/
++{
++    va_list argumentPointer;
++
++    if (g_QuietMode)
++    {
++        goto Cleanup;
++    }
++
++    va_start(argumentPointer, FormatString);
++
++    printf("\tStatus: ");
++    vprintf(FormatString, argumentPointer);
++    printf("\n");
++
++    va_end(argumentPointer);
++
++Cleanup:
++    return;
++}
++
++
++VOID
++PrintVhdIdentifier(
++    __in GUID Identifier,
++    __in_z const char* FormatString
++    )
++/*++
++
++Routine Description:
++
++    Prints a VHD identifier as status
++
++Arguments:
++
++    FormatString - the printf format string.
++
++    ... - VarArgs passed to printf.
++
++Return Value:
++
++    None.
++
++--*/
++{
++    CHAR parentIdString[48];
++
++    if (g_QuietMode)
++    {
++        goto Cleanup;
++    }
++
++    uuid_unparse(Identifier, parentIdString);
++
++    printf("\tStatus: ");
++    printf(FormatString, parentIdString);
++    printf("\n");
++
++Cleanup:
++    return;
++}
++
++
++//
++// Utility functions
++//
++
++
++ULONG64
++RoundUpUlong64(
++    __in ULONG64 Value,
++    __in ULONG64 PowerOf2
++    )
++/*++
++
++Routine Description:
++
++    Rounds a 64-bit Value up to the nearest given PowerOf2.
++
++Arguments:
++
++    Value - Supplies the value to round.
++
++    PowerOf2 - Supplies the value to round to.
++
++Return Value:
++
++    The rounded value.
++
++--*/
++{
++    return (Value + (PowerOf2 - 1)) & ~(PowerOf2 - 1);
++}
++
++
++ULONG
++CalculateChecksum(
++    __in_bcount(Length) PVOID Buffer,
++    __in                ULONG Length
++    )
++/*++
++
++Routine Description:
++
++    This routine calculates the one's complement of the checksum of all the
++    bytes with the given range, excluding the address to ignore.
++
++Arguments:
++
++    Buffer - Pointer to the buffer to calculate the checksum for.
++
++    Length - Length of the buffer in bytes.
++
++Return Value:
++
++    Checksum.
++
++--*/
++{
++    PUCHAR address    = NULL;
++    ULONG  checksum   = 0;
++
++    checksum = 0;
++    address = (PUCHAR)Buffer;
++
++    while (Length != 0)
++    {
++        checksum += *address;
++        Length -= 1;
++        address += 1;
++    }
++
++    return ~checksum;
++}
++
++
++BOOL
++ZeroFileContents(
++    __in HANDLE           FileHandle,
++    __in LARGE_INTEGER    FileOffset,
++    __in DWORD            BytesToClear
++    )
++/*++
++
++Routine Description:
++
++    Zeros out a section of a file.
++
++Arguments:
++
++    FileHandle - Handle to the open file.
++
++    FileOffset - Offset in the file to begin clearing.
++
++    BytesToClear - Number of bytes of space to clear.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure.
++
++--*/
++{
++    LPVOID  buffer          = NULL;
++    DWORD   bytesWritten    = 0;
++    DWORD   bufferSize      = 1024 * 1024;
++    DWORD   bytesToWrite    = 0;
++    BOOL    success         = FALSE;
++
++    // Validate input
++    if (FileHandle == INVALID_HANDLE_VALUE)
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Allocate and clear the 1 MB zeroing buffer
++    //
++    buffer = malloc(bufferSize);
++    if (buffer == NULL)
++    {
++        PrintError(ERROR_OUTOFMEMORY, "Unable to allocate zeroing buffer");
++        goto Cleanup;
++    }
++    RtlZeroMemory(buffer, bufferSize);
++
++    //
++    // Seek to the file offset
++    //
++    if (!SetFilePointerEx(FileHandle, FileOffset, NULL, FILE_BEGIN))
++    {
++        PrintError(GetLastError(), "Unable to seek to file offset %lld", FileOffset);
++        goto Cleanup;
++    }
++    
++    //
++    // Clear file contents.
++    // This isn't particularly fast, but maintainability is more important here.
++    //
++    while (BytesToClear > 0)
++    {
++        if (BytesToClear > bufferSize)
++        {
++            bytesToWrite = bufferSize;
++        }
++        else
++        {
++            bytesToWrite = BytesToClear;
++        }
++        BytesToClear -= bytesToWrite;
++
++        if (!WriteFile(FileHandle, buffer, bytesToWrite, &bytesWritten, NULL))
++        {
++            PrintError(GetLastError(), "Unable to write data to file");
++            goto Cleanup;
++        }
++
++        if (bytesWritten != bytesToWrite)
++        {
++            PrintError(ERROR_WRITE_FAULT, "Bytes written count unexpected");
++            goto Cleanup;
++        }
++    }
++
++    success = TRUE;
++
++Cleanup:
++
++    if (buffer != NULL)
++    {
++        free(buffer);
++        buffer = NULL;
++    }
++
++    return success;
++}
++
++//
++// VHD format functions
++//
++
++VOID
++GetVirtualDiskGeometry(
++    __in  ULONGLONG TotalSectors,
++    __out PUSHORT   DiskCylinders,
++    __out PUCHAR    DiskHeads,
++    __out PUCHAR    DiskSectorsPerTrack
++    )
++/*++
++
++Routine Description:
++
++    This routine returns the disk geometry values given the total number of
++    sectors on the disk.
++
++Arguments:
++
++    TotalSectors - Supplies the total number of sectors on the disk.
++
++    DiskCylinders - Supplies a pointer to a value that will hold the number of
++        cylinders on the disk.
++
++    DiskHeads - Supplies a pointer to a value that will hold the number of
++        heads on the disk.
++
++    DiskSectorsPerTrack - Supplies a pointer to a value that will hold the
++        number sectors per track on the disk.
++
++Return Value:
++
++    None.
++
++--*/
++{
++    USHORT cylinders            = 0;
++    ULONG  cylinderTimesHeads   = 0;
++    UCHAR  heads                = 0;
++    UCHAR  sectorsPerTrack      = 0;
++
++    // Upper bound the total sector count.
++    if (TotalSectors > (65535 * 16 * 255))
++    {
++        TotalSectors = 65535 * 16 * 255;
++    }
++
++    if (TotalSectors >= (65535 * 16 * 63))
++    {
++        sectorsPerTrack = 255;
++        heads = 16;
++        cylinderTimesHeads = (ULONG)(TotalSectors / sectorsPerTrack);
++    }
++    else
++    {
++        sectorsPerTrack = 17;
++        cylinderTimesHeads = (ULONG)(TotalSectors / sectorsPerTrack);
++        heads = (UCHAR)((cylinderTimesHeads + 1023) / 1024);
++        
++        if (heads < 4)
++        {
++            heads = 4;
++        }
++
++        if ((cylinderTimesHeads >= ((ULONG)heads * 1024)) || (heads > 16))
++        {
++            sectorsPerTrack = 31;
++            heads = 16;
++            cylinderTimesHeads = (ULONG)(TotalSectors / sectorsPerTrack);
++        }
++
++        if (cylinderTimesHeads >= ((ULONG)heads * 1024))
++        {
++            sectorsPerTrack = 63;
++            heads = 16;
++            cylinderTimesHeads = (ULONG)(TotalSectors / sectorsPerTrack);
++        }
++    }
++
++    cylinders = (USHORT)(cylinderTimesHeads / heads);
++
++    *DiskCylinders = cylinders;
++    *DiskHeads = heads;
++    *DiskSectorsPerTrack = sectorsPerTrack;
++}
++
++
++BOOL
++GetTimestamp(
++    __in ULONG* Timestamp
++    )
++/*++
++
++Routine Description:
++
++    This routine calculates the VHD timestamp, based on the number
++    of seconds since 1/1/2000.
++
++Arguments:
++
++    Timestamp - returns the VHD timestamp value, based on the current time.
++
++Return Value:
++
++    BOOL - TRUE upon success, FALSE upon failure.
++
++--*/
++{
++    LARGE_INTEGER   seconds;
++    SYSTEMTIME      systemTime;
++
++    // Get current time, UNIX epoch (1970) based
++    time(&systemTime);
++    seconds = systemTime;
++
++    // Subtract number of seconds from 1970 to 2000
++    seconds = seconds - SecondsToStartOf2000;
++
++    //
++    //  If the result is negative then the date was before 2000 or if
++    //  the result is greater than a ULONG then it's too far in the
++    //  future so we return FALSE.
++    //
++    if ((seconds & 0xffffffff00000000LL) != 0)
++    {
++        return FALSE;
++    }
++
++    *Timestamp = seconds;
++    
++    return TRUE;
++}
++
++
++BOOL
++CreateVhdFooter(
++    __in  ULONG64          VirtualSize,
++    __in  GUID             UniqueId,
++    __in  BOOLEAN          FixedType,
++    __in  UINT64           SparseHeaderOffset,
++    __out VHD_DISK_FOOTER* Footer
++    )
++/*++
++
++Routine Description:
++
++    This routine creates a valid fixed VHD footer given a virtual disk size.
++
++Arguments:
++
++    VirtualSize - Size of the virtual storage device in bytes.
++
++    UniqueId - the unique identifier to place in the footer.
++
++    FixedType - TRUE if a fixed VHD footer should be generated,
++        FALSE for a sparse VHD footer.
++
++    SparseHeaderOffset - for sparse VHD footers, the offset to the
++        sparse header.
++
++    Footer - Upon return, filled with a valid VHD 1.0 footer for the 
++        virtual storage device.
++
++Return Value:
++
++    BOOL - TRUE upon success, FALSE upon failure.
++
++--*/
++{
++    ULONG64 totalSectors     = 0;
++    USHORT  cylinders        = 0;
++    ULONG   timestamp        = 0;
++    UCHAR   heads            = 0;
++    UCHAR   sectorsPerTrack  = 0;
++    BOOL    success          = FALSE;
++
++    RtlZeroMemory(Footer, sizeof(VHD_DISK_FOOTER));
++
++    //
++    // Gather data
++    //
++
++    assert((VirtualSize % VHD_SECTOR_SIZE) == 0);
++    totalSectors = VirtualSize / VHD_SECTOR_SIZE;
++
++    GetVirtualDiskGeometry(totalSectors, &cylinders, &heads, &sectorsPerTrack);
++
++    if (!GetTimestamp(&timestamp))
++    {
++        PrintError(ERROR_OUTOFMEMORY, "Unable to determine timestamp");
++        goto Cleanup;
++    }
++
++    //
++    // Initialize the VHD 1.0 Footer
++    //
++
++    Footer->Cookie[0] = 'c';
++    Footer->Cookie[1] = 'o';
++    Footer->Cookie[2] = 'n';
++    Footer->Cookie[3] = 'e';
++    Footer->Cookie[4] = 'c';
++    Footer->Cookie[5] = 't';
++    Footer->Cookie[6] = 'i';
++    Footer->Cookie[7] = 'x';
++
++    Footer->Features = _byteswap_ulong(0x00000002);
++    Footer->FileFormatVersion = _byteswap_ulong(VHD_CURRENT_FILE_FORMAT_VERSION);
++
++    if (FixedType)
++    {
++        Footer->DiskType = VHD_TYPE_BIG_FIXED;
++        Footer->DataOffset = 0xFFFFFFFFFFFFFFFFULL;
++    }
++    else
++    {
++        Footer->DiskType = VHD_TYPE_BIG_SPARSE;
++        Footer->DataOffset = SparseHeaderOffset;
++    }
++
++    Footer->TimeStamp = _byteswap_ulong(timestamp);
++
++    Footer->CreatorApplication[0] = 'h';
++    Footer->CreatorApplication[1] = 'a';
++    Footer->CreatorApplication[2] = 'c';
++    Footer->CreatorApplication[3] = 'k';
++
++    Footer->CreatorVersion = _byteswap_ulong(VHD_CREATE_TOOL_VERSION);
++
++    Footer->CreatorHostOS = vhd_host_os.result;
++
++    Footer->OriginalSize = _byteswap_uint64(VirtualSize);
++    Footer->CurrentSize = _byteswap_uint64(VirtualSize);
++
++    Footer->Geometry.Cylinders = _byteswap_ushort(cylinders);
++    Footer->Geometry.Heads = heads;
++    Footer->Geometry.SectorsPerTrack = sectorsPerTrack;
++
++    RtlCopyMemory(&Footer->UniqueId, UniqueId, 16);
++
++    Footer->SavedState = 0;
++
++    Footer->Checksum = _byteswap_ulong(CalculateChecksum((PVOID)Footer, sizeof(VHD_DISK_FOOTER)));
++
++    PrintStatus("VHD footer generated");
++
++    success = TRUE;
++
++Cleanup:
++    return success;
++}
++
++
++BOOL
++OpenVhdFile(
++    __in  LPTSTR            Filename,
++    __out HANDLE*           FileHandle,
++    __out LARGE_INTEGER*    FileSize
++    )
++/*++
++
++Routine Description:
++
++    Opens a file for IO & retrieves the physical file size
++
++Arguments:
++
++    Filename - name of the file to open.
++
++    FileHandle - Upon successful return, contains the handle to the file.
++
++    FileSize - Upon successful return, contains the physical size of the file.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    BOOL status = FALSE;
++
++    //
++    // Initialize out parameters
++    //
++    *FileHandle = INVALID_HANDLE_VALUE;
++    *FileSize = 0;
++
++    //
++    // Open the file
++    //
++    PrintStatus("Attempting to open file \"%s\"", Filename);
++    *FileHandle = fopen(Filename, "a");
++
++    if (*FileHandle == INVALID_HANDLE_VALUE)
++    {
++        PrintError(GetLastError(), "Unable to open file \"%s\"", Filename);
++        goto Cleanup;
++    }
++
++    //
++    // Determine the file length
++    //
++    if (!GetFileSizeEx(*FileHandle, FileSize))
++    {
++        PrintError(GetLastError(), "Unable to retrieve file size");
++        goto Cleanup;
++    }
++    PrintStatus("File opened, current size is %lld", *FileSize);
++
++    status = TRUE;
++
++Cleanup:
++
++    if (!status && *FileHandle != INVALID_HANDLE_VALUE)
++    {
++        CloseHandle(*FileHandle);
++        *FileHandle = INVALID_HANDLE_VALUE;
++    }
++
++    return status;
++}
++
++
++VOID
++RoundUpToSectorSize(
++    __inout LARGE_INTEGER* FileSize
++    )
++/*++
++
++Routine Description:
++
++    Rounds the input file size up to the nearest sector
++
++Arguments:
++
++    FileSize - Size to round up.
++
++Return Value:
++
++    None.
++
++--*/
++{
++    ULONG64 size = *FileSize;
++    size = RoundUpUlong64(size, VHD_SECTOR_SIZE);
++
++    if (size != *FileSize)
++    {
++        PrintStatus("Warning: Rounding file size up to nearest sector boundary.");
++    }
++
++    *FileSize = size;
++}
++
++
++BOOL
++ReadFooter(
++    __in  HANDLE           FileHandle,
++    __in  UINT64           FooterOffset,
++    __out VHD_DISK_FOOTER* Footer
++    )
++/*++
++
++Routine Description:
++
++    Reads the VHD footer from an open VHD file
++
++Arguments:
++
++    FileHandle - handle to the open VHD file.
++
++    FooterOffset - file offset of the footer object within the file.
++
++    Footer - Upon successful return, contains the footer object in big-endian format.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    LARGE_INTEGER savedPosition;
++    LARGE_INTEGER footerPosition;
++    DWORD bytesRead;
++    BOOL savedCurrentPosition = FALSE;
++    BOOL status = FALSE;
++
++    memset(Footer, 0, sizeof(VHD_DISK_FOOTER));
++
++    //
++    // Save the current file pointer
++    //
++    savedPosition = 0;
++    if (!SetFilePointerEx(FileHandle, savedPosition, &savedPosition, FILE_CURRENT))
++    {
++        PrintError(GetLastError(), "Unable to get current file pointer");
++        goto Cleanup;
++    }
++
++    savedCurrentPosition = TRUE;
++
++    //
++    // Read the existing footer.
++    //
++    footerPosition = FooterOffset;
++    if (!SetFilePointerEx(FileHandle, footerPosition, NULL, FILE_BEGIN))
++    {
++        PrintError(GetLastError(), "Unable to set file pointer to footer offset");
++        goto Cleanup;
++    }
++
++    if (!ReadFile(FileHandle, Footer, sizeof(VHD_DISK_FOOTER), &bytesRead, NULL))
++    {
++        PrintError(GetLastError(), "Cannot read existing footer");
++        goto Cleanup;
++    }
++
++    if (bytesRead != sizeof(VHD_DISK_FOOTER))
++    {
++        PrintError(ERROR_HANDLE_EOF, "Cannot read existing footer");
++        goto Cleanup;
++    }
++
++    status = TRUE;
++
++Cleanup:
++
++    if (savedCurrentPosition)
++    {
++        SetFilePointerEx(FileHandle, savedPosition, NULL, FILE_BEGIN);
++    }
++
++    return status;
++}
++
++
++BOOL
++ReadSparseHeader(
++    __in  HANDLE             FileHandle,
++    __in  VHD_DISK_FOOTER*   Footer,
++    __out VHD_SPARSE_HEADER* SparseHeader
++    )
++/*++
++
++Routine Description:
++
++    Reads the VHD sparse header from a VHD file.
++
++Arguments:
++
++    FileHandle - handle to the open VHD file.
++
++    Footer - Contains the footer object in big-endian format.
++
++    SparseHeader - Upon successful return, contains the sparse header object in big-endian format.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    LARGE_INTEGER savedPosition;
++    LARGE_INTEGER headerPosition;
++    DWORD bytesRead;
++    BOOL savedCurrentPosition = FALSE;
++    BOOL status = FALSE;
++
++    memset(SparseHeader, 0, sizeof(VHD_SPARSE_HEADER));
++
++    //
++    // Save the current file pointer
++    //
++    savedPosition = 0;
++    if (!SetFilePointerEx(FileHandle, savedPosition, &savedPosition, FILE_CURRENT))
++    {
++        PrintError(GetLastError(), "Unable to get current file pointer");
++        goto Cleanup;
++    }
++    savedCurrentPosition = TRUE;
++
++    //
++    // Move the file pointer to the start of the sparse header.
++    //
++    headerPosition = _byteswap_uint64(Footer->DataOffset);
++    if (!SetFilePointerEx(FileHandle, headerPosition, NULL, FILE_BEGIN))
++    {
++        PrintError(GetLastError(), "Unable to set file pointer");
++        goto Cleanup;
++    }
++
++    //
++    // Read the sparse header.
++    //
++    if (!ReadFile(FileHandle, SparseHeader, sizeof(VHD_SPARSE_HEADER), &bytesRead, NULL))
++    {
++        PrintError(GetLastError(), "Cannot read existing sparse header");
++        goto Cleanup;
++    }
++
++    if (bytesRead != sizeof(VHD_SPARSE_HEADER))
++    {
++        PrintError(ERROR_HANDLE_EOF, "Cannot read existing sparse header");
++        goto Cleanup;
++    }
++    status = TRUE;
++
++Cleanup:
++
++    if (savedCurrentPosition)
++    {
++        SetFilePointerEx(FileHandle, savedPosition, NULL, FILE_BEGIN);
++    }
++
++    return status;
++}
++
++
++BOOL
++WriteFooter(
++    __in  HANDLE           FileHandle,
++    __in  UINT64           FooterOffset,
++    __in  VHD_DISK_FOOTER* Footer
++    )
++/*++
++
++Routine Description:
++
++    Writes a VHD footer to an open VHD file
++
++Arguments:
++
++    FileHandle - handle to the open VHD file.
++
++    FooterOffset - file offset to write the footer object within the file.
++
++    Footer - Footer object in big-endian format to write to the file.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    LARGE_INTEGER savedPosition;
++    LARGE_INTEGER footerPosition;
++    DWORD bytesWritten;
++    BOOL savedCurrentPosition = FALSE;
++    BOOL status = FALSE;
++
++    //
++    // Save the current file pointer
++    //
++    savedPosition = 0;
++    if (!SetFilePointerEx(FileHandle, savedPosition, &savedPosition, FILE_CURRENT))
++    {
++        PrintError(GetLastError(), "Unable to get current file pointer");
++        goto Cleanup;
++    }
++    savedCurrentPosition = TRUE;
++
++
++    //
++    // Seek to the offset in the file
++    //
++    footerPosition = FooterOffset;
++    if (!SetFilePointerEx(FileHandle, footerPosition, NULL, FILE_BEGIN))
++    {
++        PrintError(GetLastError(), "Unable to set file pointer to footer offset");
++        goto Cleanup;
++    }
++
++    //
++    // Write the footer
++    //
++    if (!WriteFile(FileHandle, (PVOID)Footer, sizeof(VHD_DISK_FOOTER), &bytesWritten, NULL))
++    {
++        PrintError(GetLastError(), "Unable to write VHD footer");
++        goto Cleanup;
++    }
++
++    if (bytesWritten != sizeof(VHD_DISK_FOOTER))
++    {
++        PrintError(ERROR_WRITE_FAULT, "Bytes written count unexpected");
++        goto Cleanup;
++    }
++
++    PrintStatus("VHD footer written to file.");
++
++    status = TRUE;
++
++Cleanup:
++    
++    if (savedCurrentPosition)
++    {
++        SetFilePointerEx(FileHandle, savedPosition, NULL, FILE_BEGIN);
++    }
++
++    return status;
++}
++
++
++BOOL
++SetFileLength(
++    __in HANDLE FileHandle,
++    __in UINT64 FileLength
++    )
++/*++
++
++Routine Description:
++
++    Sets the file length of the given file, potentially
++    truncating it.  It does not set the valid data length.
++
++Arguments:
++
++    FileHandle - handle to the open VHD file.
++
++    FileLength - file length to set.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    LARGE_INTEGER savedPosition;
++    LARGE_INTEGER fileSize;
++    BOOL savedCurrentPosition = FALSE;
++    BOOL status = FALSE;
++
++    //
++    // Save the current file pointer
++    //
++    savedPosition = 0;
++    if (!SetFilePointerEx(FileHandle, savedPosition, &savedPosition, FILE_CURRENT))
++    {
++        PrintError(GetLastError(), "Unable to get current file pointer");
++        goto Cleanup;
++    }
++    savedCurrentPosition = TRUE;
++
++    //
++    // If the saved file pointer is beyond the new end-of-file, don't
++    // restore the saved position on exit.  Instead, leave the file
++    // pointer at the new EOF.
++    //
++    if ((UINT64)savedPosition > FileLength)
++    {
++        savedCurrentPosition = FALSE;
++    }
++
++    //
++    // Move the file pointer to the new end-of-file.
++    //
++    fileSize = FileLength;
++
++    if (!SetFilePointerEx(FileHandle, fileSize, NULL, FILE_BEGIN))
++    {
++        PrintError(GetLastError(), "Unable to set file pointer to new end of file");
++        goto Cleanup;
++    }
++
++    //
++    // Set EOF
++    //
++    if (!SetEndOfFile(FileHandle))
++    {
++        PrintError(GetLastError(), "Unable to set EOF");
++        goto Cleanup;
++    }
++
++    PrintStatus("Set the file length");
++
++    status = TRUE;
++
++Cleanup:
++
++    if (savedCurrentPosition)
++    {
++        SetFilePointerEx(FileHandle, savedPosition, NULL, FILE_BEGIN);
++    }
++
++    return status;
++}
++
++
++//
++// Main handler functions
++//
++
++
++BOOL
++ConvertToVhd(
++    __in LPTSTR Filename
++    )
++/*++
++
++Routine Description:
++
++    Pads to some convenient length and Adds a VHD footer 
++
++Arguments:
++
++    Filename - name of the file to convert to a VHD.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    VHD_DISK_FOOTER footer;
++    LARGE_INTEGER   fileSize;
++    LARGE_INTEGER   fileSizePadded;
++    UINT64          padIncrement    = 2 * 1024 * 1024;  // must be a power of 2
++    UINT64          size;
++    HANDLE          fileHandle      = INVALID_HANDLE_VALUE;
++    GUID            uniqueId;
++    BOOL            status          = FALSE;
++
++    PrintStatus("Converting \"%s\" to a fixed format VHD.", Filename);
++
++    //
++    // Open the file
++    //
++    if (!OpenVhdFile(Filename, &fileHandle, &fileSize))
++    {
++        goto Cleanup;
++    }
++
++    fileSizePadded = fileSize;
++
++    //
++    // Pad a little -- some place we're losing one cylinder (of our heads/sectors,
++    // = 255/63, abt 8Mb, in translation on the way into HyperV. No other virtualization
++    // bumps into this so maybe it's a boundary error in HyperV.  Compensate by
++    // adding two sectors here.
++    //
++    fileSizePadded += 1024;
++
++    // 
++    // Pad up to increment of 2MB.  This also incidentally puts on
++    // a sector boundary, so we've removed the round-up-to-sectory boundary
++    // code here.
++    //
++    size = fileSizePadded;
++    fileSizePadded = RoundUpUlong64(size, padIncrement);
++
++    // 
++    // Expand file to match padding
++    //
++    if (fileSizePadded != fileSize) {
++        if (!SetFileValidData(fileHandle, fileSizePadded)) {
++	    goto Cleanup;
++	}
++	if (!SetFilePointerEx(fileHandle, 0, NULL, SEEK_END)) {
++	    goto Cleanup;
++	}
++	fileSize = fileSizePadded;
++    }
++
++    //
++    // Error if file is too small
++    //
++    if (fileSize < (1024 * 1024 * 12))
++    {
++        PrintError(ERROR_HANDLE_EOF, "File is smaller than 12 MB.");
++        goto Cleanup;
++    }
++
++
++    //
++    // Create the footer
++    //
++    uuid_generate(uniqueId);
++
++    if (!CreateVhdFooter(fileSize, uniqueId, TRUE, 0, &footer))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Append the footer
++    //
++    if (!WriteFooter(fileHandle, fileSize, &footer))
++    {
++        goto Cleanup;
++    }
++
++    status = TRUE;
++
++Cleanup:
++
++    if (fileHandle != INVALID_HANDLE_VALUE)
++    {
++        CloseHandle(fileHandle);
++        fileHandle = INVALID_HANDLE_VALUE;
++    }
++
++    return status;
++}
++
++
++BOOL
++CreateNewVhd(
++    __in LPTSTR Filename,
++    __in UINT64 Filesize
++    )
++/*++
++
++Routine Description:
++
++    Adds a VHD footer and clears the first few MB of an existing file.
++
++Arguments:
++
++    Filename - name of the file to create.
++
++    Filesize - size of the resulting data section.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failures
++
++--*/
++{
++    VHD_DISK_FOOTER footer;
++    LARGE_INTEGER   filePointer;
++    HANDLE          fileHandle      = INVALID_HANDLE_VALUE;
++    GUID            uniqueId;
++    BOOL            status          = FALSE;
++
++    PrintStatus("Creating new fixed format VHD with name \"%s\"", Filename);
++
++    //
++    // Error if file is too small
++    //
++    if (Filesize < (1024 * 1024 * 12))
++    {
++        PrintError(ERROR_HANDLE_EOF, "File is smaller than 12 MB.");
++        goto Cleanup;
++    }
++
++    //
++    // Create the file
++    //
++    PrintStatus("Attempting to create file \"%s\"", Filename);
++
++    fileHandle = fopen(Filename, "w");
++    if (fileHandle == INVALID_HANDLE_VALUE)
++    {
++        PrintError(GetLastError(), "Unable to create file \"%s\"", Filename);
++        goto Cleanup;
++    }
++
++    PrintStatus("Created file \"%s\"", Filename);
++
++    //
++    // Round up to the nearest sector size
++    //
++    filePointer = Filesize;
++    RoundUpToSectorSize(&filePointer);
++
++    //
++    // Set the file length
++    //
++    if (!SetFileLength(fileHandle, filePointer))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Set the valid data length
++    //
++    if (!SetFileValidData(fileHandle, filePointer))
++    {
++        PrintError(GetLastError(), "Unable to set valid data length");
++        goto Cleanup;
++    }
++
++    PrintStatus("Set the valid data length");
++
++    //
++    // Create the footer
++    //
++    uuid_generate(uniqueId);
++
++    if (!CreateVhdFooter(filePointer, uniqueId, TRUE, 0, &footer))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Append the footer
++    //
++    if (!WriteFooter(fileHandle, filePointer, &footer))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Clear out first 12 MB of file.
++    //
++    filePointer = 0;
++    if (!ZeroFileContents(fileHandle, filePointer, 12 * 1024 * 1024))
++    {
++        goto Cleanup;
++    }
++
++    PrintStatus("VHD header area cleared.");
++
++    status = TRUE;
++
++Cleanup:
++
++    if (fileHandle != INVALID_HANDLE_VALUE)
++    {
++        CloseHandle(fileHandle);
++        fileHandle = INVALID_HANDLE_VALUE;
++    }
++
++    return status;
++}
++
++
++BOOL
++ExtendVhd(
++    __in LPTSTR Filename,
++    __in UINT64 Filesize
++    )
++/*++
++
++Routine Description:
++
++    Adds a VHD footer and clears the first few MB of an existing file.
++
++Arguments:
++
++    Filename - name of the VHD file to extend.
++
++    Filesize - new virtual size of the VHD.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    VHD_DISK_FOOTER footer;
++    LARGE_INTEGER   originalFileSize;
++    LARGE_INTEGER   newFileSize;
++    HANDLE          fileHandle      = INVALID_HANDLE_VALUE;
++    GUID            uniqueId;
++    BOOL            status          = FALSE;
++
++    PrintStatus("Extending \"%s\" to a larger size.", Filename);
++
++    //
++    // Open the file
++    //
++    if (!OpenVhdFile(Filename, &fileHandle, &originalFileSize))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Error if file is too small to operate on.
++    //
++    if (originalFileSize < (1024 * 1024 * 12))
++    {
++        PrintError(ERROR_HANDLE_EOF, "File is smaller than 12 MB.");
++        goto Cleanup;
++    }
++
++    //
++    // Error if a shrink operation is attempted
++    //
++    if ((UINT64)originalFileSize > Filesize)
++    {
++        PrintError(ERROR_HANDLE_EOF, "Cannot extend a VHD smaller than its current size");
++        goto Cleanup;
++    }
++
++    //
++    // Read the existing footer.
++    //
++    originalFileSize -= VHD_SECTOR_SIZE;
++    if (!ReadFooter(fileHandle, originalFileSize, &footer))
++    {
++        goto Cleanup;
++    }
++
++    RtlCopyMemory(&uniqueId, footer.UniqueId, sizeof(GUID));
++
++    //
++    // Round the extension up to the nearest sector size
++    //
++    newFileSize = Filesize;
++    RoundUpToSectorSize(&newFileSize);
++    
++    //
++    // Set the file length
++    //
++    if (!SetFileLength(fileHandle, newFileSize))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Set the valid data length
++    //
++    if (!SetFileValidData(fileHandle, newFileSize))
++    {
++        PrintError(GetLastError(), "Unable to set valid data length");
++        goto Cleanup;
++    }
++
++    PrintStatus("Set the valid data length");
++
++    //
++    // Create the footer
++    //
++    if (!CreateVhdFooter(newFileSize, uniqueId, TRUE, 0, &footer))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Append the footer
++    //
++    if (!WriteFooter(fileHandle, newFileSize, &footer))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Clear out original footer.
++    //
++    if (!ZeroFileContents(fileHandle, originalFileSize, VHD_SECTOR_SIZE))
++    {
++        goto Cleanup;
++    }
++
++    PrintStatus("Existing footer cleared");
++
++    status = TRUE;
++
++Cleanup:
++
++    if (fileHandle != INVALID_HANDLE_VALUE)
++    {
++        CloseHandle(fileHandle);
++        fileHandle = INVALID_HANDLE_VALUE;
++    }
++
++    return status;
++}
++
++
++BOOL
++RepairVhd(
++    __in LPTSTR Filename,
++    __in LPTSTR ChildFilename
++    )
++/*++
++
++Routine Description:
++
++    Repairs a VHD chain broken by an extend operation on the base VHD.
++    Resets the base VHD size to match the child.
++
++Arguments:
++
++    Filename - name of the base VHD file to repair.
++
++    ChildFilename - name of the next child VHD in the disk chain.
++
++Return Value:
++
++    BOOL - TRUE on success, FALSE on failure
++
++--*/
++{
++    VHD_SPARSE_HEADER   childSparseHeader;
++    VHD_DISK_FOOTER     footer;
++    VHD_DISK_FOOTER     childFooter;
++    LARGE_INTEGER       fileSize;
++    LARGE_INTEGER       childFileSize;
++    HANDLE              fileHandle      = INVALID_HANDLE_VALUE;
++    HANDLE              childFileHandle = INVALID_HANDLE_VALUE;
++    BOOL                status          = FALSE;
++    GUID parentIdentifier;
++    GUID baseIdentifier;
++
++    PrintStatus("Resizing base VHD \"%s\" to match the size indicated in child VHD \"%s\".", Filename, ChildFilename);
++    
++    //
++    // Open the base file
++    //
++    if (!OpenVhdFile(Filename, &fileHandle, &fileSize))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Open the child file
++    //
++    if (!OpenVhdFile(ChildFilename, &childFileHandle, &childFileSize))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Read the base VHD footer.
++    //
++    fileSize -= VHD_SECTOR_SIZE;
++    if (!ReadFooter(fileHandle, fileSize, &footer))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Verify we have a fixed or dynamic VHD as the base.
++    //
++    switch (footer.DiskType)
++    {
++    case VHD_TYPE_BIG_FIXED:
++        PrintStatus("Opened \"%s\" as base VHD file, type is fixed-sized.", Filename);
++        break;
++
++    case VHD_TYPE_BIG_SPARSE:
++        PrintStatus("Opened \"%s\" as base VHD file, type is dynamic-sized.", Filename);
++        break;
++
++    case VHD_TYPE_BIG_DIFF:
++        PrintError(ERROR_BAD_FILE_TYPE, "VHD \"%s\" is a differencing disk.  You must enter the base VHD for this task.", Filename);
++        goto Cleanup;
++
++    default:
++        PrintError(ERROR_BAD_FILE_TYPE, "VHD \"%s\" is an unsupported type.", Filename);
++        goto Cleanup;
++    }
++
++    memcpy(baseIdentifier, footer.UniqueId, sizeof(GUID));
++    PrintVhdIdentifier(baseIdentifier, "Base VHD's identifier is \"%s\"");
++
++    //
++    // Read the child VHD's footer.
++    //
++    childFileSize -= VHD_SECTOR_SIZE;
++    if (!ReadFooter(childFileHandle, childFileSize, &childFooter))
++    {
++        goto Cleanup;
++    }
++
++    //
++    // Verify we have a differencing disk as the child.
++    //
++    if (childFooter.DiskType != VHD_TYPE_BIG_DIFF)
++    {
++        PrintError(ERROR_BAD_FILE_TYPE, "Child VHD \"%s\" is not a differencing VHD.", ChildFilename);
++        goto Cleanup;
++    }
++
++    PrintStatus("Opened \"%s\" as child VHD file.", ChildFilename);
++
++    //
++    // Retrieve the child's sparse header and parent pointer information
++    //
++    if (!ReadSparseHeader(childFileHandle, &childFooter, &childSparseHeader))
++    {
++        goto Cleanup;
++    }
++    
++    memcpy(parentIdentifier, childSparseHeader.ParentUniqueId, sizeof(GUID));
++    PrintVhdIdentifier(parentIdentifier, "Child VHD's parent identifier is \"%s\"");
++
++    //
++    // Verify that the child's parent pointer matches the parent id.
++    //
++
++    if (0 != memcmp(parentIdentifier, footer.UniqueId, sizeof(GUID)))
++    {
++        PrintError(ERROR_HANDLE_EOF, "Child's parent identifier doesn't match the base VHD's identifier.");
++        goto Cleanup;
++    }
++
++    //
++    // Determine the correct size for the base VHD.
++    //
++
++    PrintStatus("Resizing base VHD to match child size of %llu bytes", _byteswap_uint64(childFooter.CurrentSize));
++
++    //
++    // Resize the parent VHD to match the expected size.
++    //
++
++    if (footer.DiskType == VHD_TYPE_BIG_FIXED)
++    {
++        //
++        // Fixed VHDs only contain a footer.  Truncate the file
++        // and write the new footer.
++        //
++
++        LARGE_INTEGER newFileSize;
++        newFileSize = _byteswap_uint64(childFooter.CurrentSize);
++
++        //
++        // Set the file length
++        //
++        if (!SetFileLength(fileHandle, newFileSize))
++        {
++            goto Cleanup;
++        }
++        
++        PrintStatus("Base VHD truncated to new size %llu.", newFileSize);
++
++        //
++        // Create the footer
++        //
++        if (!CreateVhdFooter(newFileSize, parentIdentifier, TRUE, 0, &footer))
++        {
++            goto Cleanup;
++        }
++
++        //
++        // Write the footer
++        //
++        if (!WriteFooter(fileHandle, newFileSize, &footer))
++        {
++            goto Cleanup;
++        }
++    }
++    else
++    {
++        //
++        // Sparse VHDs contain a footer and a duplicate header.
++        // Update both of these, but leave the file size intact.
++        //
++
++        //
++        // Create the footer
++        //
++        VHD_DISK_FOOTER newFooter;
++        if (!CreateVhdFooter(_byteswap_uint64(childFooter.CurrentSize), parentIdentifier, FALSE, footer.DataOffset, &newFooter))
++        {
++            goto Cleanup;
++        }
++
++        //
++        // Write the footer to the beginning and end of the VHD.
++        //
++        if (!GetFileSizeEx(fileHandle, &fileSize))
++        {
++            PrintError(GetLastError(), "Unable to retrieve file size");
++            goto Cleanup;
++        }
++
++        if (!WriteFooter(fileHandle, fileSize - VHD_SECTOR_SIZE, &newFooter))
++        {
++            goto Cleanup;
++        }
++
++        if (!WriteFooter(fileHandle, 0, &newFooter))
++        {
++            goto Cleanup;
++        }
++    }
++
++    PrintStatus("Operation complete.");
++    status = TRUE;
++
++Cleanup:
++
++    if (fileHandle != INVALID_HANDLE_VALUE)
++    {
++        CloseHandle(fileHandle);
++        fileHandle = INVALID_HANDLE_VALUE;
++    }
++
++    if (childFileHandle != INVALID_HANDLE_VALUE)
++    {
++        CloseHandle(childFileHandle);
++        childFileHandle = INVALID_HANDLE_VALUE;
++    }
++
++    return status;
++}
++
++
++int 
++main(
++    __in int     argc,
++    __in _TCHAR* argv[]
++    )
++/*++
++
++Routine Description:
++
++    Entrypoint for the tool
++
++Arguments:
++
++    argc - Number of command line arguments
++
++    argv - Array of command line arguments
++
++Return Value:
++
++    int - 0 on success, >0 on failure
++
++--*/
++{
++    enum PROGRAM_MODE programMode;
++    LPTSTR       filename        = NULL;
++    LPTSTR       childFilename   = NULL;
++    UINT64       filesize        = 0;
++    int          status          = 1;
++
++    //
++    // Parse command line
++    //
++    if (!ParseCommandLine(argc, argv, &programMode, &filename, &filesize, &childFilename))
++    {
++        goto Cleanup;
++    }
++
++    switch(programMode)
++    {
++    case ProgramModeCreate:
++        if (!CreateNewVhd(filename, filesize))
++        {
++            goto Cleanup;
++        }
++        break;
++
++    case ProgramModeConvert:
++        if (!ConvertToVhd(filename))
++        {
++            goto Cleanup;
++        }
++        break;
++
++    case ProgramModeExtend:
++        if (!ExtendVhd(filename, filesize))
++        {
++            goto Cleanup;
++        }
++        break;
++
++    case ProgramModeRepair:
++        if (!RepairVhd(filename, childFilename))
++        {
++            goto Cleanup;
++        }
++        break;
++
++    default:
++        PrintStatus("Unknown Command");
++        goto Cleanup;
++    }
++
++    PrintStatus("Complete");
++
++    status = 0;
++
++Cleanup:
++    
++    if (filename != NULL)
++    {
++        free(filename);
++        filename = NULL;
++    }
++
++    if (childFilename != NULL)
++    {
++        free(childFilename);
++        childFilename = NULL;
++    }
++
++    return status;
++}
++
+Binary files vhdtool-2.0/ref/cf.footer.orig and vhdtool-2.0/ref/cf.footer differ
+--- vhdtool-2.0/ref/cf-dyn.barefile.orig	1969-12-31 16:00:00.000000000 -0800
++++ vhdtool-2.0/ref/cf-dyn.barefile	2022-05-26 11:51:57.197895261 -0700
+@@ -0,0 +1 @@
++ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ
+\ No newline at end of file
+Binary files vhdtool-2.0/ref/cf-dyn.header.orig and vhdtool-2.0/ref/cf-dyn.header differ
+Binary files vhdtool-2.0/ref/cf-dyn.footer.orig and vhdtool-2.0/ref/cf-dyn.footer differ
+--- vhdtool-2.0/README.orig	1969-12-31 16:00:00.000000000 -0800
++++ vhdtool-2.0/README	2022-05-26 11:51:57.185895738 -0700
+@@ -0,0 +1,49 @@
++test.sh and footercheck.py used to check two conversions of the 
++same file, one by the original VhdTool.exe on Windows, one here.
++
++FILES:
++
++Makefile       toplevel Makefile
++VhdTool.c      Linux port of VhdTool.cpp
++wg_vhdtool.h   Macros used in Linux port
++LICENSE        Excerpt from VhdTool.cpp
++VhdTool.cpp    Original VhdTool.cpp from upstream
++VhdTool.exe    Original VhdTool.exe from upstream
++footercheck.py Check ref.footer against test footer
++ref/           Reference results for "make test"
++
++The footer is the last 512 bytes of a .vhd file.  Layout, with
++typical values shown as hex or as ASCII:
++
++typedef struct
++{
++/* 00 */ UCHAR   Cookie[8];                 conectix
++/* 08 */ ULONG   Features;                  00 00 00 02
++/* 0c */ ULONG   FileFormatVersion;         00 01 00 00   
++/* 10 */ ULONG64 DataOffset;                ff ff ff ff ff ff ff ff
++/* 18 */ ULONG   TimeStamp;                 18 ca 89 39
++/* 1c */ UCHAR   CreatorApplication[4];     hack
++/* 20 */ ULONG   CreatorVersion;            00 02 00 00
++/* 24 */ ULONG   CreatorHostOS;             Wi2k
++/* 28 */ ULONG64 OriginalSize;              00 00 00 00 b7 60 00 00
++/* 30 */ ULONG64 CurrentSize;               00 00 00 00 b7 60 00 00
++
++    struct
++    {
++/* 38 */ USHORT Cylinders;                  17 49
++/* 3a */ UCHAR  Heads;                      10
++/* 3b */ UCHAR  SectorsPerTrack;            3f
++    } Geometry;
++
++/* 3c */ ULONG   DiskType;                  00 00 00 02
++/* 40 */ ULONG   Checksum;                  ff ff e5 05
++/* 44 */ UCHAR   UniqueId[16];              a9 dd 2d c6 d7 79 4e 9c 
++                                            ab e6 8b 1c 0c d2 03 5d
++/* 54 */ UCHAR   SavedState;                00
++/* 55 */ UCHAR   Reserved[427];
++} VHD_DISK_FOOTER;
++
++Geometry apparently matters only to HyperV, or maybe matters not at all.  
++We've left VhdTool.cpp geometry tinkering alone, except we force it to 
++extend the image by 1024 bytes which is enough to force it to give us all
++the cylinders everybody else gives us.
+--- vhdtool-2.0/fix2dynvhd.c.orig	1969-12-31 16:00:00.000000000 -0800
++++ vhdtool-2.0/fix2dynvhd.c	2022-05-26 11:51:57.197895261 -0700
+@@ -0,0 +1,388 @@
++/*
++ * Copyright 2012 WatchGuard Technologies, Inc.
++ *
++ * WatchGuard Technologies, Inc. grants you the right to use this code under the terms of the 
++ * MICROSOFT PUBLIC LICENSE (Ms-PL), a copy of which should accompany this file.
++ *
++ * Author: John Borchek, 03 March 2013
++ */
++
++/* large file support in 32-bit binaries */
++
++#define _GNU_SOURCE
++#define _FILE_OFFSET_BITS 64
++#define _LARGEFILE_SOURCE
++#define _LARGEFILE64_SOURCE
++
++#include <stdio.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <unistd.h>
++#include <time.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <endian.h>
++
++#define	INT64		int64_t
++#define	DWORD		uint32_t
++
++#define	KB		(1024LL)
++#define	MB		(1024LL*KB)
++#define	GB		(1024LL*MB)
++
++#define	DISK_SECTORS	(63LL)
++#define	DISK_HEADS	(255LL)
++#define	SECTOR_SIZE	(512LL)
++#define	TRACK_SIZE	(DISK_HEADS * DISK_SECTORS * SECTOR_SIZE)
++
++#define	MAX_BLOCK_SIZE	(2*MB)
++#define	MIN_BLOCK_SIZE	(1*MB)
++
++#define	MAX_FILE_SIZE	(128*GB-MAX_BLOCK_SIZE)
++
++#define	ENTRIES		(MAX_FILE_SIZE/MIN_BLOCK_SIZE)
++
++int64_t	BLOCK_SIZE	= MAX_BLOCK_SIZE;
++int     verbose         = 0;
++
++DWORD check(unsigned char* p)
++{
++  int   j;
++  DWORD sum = 0;
++
++  for (j = 0; j < SECTOR_SIZE; j++) sum += *p++;
++
++  return htobe32(~sum);
++}
++
++struct	{
++  struct	{
++  char		Cookie[8];
++  DWORD		Features;
++  DWORD		File_Format_Version;
++  INT64		Data_Offset;
++  DWORD		Time_Stamp;
++  char		Creator_Application[4];
++  DWORD		Creator_Version;
++  char		Creator_Host_OS[4];
++  INT64		Original_Size;
++  INT64		Current_Size;
++  short		Cylinders;
++  char		Heads;
++  char		Track_Size;
++  DWORD		Disk_Type;
++  DWORD		Checksum;
++  char		Unique_Id[16];
++  char		Saved_State;
++  char		Reserved[427];
++  } Footer;
++
++  struct	{
++  char		Cookie[8];
++  INT64		Data_Offset;
++  INT64		Table_Offset;
++  DWORD		Header_Version;
++  DWORD		Max_Table_Entries;
++  DWORD		Block_Size;
++  DWORD		Checksum;
++  char		Reserved[984];
++  } Header;
++
++  DWORD		BAT[ENTRIES+1];
++} VHD;
++
++char	BitMap[SECTOR_SIZE];
++
++char	Data[MAX_BLOCK_SIZE];
++char	Zero[MAX_BLOCK_SIZE];
++
++int	fdi	= -1;
++int	fdo	= -1;
++
++struct	stat	stats;
++
++INT64	fix_size;
++INT64	pad_size;
++INT64	org_size;
++INT64	cur_size;
++
++void bp(void) {}
++
++/* Macro containing exit doesn't leave gcc -Wall hollering 
++ * about return from non-void function at end of main()
++ */
++#define done(ec, str) \
++  ({char *_str = (char*)(str); \
++  int _errno = errno; \
++  if (fdo >= 0) close(fdo); \
++  if (fdi >= 0) close(fdi); \
++  errno = _errno; \
++  if (errno) perror(_str); \
++  else if (*_str) printf("%s\n", _str); \
++  exit(ec);})
++
++int copy_block(DWORD n)
++{
++  memset(Data, 0, sizeof(Data));
++
++  if (n > BLOCK_SIZE) n = BLOCK_SIZE;
++
++  if (read( fdi, Data, n)           != n)
++    done(-2, "Read data failure");
++
++  if (memcmp(Data, Zero, n) == 0) return -1;
++
++  n += (SECTOR_SIZE - 1);
++  n &= -SECTOR_SIZE;
++
++  if (n < BLOCK_SIZE) n = BLOCK_SIZE;
++  
++  if (write(fdo, &BitMap, sizeof(BitMap)) != sizeof(BitMap))
++    done(-3, "Write map failure");
++
++  if (write(fdo, Data, n)           != n)
++    done(-4, "Write data failure");
++
++  return ((n + sizeof(BitMap)) / SECTOR_SIZE);
++}
++
++void usage(char *us) {
++  char *pa = {0};
++
++  pa = strrchr(us, '/');
++  if (pa == NULL) {
++    pa = us;
++  }
++  fprintf(stderr, 
++  "Usage: %s [-v] [-1] infile outfile\n"
++  "       %s -h\n"
++  "       %s -s\n"
++  "\n"
++  "       -v -- enable verbose output\n"
++  "       -1 -- use 1MB blocksize instead of default 2MB\n"
++  "       -s -- print sizes of header/footer structures and exit\n"
++  "       -h -- print this help and exit\n"
++  "\n"
++  "       infile must exist, will not be altered\n"
++  "       outfile is created if it does not exist,\n"
++  "       outfile is overwritten if it does exist.\n"
++  "\n", pa, pa, pa);
++}
++
++void print_sizes(void)
++{
++  printf("VHD dynamic header size   : %6u Bytes\n", 
++    (unsigned)(sizeof(VHD.Header) + sizeof VHD.Footer));
++  printf("VHD fixed disk footer size: %6u Bytes\n", 
++    (unsigned)sizeof(VHD.Footer));
++}
++
++int main(int argc, char** argv)
++{
++  int   rc   = 0;
++  DWORD j    = 0;
++  DWORD blk  = 0;
++  DWORD ent  = 0;
++  INT64 off  = 0;
++  DWORD sum  = 0;
++  INT64 left = 0;
++  char* inp  = {0};
++  char* out  = {0};
++  char* us   = {0};
++
++  us = *argv;
++
++  if (argc == 1) {
++    usage(us);
++    done(0, "");
++  }
++
++  while (--argc && *(++argv)) {
++    if (**argv == '-') {
++      switch (*(*argv+1)) {
++      case '1':
++        BLOCK_SIZE = MIN_BLOCK_SIZE;
++        break;
++      case 'v':
++        verbose = 1;
++        break;
++      case 'h':
++        usage(us);
++        done(0, "");
++        break;
++      case 's':
++        print_sizes();
++        done(0, "");
++        break;
++      default:
++        usage(us);
++        fprintf(stderr, "Error: unknown option %s\n", *argv);
++        done(-1, "");
++        break;
++      }
++      continue;
++    }
++
++    if (!inp) {
++      inp = *argv;
++    } else if (!out) {
++      out = *argv;
++    } else {
++      usage(us);
++      fprintf(stderr, "Error: too many input parameters\n");
++      done(-1, "");
++    }
++  }
++
++  if (!inp) {
++    usage(us);
++    fprintf(stderr, "Error: must specify input file\n");
++    done(-1, "");
++  }
++
++  if (!out) {
++    usage(us);
++    fprintf(stderr, "Error: must specify output file\n");
++    done(-1, "");
++  }
++
++  fdi = open(inp, O_RDONLY);
++  if (fdi <  0)  done(-1, "Error: can't open input file");
++
++  rc = fstat(fdi, &stats);
++  if (rc !=  0)  done(-1, "Error: can't read input file size");
++
++  fix_size = stats.st_size;
++
++  if (fix_size > MAX_FILE_SIZE) done(-1, "Error: input file over 128GB");
++
++  rc = lseek64(fdi, fix_size-sizeof(VHD.Footer), SEEK_CUR);
++  if (rc == -1)  done(-1, "Error: reading input file");
++
++  rc = read(fdi, &VHD.Footer, sizeof(VHD.Footer));
++  if (rc != sizeof(VHD.Footer))  done(-1, "Error: can't find input file .vhd footer");
++
++  sum = VHD.Footer.Checksum;
++  VHD.Footer.Checksum =   0;
++
++  if (memcmp(&VHD.Footer.Cookie, "conectix", 8)) {
++   /* Subtract seconds from start of UNIX epoch 1970-01-01 00:00:00 UTC 
++    * to start of VHD epoch 2000-01-01 00:00:00 UTC */
++    DWORD now = time(0) - (((30 * 365) + 7) * 24 * 60 * 60);
++    DWORD cyl = (fix_size + (TRACK_SIZE - 1)) /  TRACK_SIZE;
++    
++    pad_size  = (fix_size + (BLOCK_SIZE - 1)) & -BLOCK_SIZE;
++
++    memcpy(VHD.Footer.Cookie,    "conectix", 8);
++
++    VHD.Footer.Features            = htobe32(2);
++    VHD.Footer.File_Format_Version = htobe32(0x10000);
++    VHD.Footer.Time_Stamp          = htobe32(now);
++    VHD.Footer.Creator_Version     = htobe32(0x60001);
++    VHD.Footer.Original_Size       = htobe64(pad_size);
++    VHD.Footer.Current_Size        = htobe64(pad_size);
++
++    if (cyl <= UINT16_MAX) {
++      VHD.Footer.Heads             = DISK_HEADS;
++      VHD.Footer.Track_Size        = DISK_SECTORS;
++      VHD.Footer.Cylinders         = htobe16(cyl);
++    }
++
++    memcpy(VHD.Footer.Creator_Application, "win ",     4);
++    memcpy(VHD.Footer.Creator_Host_OS,     "Wi2k",     4);
++    memcpy(VHD.Footer.Unique_Id,           &VHD.Footer.Time_Stamp, 4);
++
++  } else {
++    fix_size -= sizeof(VHD.Footer);
++    pad_size = (fix_size + (BLOCK_SIZE - 1)) & -BLOCK_SIZE;
++
++    if (sum != check((unsigned char*)&VHD.Footer))
++      done(8, "Bad checksum");
++  }
++
++  VHD.Footer.Data_Offset       = htobe64(sizeof(VHD.Footer));
++  VHD.Footer.Disk_Type         = htobe32(3);
++  VHD.Footer.Checksum          = check((unsigned char*)&VHD.Footer);
++
++  org_size = be64toh(VHD.Footer.Original_Size);
++  cur_size = be64toh(VHD.Footer.Current_Size);
++
++  printf("\n");
++
++  printf("VHD Block Size %9dMB\n",  (int)(BLOCK_SIZE / MB));
++
++  printf("\n");
++
++  printf("Fixed VHD Size %11lld\n", (long long)fix_size);
++  printf("Original  Size %11lld\n", (long long)org_size);
++  printf("Current   Size %11lld\n", (long long)cur_size);
++  printf("Padded    Size %11lld\n", (long long)pad_size);
++
++  ent = pad_size / BLOCK_SIZE;
++
++  rc = lseek64(fdi, 0, SEEK_SET);
++  if (rc == -1)  done(9, "Error: can't find data in input file");
++
++  off  = (sizeof(VHD.Footer) + sizeof(VHD.Header) + (ent * sizeof(DWORD)));
++  off += (SECTOR_SIZE - 1);
++  off &= -SECTOR_SIZE;
++
++  blk  = off / SECTOR_SIZE;
++
++  printf("\n");
++  printf("BAT    Entries %11d\n", (int)ent);
++  printf("BAT    Offset  %11d\n", (int)off);
++  printf("Data   Offset  %11d\n", (int)blk);
++
++  memcpy(&VHD.Header.Cookie, "cxsparse", 8);
++
++  VHD.Header.Checksum          =  0;
++  VHD.Header.Data_Offset       = -1;
++  VHD.Header.Table_Offset      = htobe64(sizeof(VHD.Footer)+sizeof(VHD.Header));
++  VHD.Header.Header_Version    = htobe32(0x00010000);
++  VHD.Header.Max_Table_Entries = htobe32(ent);
++  VHD.Header.Block_Size        = htobe32(BLOCK_SIZE);
++  VHD.Header.Checksum          = check((unsigned char*)&VHD.Header);
++
++  fdo = creat(out, 0644);
++  if (fdo == -1) {
++    usage(us);
++    fprintf(stderr, "Error: cannot create output file %s\n", out);
++    done(-1, "");
++  }
++
++  rc = lseek64(fdo, off, SEEK_SET);
++  if (rc == -1)  done(10, "Seek failure in input file");
++
++  memset(VHD.BAT, -1, sizeof(VHD.BAT));
++  memset(BitMap,  -1, (BLOCK_SIZE / SECTOR_SIZE) / 8);
++
++  printf("\n");
++  for (j = 0, left = fix_size; left > 0; left -= BLOCK_SIZE, j++) {
++    int k = copy_block((left < BLOCK_SIZE) ? left : BLOCK_SIZE);
++
++    if (k != -1) {
++      if (verbose) printf("%5dMB Sector %11d\n", 
++      (int)(j * (BLOCK_SIZE / MB)), (int)blk);
++      VHD.BAT[j] = htobe32(blk);
++      blk += k;
++    }
++  }
++
++  rc = sizeof(VHD.Footer);
++  if (write(fdo, &VHD.Footer, rc)  != rc)  done(11, "Error: can't write output file footer");
++
++  rc = lseek64(fdo, 0, SEEK_SET);
++  if (rc == -1)  done(12, "Error can't find input file header");
++
++  if (write(fdo, &VHD.Footer, off) != off) done(13, "Error: can't write output file header");
++
++  bp();
++
++  done(0, "");
++}
++
++// vim: ai sw=2 ts=2 et
+--- vhdtool-2.0/footercheck.py.orig	1969-12-31 16:00:00.000000000 -0800
++++ vhdtool-2.0/footercheck.py	2022-05-26 11:51:57.197895261 -0700
+@@ -0,0 +1,39 @@
++#!/usr/bin/python
++
++from sys import argv, exit
++
++failed=False
++
++fd = open(argv[1])
++ref = fd.read()
++fd.close()
++
++fd = open(argv[2])
++tst = fd.read()
++fd.close()
++
++if len(ref) != 512:
++  print("Fail: ref is not 512 bytes")
++  failed=True
++
++if len(tst) != 512:
++  print("Fail: tst is not 512 bytes")
++  failed=True
++
++both = zip(range(0, len(tst)+1), ref, tst)
++
++chek = both[0:0x18] + both[0x1c:0x40] + both[0x54:]
++
++f = [(i[0], ord(i[1]), ord(i[2])) for i in chek if i[1] != i[2]]
++
++if len(f) != 0:
++  print("Fail: unaccounted differences")
++  failed = True
++  for item in f:
++    print("%3.3x %2.2x %2.2x" % item)
++
++if failed:
++  exit(-1)
++else:
++  print("PASS")
++  exit(0)
+--- vhdtool-2.0/Makefile.orig	1969-12-31 16:00:00.000000000 -0800
++++ vhdtool-2.0/Makefile	2022-05-26 11:51:57.181895896 -0700
+@@ -0,0 +1,56 @@
++WG_STATIC = -static
++LDFLAGS = $(WG_LDFLAGS) $(WG_STATIC) -luuid
++CFLAGS = $(WG_CFLAGS) -g -Wall
++
++all: vhdtool fix2dynvhd
++
++shared: WG_STATIC := 
++shared: vhdtool-shared fix2dynvhd-shared
++
++VhdTool.o: VhdTool.c wg_vhdtool.h
++
++vhdtool vhdtool-shared: VhdTool.o
++	$(CC) $^ $(LDFLAGS) -o $@
++
++fix2dynvhd fix2dynvhd-shared: fix2dynvhd.c
++	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $@
++
++install:
++	cp vhdtool* fix2dynvhd fix2dynvhd-shared $(DESTDIR)/bin
++
++clean:
++	rm -f vhdtool vhdtool-shared
++	rm -f fix2dynvhd fix2dynvhd-shared
++	rm -f *.o
++	rm -rf test
++
++test:   vhdtool fix2dynvhd
++	rm -rf test
++	mkdir test
++	dd if=/dev/zero of=test/cf.vhd bs=1024k count=128
++	set -x; \
++	./vhdtool convert test/cf.vhd; \
++	OLDSIZE="$$(($$(stat -c%s test/cf.vhd)-512))"; \
++	dd if=test/cf.vhd of=test/cf.footer bs=1 skip=$$OLDSIZE >& /dev/null
++	./fix2dynvhd -v test/cf.vhd test/cf-dyn.vhd
++	@OLDSIZE="$$(($$(stat -c%s test/cf-dyn.vhd)-512))"; \
++	dd if=test/cf-dyn.vhd of=test/cf-dyn.footer1 bs=1 count=512 >& /dev/null; \
++	dd if=test/cf-dyn.vhd of=test/cf-dyn.footer2 bs=1 skip=$$OLDSIZE >& /dev/null; \
++	dd if=test/cf-dyn.vhd of=test/cf-dyn.header bs=1 skip=512 count=1024 >& /dev/null; \
++	dd if=test/cf-dyn.vhd of=test/cf-dyn.nofooter bs=1 count=$$OLDSIZE >& /dev/null; \
++	dd if=test/cf-dyn.nofooter of=test/cf-dyn.barefile bs=1 skip=1536 >& /dev/null
++	@echo -n "fixed footer: "
++	@if ! ./footercheck.py ref/cf.footer test/cf.footer; then touch test/FAIL; fi
++	@echo -n "dynamic footer 1: "
++	@if ! ./footercheck.py ref/cf-dyn.footer test/cf-dyn.footer1; then touch test/FAIL; fi
++	@echo -n "dynamic footer 2: "
++	@if ! ./footercheck.py ref/cf-dyn.footer test/cf-dyn.footer2; then touch test/FAIL; fi
++	@echo -n "dynamic header check: "
++	@if diff ref/cf-dyn.header test/cf-dyn.header >& /dev/null; then echo "PASS"; \
++	else echo "Fail"; touch test/FAIL; fi
++	@echo -n "dynamic data check: "
++	@if diff ref/cf-dyn.barefile test/cf-dyn.barefile >& /dev/null; then echo "PASS"; \
++	else echo "Fail"; touch test/FAIL; fi
++	@if [ -f test/FAIL ]; then echo FAIL; false; else echo PASS; fi
++
++.PHONY: all clean install test shared
+--- vhdtool-2.0/wg_vhdtool.h.orig	1969-12-31 16:00:00.000000000 -0800
++++ vhdtool-2.0/wg_vhdtool.h	2022-05-26 11:51:57.197895261 -0700
+@@ -0,0 +1,205 @@
++// MICROSOFT PUBLIC LICENSE (Ms-PL)
++//
++// This license governs use of the accompanying software. If you use the
++// software, you accept this license. If you do not accept the license, do not
++// use the software.
++//
++// 1. Definitions
++//
++// The terms "reproduce," "reproduction," "derivative works," and
++// "distribution" have the same meaning here as under U.S. copyright law.
++//
++// A "contribution" is the original software, or any additions or changes to
++// the software.
++//
++// A "contributor" is any person that distributes its contribution under this
++// license.  "Licensed patents" are a contributor's patent claims that read
++// directly on its contribution. 
++//
++// 2. Grant of Rights
++//
++// (A) Copyright Grant- Subject to the terms of this license, including the
++// license conditions and limitations in section 3, each contributor grants
++// you a non-exclusive, worldwide, royalty-free copyright license to reproduce
++// its contribution, prepare derivative works of its contribution, and
++// distribute its contribution or any derivative works that you create.
++//
++// (B) Patent Grant- Subject to the terms of this license, including the
++// license conditions and limitations in section 3, each contributor grants
++// you a non-exclusive, worldwide, royalty-free license under its licensed
++// patents to make, have made, use, sell, offer for sale, import, and/or
++// otherwise dispose of its contribution in the software or derivative works
++// of the contribution in the software. 
++//
++// 3. Conditions and Limitations
++//
++// (A) No Trademark License- This license does not grant you rights to use any
++// contributors' name, logo, or trademarks.
++//
++// (B) If you bring a patent claim against any contributor over patents that
++// you claim are infringed by the software, your patent license from such
++// contributor to the software ends automatically.
++//
++// (C) If you distribute any portion of the software, you must retain all
++// copyright, patent, trademark, and attribution notices that are present in
++// the software.
++//
++// (D) If you distribute any portion of the software in source code form, you
++// may do so only under this license by including a complete copy of this
++// license with your distribution. If you distribute any portion of the
++// software in compiled or object code form, you may only do so under a
++// license that complies with this license.
++//
++// (E) The software is licensed "as-is." You bear the risk of using it. The
++// contributors give no express warranties, guarantees or conditions. You may
++// have additional consumer rights under your local laws which this license
++// cannot change. To the extent permitted under your local laws, the
++// contributors exclude the implied warranties of merchantability, fitness for
++// a particular purpose and non-infringement. 
++//
++
++#define _GNU_SOURCE
++#define _FILE_OFFSET_BITS 64
++#define _LARGEFILE_SOURCE
++#define _LARGEFILE64_SOURCE
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdarg.h>
++#include <string.h>
++#include <errno.h>
++#include <time.h>
++#include <endian.h>
++#include <assert.h>
++#include <stdint.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include <uuid/uuid.h>
++
++/* ==================================================================================
++ * Definitions in good enough agreement with
++ * http://msdn.microsoft.com/en-us/library/cc230343.aspx 
++ * http://msdn.microsoft.com/en-us/library/windows/desktop/aa383751%28v=vs.85%29.aspx
++ * for use with gcc
++ */
++
++/* Constants */
++#define ERROR_OUTOFMEMORY    ENOMEM
++#define ERROR_WRITE_FAULT    EIO
++#define ERROR_HANDLE_EOF     EIO
++#define ERROR_BAD_FILE_TYPE  EINVAL
++#define TRUE                 1
++#define FALSE                0
++#define INVALID_HANDLE_VALUE NULL
++#define FILE_BEGIN           SEEK_SET
++#define FILE_CURRENT         SEEK_CUR
++#define FILE_END             SEEK_END
++
++/* Typedefs */
++typedef char               CHAR, *LPTSTR;
++typedef char               _TCHAR;
++typedef char               TCHAR;
++typedef unsigned char      UCHAR, *PUCHAR;
++typedef int32_t            LONG;
++typedef uint32_t           ULONG;
++typedef int64_t            LONGLONG;
++typedef uint64_t           ULONGLONG;
++typedef uint64_t           UINT64;
++typedef uint64_t           ULONG64;
++typedef int16_t            SHORT;
++typedef uint16_t           USHORT, *PUSHORT;
++typedef uint32_t           DWORD;
++typedef int32_t            BOOL;
++typedef uint8_t            BOOLEAN;
++typedef void               VOID, *PVOID, *LPVOID;
++typedef uuid_t             GUID;
++typedef FILE               *HANDLE;
++typedef time_t             SYSTEMTIME;
++typedef int64_t            LARGE_INTEGER, *PLARGE_INTEGER;
++typedef uint64_t           ULARGE_INTEGER, *PULARGE_INTEGER;
++
++/* Macros */
++
++#define __in 
++#define __out
++#define __inout
++#define __in_z
++#define __in_bcount(x)
++
++/* Don't worry about multibyte characters for purposes of this port. */
++
++#define _tcsicmp(pa, pb) strcasecmp((pa), (pb))
++
++#define _tcslen(pa) strlen(pa)
++
++#define _tcscpy_s(dst, len, src) \
++  ({char *_d = (dst);\
++  int _l = (len);\
++  char *_s = (src);\
++  char * _r;\
++  _r = strncpy(_d, _s, _l);\
++  *(_d+_l-1) = '\0';\
++  _r;})
++
++#define _ttoi64(pa) atoll(pa)
++
++#define RtlZeroMemory(buffer, bufferSize) memset((buffer), 0, (bufferSize))
++
++#define RtlCopyMemory(dst, src, len) memcpy((dst), (src), (len))
++
++#define SetFilePointerEx(FileHandle, FileOffset, newOffset, whence) ({\
++  int rc; \
++  LARGE_INTEGER *res = (LARGE_INTEGER *)newOffset;\
++  rc = (fseeko((FileHandle), (FileOffset), (whence)) == 0);\
++  if (rc && res && *res) *res = ftello(FileHandle);\
++  rc;\
++  })
++
++#define GetFileSizeEx(fh, psize) ({\
++  int rc;\
++  struct stat statbuf;\
++  rc = (fstat(fileno(fh), &statbuf) == 0);\
++  if (rc) *psize = statbuf.st_size;\
++  rc;\
++  })
++
++#define ReadFile(fh, buf, len, pread, overlap_flag) ({\
++  int rc = 1;\
++  size_t readlen;\
++  readlen = fread(buf, 1, len, fh);\
++  if (readlen == 0 && errno) rc = 0;\
++  else *(pread) = readlen;\
++  rc;\
++  })
++
++#define WriteFile(fh, buf, len, pwrite, overlap_flag) ({\
++  int rc = 1;\
++  size_t writelen;\
++  writelen = fwrite(buf, 1, len, fh);\
++  if (writelen == 0 && errno) rc = 0;\
++  else *(pwrite) = writelen;\
++  rc;\
++  })
++
++#define SetEndOfFile(fh) ({\
++  (ftruncate(fileno(fh), ftell(fh)) == 0);\
++  })
++
++#define SetFileValidData(fh, len) ({\
++  (ftruncate(fileno(fh), len) == 0);\
++  })
++
++#define CloseHandle(fp) ({\
++  (fclose(fp) == 0);\
++  })
++
++#define GetLastError() errno
++
++#define TEXT(t) t
++
++#define _byteswap_ushort(x) htobe16(x)
++
++#define _byteswap_ulong(x)  htobe32(x)
++
++#define _byteswap_uint64(x) htobe64(x)

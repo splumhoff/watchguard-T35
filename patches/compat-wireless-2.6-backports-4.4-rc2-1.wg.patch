@@ -1,0 +1,1785 @@
+WatchGuard patches to sources for compat-wireless-2.6-backports-4.4-rc2-1 as of
+Thu May 26 11:27:00 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- compat-wireless-2.6-backports-4.4-rc2-1/defconfigs/ath10k.orig	2022-05-26 11:26:30.943884063 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/defconfigs/ath10k	2022-05-26 11:26:32.103836670 -0700
+@@ -1,7 +1,7 @@
+ CPTCFG_CFG80211=m
+ CPTCFG_CFG80211_WEXT=y
+ CPTCFG_MAC80211=m
+-CPTCFG_MAC80211_LEDS=y
++CPTCFG_MAC80211_LEDS=n
+ CPTCFG_MAC80211_MESH=y
+ CPTCFG_WLAN=y
+ CPTCFG_ATH_CARDS=m
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath10k/htt_tx.c.orig	2022-05-26 11:26:31.435863961 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath10k/htt_tx.c	2022-05-26 11:26:32.595816570 -0700
+@@ -543,6 +543,7 @@
+ 	struct htt_msdu_ext_desc *ext_desc = NULL;
+ 	bool limit_mgmt_desc = false;
+ 	bool is_probe_resp = false;
++	unsigned long flags;
+ 
+ 	if (unlikely(ieee80211_is_mgmt(hdr->frame_control)) &&
+ 	    ar->hw_params.max_probe_resp_desc_thres) {
+@@ -556,9 +557,9 @@
+ 	if (res)
+ 		goto err;
+ 
+-	spin_lock_bh(&htt->tx_lock);
++	spin_lock_irqsave(&htt->tx_lock, flags);
+ 	res = ath10k_htt_tx_alloc_msdu_id(htt, msdu);
+-	spin_unlock_bh(&htt->tx_lock);
++	spin_unlock_irqrestore(&htt->tx_lock, flags);
+ 	if (res < 0)
+ 		goto err_tx_dec;
+ 
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath10k/core.c.orig	2022-05-26 11:26:31.435863961 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath10k/core.c	2022-05-26 11:26:32.591816733 -0700
+@@ -889,13 +889,13 @@
+ 		ath10k_err(ar, "failed to create board name: %d", ret);
+ 		return ret;
+ 	}
+-
++#if 0
+ 	ar->bd_api = 2;
+ 	ret = ath10k_core_fetch_board_data_api_n(ar, boardname,
+ 						 ATH10K_BOARD_API2_FILE);
+ 	if (!ret)
+ 		goto success;
+-
++#endif
+ 	ar->bd_api = 1;
+ 	ret = ath10k_core_fetch_board_data_api_1(ar);
+ 	if (ret) {
+@@ -1132,10 +1132,10 @@
+ static int ath10k_core_fetch_firmware_files(struct ath10k *ar)
+ {
+ 	int ret;
+-
++#if 0//WG JQ, don't need to load calibration file in XTM wireless.
+ 	/* calibration file is optional, don't check for any errors */
+ 	ath10k_fetch_cal_file(ar);
+-
++#endif
+ 	ar->fw_api = 5;
+ 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "trying fw api %d\n", ar->fw_api);
+ 
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9330_1p1_initvals.h.orig	2022-05-26 11:26:31.471862490 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9330_1p1_initvals.h	2022-05-26 11:26:32.679813138 -0700
+@@ -38,7 +38,7 @@
+ 	{0x00009e14, 0x31365d5e, 0x3136605e, 0x3136605e, 0x31365d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003ce, 0x000003ce},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00003221, 0x00003221},
+ 	{0x00009e3c, 0xcf946222, 0xcf946222, 0xcf946222, 0xcf946222},
+ 	{0x00009e44, 0x02321e27, 0x02321e27, 0x02282324, 0x02282324},
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9565_1p0_initvals.h.orig	2022-05-26 11:26:31.475862327 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9565_1p0_initvals.h	2022-05-26 11:26:32.687812810 -0700
+@@ -345,7 +345,7 @@
+ 	{0x00009e14, 0x37b95d5e, 0x37b9605e, 0x3379605e, 0x33795d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003a4, 0x000003a4},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00000021, 0x00000021},
+ 	{0x00009e3c, 0xcf946222, 0xcf946222, 0xcf946220, 0xcf946220},
+ 	{0x00009e44, 0xfe321e27, 0xfe321e27, 0xfe291e27, 0xfe291e27},
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9580_1p0_initvals.h.orig	2022-05-26 11:26:31.475862327 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9580_1p0_initvals.h	2022-05-26 11:26:32.687812810 -0700
+@@ -1288,7 +1288,7 @@
+ 	{0x00009e14, 0x37b95d5e, 0x37b9605e, 0x3379605e, 0x33795d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003ce, 0x000003ce},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00000021, 0x00000021},
+ 	{0x00009e3c, 0xcf946220, 0xcf946220, 0xcf946222, 0xcf946222},
+ 	{0x00009e44, 0x02321e27, 0x02321e27, 0x02291e27, 0x02291e27},
+@@ -1318,7 +1318,7 @@
+ 	{0x0000ae04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+ 	{0x0000ae18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x0000ae1c, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+-	{0x0000ae20, 0x000001b5, 0x000001b5, 0x000001ce, 0x000001ce},
++	{0x0000ae20, 0x000001a6, 0x000001a6, 0x000001aa, 0x000001aa},
+ 	{0x0000b284, 0x00000000, 0x00000000, 0x00000150, 0x00000150},
+ 	{0x0000b830, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+ 	{0x0000be04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9330_1p2_initvals.h.orig	2022-05-26 11:26:31.471862490 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9330_1p2_initvals.h	2022-05-26 11:26:32.679813138 -0700
+@@ -343,7 +343,7 @@
+ 	{0x00009e14, 0x31395d5e, 0x3139605e, 0x3139605e, 0x31395d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003ce, 0x000003ce},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00003221, 0x00003221},
+ 	{0x00009e3c, 0xcf946222, 0xcf946222, 0xcf946222, 0xcf946222},
+ 	{0x00009e44, 0x02321e27, 0x02321e27, 0x02282324, 0x02282324},
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar953x_initvals.h.orig	2022-05-26 11:26:31.471862490 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar953x_initvals.h	2022-05-26 11:26:32.683812974 -0700
+@@ -356,7 +356,7 @@
+ 	{0x00009e14, 0x37b95d5e, 0x37b9605e, 0x3379605e, 0x33795d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003ce, 0x000003ce},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00000021, 0x00000021},
+ 	{0x00009e3c, 0xcfa10820, 0xcfa10820, 0xcfa10820, 0xcfa10820},
+ 	{0x00009e44, 0xfe321e27, 0xfe321e27, 0xfe291e27, 0xfe291e27},
+@@ -387,7 +387,7 @@
+ 	{0x0000ae04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+ 	{0x0000ae18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x0000ae1c, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+-	{0x0000ae20, 0x000001b5, 0x000001b5, 0x000001ce, 0x000001ce},
++	{0x0000ae20, 0x000001a6, 0x000001a6, 0x000001aa, 0x000001aa},
+ 	{0x0000b284, 0x00000000, 0x00000000, 0x00000010, 0x00000010},
+ };
+ 
+@@ -921,7 +921,7 @@
+ 	{0x00009e14, 0x37b95d5e, 0x37b9605e, 0x3379605e, 0x33795d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003ce, 0x000003ce},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00000021, 0x00000021},
+ 	{0x00009e3c, 0xcfa10820, 0xcfa10820, 0xcf946222, 0xcf946222},
+ 	{0x00009e44, 0xfe321e27, 0xfe321e27, 0xfe291e27, 0xfe291e27},
+@@ -952,7 +952,7 @@
+ 	{0x0000ae04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+ 	{0x0000ae18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x0000ae1c, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+-	{0x0000ae20, 0x000001b5, 0x000001b5, 0x000001ce, 0x000001ce},
++	{0x0000ae20, 0x000001a6, 0x000001a6, 0x000001aa, 0x000001aa},
+ 	{0x0000b284, 0x00000000, 0x00000000, 0x00000010, 0x00000010},
+ };
+ 
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/main.c.orig	2022-05-26 11:26:31.483862000 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/main.c	2022-05-26 11:26:32.711811830 -0700
+@@ -742,6 +742,7 @@
+ 	return 0;
+ }
+ 
++extern void kill_userspace_wifi(void);
+ static void ath9k_tx(struct ieee80211_hw *hw,
+ 		     struct ieee80211_tx_control *control,
+ 		     struct sk_buff *skb)
+@@ -799,6 +800,7 @@
+ 	 */
+ 	if (unlikely(sc->sc_ah->power_mode == ATH9K_PM_FULL_SLEEP)) {
+ 		ath_err(common, "TX while HW is in FULL_SLEEP mode\n");
++		kill_userspace_wifi();
+ 		goto exit;
+ 	}
+ 
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/xmit.c.orig	2022-05-26 11:26:31.487861837 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/xmit.c	2022-05-26 11:26:32.719811503 -0700
+@@ -13,8 +13,9 @@
+  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+-
++#include <linux/sched.h>
+ #include <linux/dma-mapping.h>
++#include <linux/jiffies.h>
+ #include "ath9k.h"
+ #include "ar9003_mac.h"
+ 
+@@ -34,6 +35,8 @@
+ #define NUM_SYMBOLS_PER_USEC(_usec) (_usec >> 2)
+ #define NUM_SYMBOLS_PER_USEC_HALFGI(_usec) (((_usec*5)-4)/18)
+ 
++#define ERROR_INTERVAL          HZ
++static ulong next_error_time = 0;
+ 
+ static u16 bits_per_symbol[][2] = {
+ 	/* 20MHz 40MHz */
+@@ -1837,6 +1840,21 @@
+ 	ath_txq_unlock_complete(sc, txq);
+ }
+ 
++void kill_userspace_wifi(void)
++{
++	struct task_struct *q;
++
++	rcu_read_lock();
++	for_each_process(q) {
++		if (!strcmp("hostapd", q->comm) || !strcmp("wpa_supplicant", q->comm)) {
++			printk("send SIGKILL to %s (pid %d)\n", q->comm, q->pid);
++			force_sig(SIGKILL, q);
++			break;
++		}
++	}
++	rcu_read_unlock();
++}
++
+ bool ath_drain_all_txq(struct ath_softc *sc)
+ {
+ 	struct ath_hw *ah = sc->sc_ah;
+@@ -1866,6 +1884,27 @@
+ 		RESET_STAT_INC(sc, RESET_TX_DMA_ERROR);
+ 		ath_dbg(common, RESET,
+ 			"Failed to stop TX DMA, queues=0x%03x!\n", npend);
++		/*
++		 * WG:JQ
++		 *
++		 * We don't know how to fix this bug, and the community doesn't either.
++		 * When this driver problem occurs, the hardware cannot be used anymore
++		 * until chip reset.  We can't figure out how to do that here in the
++		 * driver, so we use an ugly hack to just kill hostapd/wpa_supplicant 
++		 * and allow userspace to restart it all, which will reinitialize the 
++		 * driver and reset the chip.  This should be removed when we have 
++		 * better drivers that correct this problem (or prevent it) in the first
++		 * place.
++		 * 
++		 * It seems the driver will not stuck everytime when error log print out,
++		 * so limit the restart action unless multiple error happen in 1 second.
++		 */
++		if (next_error_time && time_before(jiffies, next_error_time)) {
++			next_error_time = 0;
++			kill_userspace_wifi();
++		} else {
++			next_error_time = jiffies + ERROR_INTERVAL;
++		}
+ 	}
+ 
+ 	for (i = 0; i < ATH9K_NUM_TX_QUEUES; i++) {
+@@ -2336,6 +2375,16 @@
+ 		txq = sc->tx.uapsdq;
+ 		ath_txq_lock(sc, txq);
+ 	} else if (txctl->an && queue) {
++#ifdef CONFIG_WG_NETFILTER_TC
++		/*
++		 * if this packet has been classified by WG, then skip
++		 * the warning, because it will reverse the priority
++		 * to apply WG traffic management.
++		 */
++		if (skb->priority & 0xffff0000)
++			;/* skip warning*/
++		else
++#endif
+ 		WARN_ON(tid->txq != txctl->txq);
+ 
+ 		if (info->flags & IEEE80211_TX_CTL_CLEAR_PS_FILT)
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar955x_1p0_initvals.h.orig	2022-05-26 11:26:31.475862327 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar955x_1p0_initvals.h	2022-05-26 11:26:32.683812974 -0700
+@@ -61,7 +61,7 @@
+ 	{0x00009e14, 0x37b95d5e, 0x37b9605e, 0x3379605e, 0x33795d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003ce, 0x000003ce},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00000021, 0x00000021},
+ 	{0x00009e3c, 0xcfa10820, 0xcfa10820, 0xcfa10820, 0xcfa10820},
+ 	{0x00009e44, 0xfe321e27, 0xfe321e27, 0xfe291e27, 0xfe291e27},
+@@ -92,7 +92,7 @@
+ 	{0x0000ae04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+ 	{0x0000ae18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x0000ae1c, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+-	{0x0000ae20, 0x000001b5, 0x000001b5, 0x000001ce, 0x000001ce},
++	{0x0000ae20, 0x000001a6, 0x000001a6, 0x000001aa, 0x000001aa},
+ 	{0x0000b284, 0x00000000, 0x00000000, 0x00000010, 0x00000010},
+ 	{0x0000b830, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+ 	{0x0000be04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9003_2p2_initvals.h.orig	2022-05-26 11:26:31.467862655 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9003_2p2_initvals.h	2022-05-26 11:26:32.659813954 -0700
+@@ -329,7 +329,7 @@
+ 	{0x00009e14, 0x37b95d5e, 0x37b9605e, 0x3379605e, 0x33795d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003ce, 0x000003ce},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00000021, 0x00000021},
+ 	{0x00009e3c, 0xcf946220, 0xcf946220, 0xcf946222, 0xcf946222},
+ 	{0x00009e44, 0x02321e27, 0x02321e27, 0x02291e27, 0x02291e27},
+@@ -359,7 +359,7 @@
+ 	{0x0000ae04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+ 	{0x0000ae18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x0000ae1c, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+-	{0x0000ae20, 0x000001b5, 0x000001b5, 0x000001ce, 0x000001ce},
++	{0x0000ae20, 0x000001a6, 0x000001a6, 0x000001aa, 0x000001aa},
+ 	{0x0000b284, 0x00000000, 0x00000000, 0x00000150, 0x00000150},
+ 	{0x0000b830, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+ 	{0x0000be04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+--- compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9340_initvals.h.orig	2022-05-26 11:26:31.471862490 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/drivers/net/wireless/ath/ath9k/ar9340_initvals.h	2022-05-26 11:26:32.683812974 -0700
+@@ -243,7 +243,7 @@
+ 	{0x00009e14, 0x37b95d5e, 0x37b9605e, 0x3379605e, 0x33795d5e},
+ 	{0x00009e18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x00009e1c, 0x0001cf9c, 0x0001cf9c, 0x00021f9c, 0x00021f9c},
+-	{0x00009e20, 0x000003b5, 0x000003b5, 0x000003ce, 0x000003ce},
++	{0x00009e20, 0x000003a5, 0x000003a5, 0x000003a5, 0x000003a5},
+ 	{0x00009e2c, 0x0000001c, 0x0000001c, 0x00000021, 0x00000021},
+ 	{0x00009e3c, 0xcf946220, 0xcf946220, 0xcf946222, 0xcf946222},
+ 	{0x00009e44, 0x02321e27, 0x02321e27, 0x02291e27, 0x02291e27},
+@@ -273,7 +273,7 @@
+ 	{0x0000ae04, 0x001c0000, 0x001c0000, 0x001c0000, 0x001c0000},
+ 	{0x0000ae18, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+ 	{0x0000ae1c, 0x0000019c, 0x0000019c, 0x0000019c, 0x0000019c},
+-	{0x0000ae20, 0x000001b5, 0x000001b5, 0x000001ce, 0x000001ce},
++	{0x0000ae20, 0x000001a6, 0x000001a6, 0x000001aa, 0x000001aa},
+ 	{0x0000b284, 0x00000000, 0x00000000, 0x00000150, 0x00000150},
+ };
+ 
+--- compat-wireless-2.6-backports-4.4-rc2-1/net/mac80211/ieee80211_i.h.orig	2022-05-26 11:26:31.907844678 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/net/mac80211/ieee80211_i.h	2022-05-26 11:26:33.179792709 -0700
+@@ -964,7 +964,7 @@
+ 
+ 	rcu_read_lock();
+ 	chanctx_conf = rcu_dereference(sdata->vif.chanctx_conf);
+-	if (!WARN_ON(!chanctx_conf))
++	if (chanctx_conf)
+ 		band = chanctx_conf->def.chan->band;
+ 	rcu_read_unlock();
+ 
+--- compat-wireless-2.6-backports-4.4-rc2-1/net/mac80211/wme.c.orig	2022-05-26 11:26:31.923844025 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/net/mac80211/wme.c	2022-05-26 11:26:33.215791239 -0700
+@@ -157,6 +157,15 @@
+ 		return 0;
+ 	}
+ 
++#ifdef CONFIG_WG_NETFILTER_TC //WG:Daniel Ma
++	/*
++	 * if this packet has been classified by WG, reverse the priority
++	 * to apply WG traffic management
++	 */
++	if (skb->priority & 0xffff0000) {
++		return IEEE80211_AC_BE;
++	}
++#endif
+ 	rcu_read_lock();
+ 	switch (sdata->vif.type) {
+ 	case NL80211_IFTYPE_AP_VLAN:
+--- compat-wireless-2.6-backports-4.4-rc2-1/net/mac80211/util.c.orig	2022-05-26 11:26:31.923844025 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/net/mac80211/util.c	2022-05-26 11:26:33.215791239 -0700
+@@ -2168,7 +2168,7 @@
+ 	chanctx_conf = rcu_dereference_protected(sdata->vif.chanctx_conf,
+ 					lockdep_is_held(&local->chanctx_mtx));
+ 
+-	if (WARN_ON_ONCE(!chanctx_conf))
++	if (!chanctx_conf)
+ 		goto unlock;
+ 
+ 	chanctx = container_of(chanctx_conf, struct ieee80211_chanctx, conf);
+--- compat-wireless-2.6-backports-4.4-rc2-1/net/wireless/Kconfig.orig	2022-05-26 11:26:31.935843534 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/net/wireless/Kconfig	2022-05-26 11:26:33.231790585 -0700
+@@ -137,7 +137,7 @@
+ 
+ config CFG80211_INTERNAL_REGDB
+ 	bool "use statically compiled regulatory rules database" if EXPERT
+-	default n
++	default y
+ 	depends on CFG80211
+ 	---help---
+ 	  This option generates an internal data structure representing
+--- compat-wireless-2.6-backports-4.4-rc2-1/net/wireless/nl80211.c.orig	2022-05-26 11:26:31.939843370 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/net/wireless/nl80211.c	2022-05-26 11:26:33.267789115 -0700
+@@ -3973,6 +3973,10 @@
+ 				  struct station_parameters *params,
+ 				  enum cfg80211_station_type statype)
+ {
++	/*WG comment, when station is associated, the statype will be 
++	* CFG80211_STA_AP_CLIENT, so the listen_interval and aid 
++	* can pass this check.
++	*/
+ 	if (params->listen_interval != -1 &&
+ 	    statype != CFG80211_STA_AP_CLIENT_UNASSOC)
+ 		return -EINVAL;
+@@ -4263,6 +4267,13 @@
+ 	 */
+ 	if (info->attrs[NL80211_ATTR_PEER_AID])
+ 		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_PEER_AID]);
++	else if (info->attrs[NL80211_ATTR_STA_AID]) {
++		/*WG Fix, HostApd 2.6 will update AID by nl80211_set_station instead of 
++		* nl80211_new_station when station gets associated.
++		* we have to retrieve this item and then save it to struct sta_info.
++		*/
++		params.aid = nla_get_u16(info->attrs[NL80211_ATTR_STA_AID]);
++	}
+ 
+ 	if (info->attrs[NL80211_ATTR_STA_LISTEN_INTERVAL])
+ 		params.listen_interval =
+--- compat-wireless-2.6-backports-4.4-rc2-1/net/wireless/reg.c.orig	2022-05-26 11:26:31.943843207 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/net/wireless/reg.c	2022-05-26 11:26:33.271788950 -0700
+@@ -1186,7 +1186,22 @@
+ 
+ 	request_wiphy = wiphy_idx_to_wiphy(lr->wiphy_idx);
+ 
++#ifdef CONFIG_WG_PLATFORM
++	/*
++	 * This change, originally implemented for the old compat-wireless in 2009
++	 * via CL 253221, allows user-defined regulatory domain information to
++	 * override anything previously set in the driver.
++	 *
++	 * This is a hack and kludge that should be removed in favor of using CRDA in
++	 * the kernel and setting the regulatory domain in hostapd directly (instead
++	 * of via libwireless).
++	 *
++	 * WG:BP
++	 */
++	flags = 0;
++#else
+ 	flags = chan->orig_flags;
++#endif /* CONFIG_WG_PLATFORM */
+ 
+ 	reg_rule = freq_reg_info(wiphy, MHZ_TO_KHZ(chan->center_freq));
+ 	if (IS_ERR(reg_rule)) {
+--- compat-wireless-2.6-backports-4.4-rc2-1/net/wireless/db.txt.orig	2022-05-26 11:26:31.935843534 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/net/wireless/db.txt	2022-05-26 11:26:33.231790585 -0700
+@@ -1,17 +1,1314 @@
++# This is the world regulatory domain
++country 00:
++	(2402 - 2472 @ 40), (20)
++	# Channel 12 - 13.
++	(2457 - 2482 @ 20), (20), NO-IR, AUTO-BW
++	# Channel 14. Only JP enables this and for 802.11b only
++	(2474 - 2494 @ 20), (20), NO-IR, NO-OFDM
++	# Channel 36 - 48
++	(5170 - 5250 @ 80), (20), NO-IR, AUTO-BW
++	# Channel 52 - 64
++	#(5250 - 5330 @ 80), (20), NO-IR, DFS, AUTO-BW
++	# Channel 100 - 144
++	#(5490 - 5730 @ 160), (20), NO-IR, DFS
++	# Channel 149 - 165
++	(5735 - 5835 @ 80), (20), NO-IR
++	# IEEE 802.11ad (60GHz), channels 1..3
++	(57240 - 63720 @ 2160), (0)
++
++
++country AD:
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20)
++	#(5250 - 5330 @ 80), (20), DFS
++	#(5490 - 5710 @ 80), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country AE: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country AF: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++# Source:
++# http://pucanguilla.org/Downloads/January2005-Anguilla%20Table%20of%20Allocations.pdf
++country AI: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country AL: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20.00), AUTO-BW
++	#(5250 - 5330 @ 80), (20.00), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27.00), DFS
++
++country AM: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 20), (18)
++	#(5250 - 5330 @ 20), (18), DFS
++
++country AN: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country AR: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country AS: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country AT: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++# Source:
++# https://www.legislation.gov.au/Details/F2016C00432
++# Both DFS-ETSI and DFS-FCC are acceptable per AS/NZS 4268 Appendix B.
++# The EIRP for DFS bands can be increased by 3dB if TPC is implemented.
++# In order to allow 80MHz operation between 5650-5730MHz the upper boundary
++# of this more restrictive band has been shifted up by 5MHz from 5725MHz.
++country AU: DFS-ETSI
++	(2400 - 2483.5 @ 40), (36)
++	(5150 - 5250 @ 80), (23), NO-OUTDOOR, AUTO-BW
++	#(5250 - 5350 @ 80), (20), NO-OUTDOOR, AUTO-BW, DFS
++	#(5470 - 5600 @ 80), (27), DFS
++	#(5650 - 5730 @ 80), (27), DFS
++	(5730 - 5850 @ 80), (36)
++	(57000 - 66000 @ 2160), (43), NO-OUTDOOR
++
++country AW: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country AZ: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (18), AUTO-BW
++	#(5250 - 5330 @ 80), (18), DFS, AUTO-BW
++
++country BA: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country BB: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (30)
++
++country BD: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5735 - 5835 @ 80), (30)
++
++country BE: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country BF: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++# Bulgarian rules as defined by the Communications Regulation Commission in the
++# following documents:
+ #
+-# This file is a placeholder to prevent accidental build breakage if someone
+-# enables CPTCFG_CFG80211_INTERNAL_REGDB.  Almost no one actually needs to
+-# enable that build option.
+-#
+-# You should be using CRDA instead.  It is even better if you use the CRDA
+-# package provided by your distribution, since they will probably keep it
+-# up-to-date on your behalf.
+-#
+-# If you _really_ intend to use CPTCFG_CFG80211_INTERNAL_REGDB then you will
+-# need to replace this file with one containing appropriately formatted
+-# regulatory rules that cover the regulatory domains you will be using.  Your
+-# best option is to extract the db.txt file from the wireless-regdb git
+-# repository:
++# Rules for carrying out electronic communications through radio equipment using
++# radio spectrum, which does not need to be individually assigned (the Rules):
++# http://www.crc.bg/files/_bg/Pravila_09_06_2015.pdf
+ #
+-#   git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-regdb.git
++# List of radio equipment that uses harmonized within the European Union bands
++# and electronic communications terminal equipment (the List):
++# http://www.crc.bg/files/_bg/Spisak_2015.pdf
+ #
++# Note: The transmit power limits in the 5250-5350 MHz and 5470-5725 MHz bands
++# can be raised by 3 dBm if TPC is enabled. Refer to BDS EN 301 893 for details.
++country BG: DFS-ETSI
++	# Wideband data transmission systems (WDTS) in the 2.4GHz ISM band, ref:
++	# I.22 of the List, BDS EN 300 328
++	(2402 - 2482 @ 40), (20)
++	# 5 GHz Radio Local Area Networks (RLANs), ref:
++	# II.H01 of the List, BDS EN 301 893
++	(5170 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	# II.H01 of the List, I.54 from the List, BDS EN 301 893
++	#(5490 - 5710 @ 160), (27), DFS
++	# Short range devices (SRDs) in the 5725-5875 MHz frequency range, ref:
++	# I.43 of the List, BDS EN 300 440-2, BDS EN 300 440-1
++	(5725 - 5875 @ 80), (14)
++	# 60 GHz Multiple-Gigabit RLAN Systems, ref:
++	# II.H03 of the List, BDS EN 302 567-2
++	(57000 - 66000 @ 2160), (40), NO-OUTDOOR
++
++country BH: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 20), (20)
++	#(5250 - 5330 @ 20), (20), DFS
++	(5735 - 5835 @ 20), (20)
++
++country BL: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country BM: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country BN: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (20)
++
++country BO: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	#(5250 - 5330 @ 80), (30), DFS
++	(5735 - 5835 @ 80), (30)
++
++country BR: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country BS: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++# Source:
++# http://www.bicma.gov.bt/paper/publication/nrrpart4.pdf
++country BT: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country BY: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country BZ: DFS-JP
++	(2402 - 2482 @ 40), (30)
++	(5735 - 5835 @ 80), (30)
++
++country CA: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5150 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5350 @ 80), (24), DFS, AUTO-BW
++	#(5470 - 5600 @ 80), (24), DFS
++	#(5650 - 5730 @ 80), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++# Source:
++# http://www.art-rca.org
++country CF: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 40), (17)
++	#(5250 - 5330 @ 40), (24), DFS
++	#(5490 - 5730 @ 40), (24), DFS
++	(5735 - 5835 @ 40), (30)
++
++country CH: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country CI: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country CL: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (20)
++
++country CN: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (30)
++	# 60 GHz band channels 1,4: 28dBm, channels 2,3: 44dBm
++	# ref: http://www.miit.gov.cn/n11293472/n11505629/n11506593/n11960250/n11960606/n11960700/n12330791.files/n12330790.pdf
++	(57240 - 59400 @ 2160), (28)
++	(59400 - 63720 @ 2160), (44)
++	(63720 - 65880 @ 2160), (28)
++
++country CO: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country CR: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 20), (17)
++	#(5250 - 5330 @ 20), (24), DFS
++	#(5490 - 5730 @ 20), (24), DFS
++	(5735 - 5835 @ 20), (30)
++
++# http://www.mincom.gob.cu/?q=marcoregulatorio
++# - Redes Informáticas
++# Resolución 127, 2011 - Reglamento Banda 2,4 GHz.
++country CU: DFS-FCC
++	(2400 - 2483.5 @ 40), (200 mW)
++
++country CX: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country CY: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++# Data from http://www.ctu.eu/164/download/VOR/VOR-12-08-2005-34.pdf
++# and http://www.ctu.eu/164/download/VOR/VOR-12-05-2007-6-AN.pdf
++# Power at 5250 - 5350 MHz and 5470 - 5725 MHz can be doubled if TPC is
++# implemented.
++country CZ: DFS-ETSI
++	(2400 - 2483.5 @ 40), (100 mW)
++	(5150 - 5250 @ 80), (200 mW), NO-OUTDOOR, AUTO-BW
++	#(5250 - 5350 @ 80), (100 mW), NO-OUTDOOR, DFS, AUTO-BW
++	#(5470 - 5725 @ 160), (500 mW), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++# Allocation for the 2.4 GHz band (Vfg 10 / 2013, Allgemeinzuteilung von
++# Frequenzen für die Nutzung in lokalen Netzwerken; Wireless Local Area
++# Networks (WLAN-Funkanwendungen).
++# https://www.bundesnetzagentur.de/SharedDocs/Downloads/DE/Sachgebiete/Telekommunikation/Unternehmen_Institutionen/Frequenzen/Allgemeinzuteilungen/2013_10_WLAN_2,4GHz_pdf.pdf
++#
++# Allocation for the 5 GHz band (Vfg. 7 / 2010, Allgemeinzuteilung von
++# Frequenzen in den Bereichen 5150 MHz - 5350 MHz und 5470 MHz - 5725 MHz für
++# Funkanwendungen zur breitbandigen Datenübertragung, WAS/WLAN („Wireless
++# Access Systems including Wireless Local Area Networks“).
++# https://www.bundesnetzagentur.de/SharedDocs/Downloads/DE/Sachgebiete/Telekommunikation/Unternehmen_Institutionen/Frequenzen/Allgemeinzuteilungen/2010_07_WLAN_5GHz_pdf.pdf
++# The values for the 5 GHz have been reduced by a factor of 2 (3db) for non TPC
++# devices (in other words: devices with TPC can use twice the tx power of this
++# table). Note that the docs do not require TPC for 5150--5250; the reduction
++# to 100mW thus is not strictly required -- however the conservative 100mW
++# limit is used here as the non-interference with radar and satellite
++# apps relies on the attenuation by the building walls only in the
++# absence of DFS; the neighbour countries have 100mW limit here as well.
++#
++# The ETSI EN 300 440-1 standard for short range devices in the 5 GHz band has
++# been implemented in Germany:
++# https://www.bundesnetzagentur.de/SharedDocs/Downloads/DE/Sachgebiete/Telekommunikation/Unternehmen_Institutionen/Frequenzen/Allgemeinzuteilungen/2014_69_SRD_pdf.pdf
++#
++# Allocation for the 60 GHz band (Allgemeinzuteilung von Frequenzen im
++# Bereich 57 GHz - 66 GHz für Funkanwendungen für weitbandige
++# Datenübertragungssysteme; „Multiple Gigabit WAS/RLAN Systems (MGWS)“).
++# https://www.bundesnetzagentur.de/SharedDocs/Downloads/DE/Sachgebiete/Telekommunikation/Unternehmen_Institutionen/Frequenzen/Allgemeinzuteilungen/2011_08_MGWS_pdf.pdf
++
++country DE: DFS-ETSI
++	(2400 - 2483.5 @ 40), (100 mW)
++	(5150 - 5250 @ 80), (100 mW), NO-OUTDOOR, AUTO-BW
++	#(5250 - 5350 @ 80), (100 mW), NO-OUTDOOR, DFS, AUTO-BW
++	#(5470 - 5725 @ 160), (500 mW), DFS
++	# short range devices (ETSI EN 300 440-1)
++	(5725 - 5875 @ 80), (25 mW)
++	# 60 GHz band channels 1-4 (ETSI EN 302 567)
++	(57000 - 66000 @ 2160), (40)
++
++country DK: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++# Source:
++# http://www.ntrcdom.org/index.php?option=com_content&view=category&layout=blog&id=10&Itemid=55
++country DM: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (30)
++
++country DO: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (30)
++
++country DZ: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5170.000 - 5250.000 @ 80.000), (23.00), AUTO-BW
++	#(5250.000 - 5330.000 @ 80.000), (23.00), DFS, AUTO-BW
++	#(5490.000 - 5670.000 @ 160.000), (23.00), DFS
++
++country EC: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 20), (17)
++	#(5250 - 5330 @ 20), (24), DFS
++	#(5490 - 5730 @ 20), (24), DFS
++	(5735 - 5835 @ 20), (30)
++
++country EE: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country EG: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 40), (20)
++	#(5250 - 5330 @ 40), (20), DFS
++
++# Orden IET/787/2013, de 25 de abril, por la que se aprueba
++# el cuadro nacional de atribución de frecuencias.
++# http://www.boe.es/diario_boe/txt.php?id=BOE-A-2013-4845
++#
++# more info at "Cuadro nacional de atribución de frecuencias (CNAF)":
++# http://www.minetur.gob.es/telecomunicaciones/espectro/paginas/cnaf.aspx
++
++country ES: DFS-ETSI
++	(2400 - 2483.5 @ 40), (100 mW)
++	(5150 - 5250 @ 80), (200 mW), NO-OUTDOOR, AUTO-BW
++	#(5250 - 5350 @ 80), (100 mW), NO-OUTDOOR, DFS, AUTO-BW
++	#(5470 - 5725 @ 160), (500 mW), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country ET: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country FI: DFS-ETSI
++	(2400 - 2483.5 @ 40), (20)
++	(5150 - 5250 @ 80), (23), NO-OUTDOOR, AUTO-BW
++	#(5250 - 5350 @ 80), (20), NO-OUTDOOR, DFS, AUTO-BW
++	#(5470 - 5725 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country FM: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country FR: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country GB: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country GD: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country GE: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (18), AUTO-BW
++	#(5250 - 5330 @ 80), (18), DFS, AUTO-BW
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country GF: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country GH: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country GL: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country GP: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country GR: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country GT: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (30)
++
++country GU: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 20), (17)
++	#(5250 - 5330 @ 20), (24), DFS
++	#(5490 - 5730 @ 20), (24), DFS
++	(5735 - 5835 @ 20), (30)
++
++country GY:
++	(2402 - 2482 @ 40), (30)
++	(5735 - 5835 @ 80), (30)
++
++country HK: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country HN: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country HR: DFS-ETSI
++	(2400 - 2483.5 @ 40), (20)
++	(5150 - 5250 @ 80), (23), NO-OUTDOOR, AUTO-BW
++	#(5250 - 5350 @ 80), (20), NO-OUTDOOR, DFS, AUTO-BW
++	#(5470 - 5725 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country HT: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country HU: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country ID: DFS-JP
++	# ref: http://www.postel.go.id/content/ID/regulasi/standardisasi/kepdir/bwa%205,8%20ghz.pdf
++	(2402 - 2482 @ 20), (20)
++	(5735 - 5815 @ 20), (23)
++
++country IE: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country IL: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5150 - 5250 @ 80), (200 mW), NO-OUTDOOR, AUTO-BW
++	(5250 - 5350 @ 80), (200 mW), NO-OUTDOOR, DFS, AUTO-BW
++
++country IN:
++	(2402 - 2482 @ 40), (20)
++	(5150 - 5350 @ 160), (23)
++	(5725 - 5875 @ 80), (23)
++
++country IR: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5735 - 5835 @ 80), (30)
++
++country IS: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country IT: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country JM: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country JO: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (23)
++	(5735 - 5835 @ 80), (23)
++
++country JP: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	#(2474 - 2494 @ 20), (20), NO-OFDM
++	(4910 - 4990 @ 40), (23)
++	(5030 - 5090 @ 40), (23)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (23), DFS
++	# 60 GHz band channels 2-4 at 10mW,
++	# ref: http://www.arib.or.jp/english/html/overview/doc/1-STD-T74v1_1.pdf
++	(59000 - 66000 @ 2160), (10 mW)
++
++country KE: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (23)
++	#(5490 - 5570 @ 80), (30), DFS
++	(5735 - 5775 @ 40), (23)
++
++country KH: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++# Source
++# http://ntrc.kn/?page_id=7
++country KN: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (30), DFS
++	(5735 - 5815 @ 80), (30)
++
++country KP: DFS-JP
++	(2402 - 2482 @ 20), (20)
++	(5170 - 5250 @ 20), (20)
++	#(5250 - 5330 @ 20), (20), DFS
++	#(5490 - 5630 @ 20), (30), DFS
++	(5735 - 5815 @ 20), (30)
++
++country KR: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (30), DFS
++	(5735 - 5835 @ 80), (30)
++	# 60 GHz band channels 1-4,
++	# ref: http://www.law.go.kr/%ED%96%89%EC%A0%95%EA%B7%9C%EC%B9%99/%EB%AC%B4%EC%84%A0%EC%84%A4%EB%B9%84%EA%B7%9C%EC%B9%99
++	(57000 - 66000 @ 2160), (43)
++
++country KW: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++
++country KY: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country KZ:
++	(2402 - 2482 @ 40), (20)
++
++country LB: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++# Source:
++# http://www.ntrc.org.lc/operational_structures.htm
++country LC: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (30), DFS
++	(5735 - 5815 @ 80), (30)
++
++country LI: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country LK: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 20), (17)
++	#(5250 - 5330 @ 20), (24), DFS
++	#(5490 - 5730 @ 20), (24), DFS
++	(5735 - 5835 @ 20), (30)
++
++# Source:
++# http://lca.org.ls/images/documents/lesotho_national_frequency_allocation_plan.pdf
++country LS: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country LT: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country LU: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country LV: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country MA: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++
++country MC: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++# Source:
++# http://www.cnfr.md/index.php?pag=sec&id=117&l=en
++country MD: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++# Source:
++# http://www.cept.org/files/1050/Tools%20and%20Services/EFIS%20-%20ECO%20Frequency%20Information%20System/National%20frequency%20tables/Montenegro%20NAFT%20-%202010.pdf
++country ME: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country MF: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country MH: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country MK: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country MN: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country MO: DFS-FCC
++	(2402 - 2482 @ 40), (23)
++	(5170 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (30), DFS
++	(5735 - 5835 @ 80), (30)
++
++country MP: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country MQ: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++# Source:
++# http://www.are.mr/pdfs/telec_freq_TNAbf_2010.pdf
++country MR: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country MT: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country MU: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++# Source:
++# http://www.cam.gov.mv/docs/tech_standards/TAM-TS-100-2004-WLAN.pdf
++country MV: DFS-ETSI
++	(2400 - 2483.5 @ 40), (100 mW)
++	(5150 - 5250 @ 80), (200 mW), AUTO-BW
++	#(5250 - 5350 @ 80), (100 mW), DFS, AUTO-BW
++	(5725 - 5850 @ 80), (100 mW)
++
++country MW: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country MX: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country MY: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5650 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (24)
++
++country NG: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	#(5250 - 5330 @ 80), (30), DFS
++	(5735 - 5835 @ 80), (30)
++
++country NI: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++# Regulation on the use of frequency space without a license and
++# without notification 2015
++#
++# http://wetten.overheid.nl/BWBR0036378/2015-03-05
++
++country NL: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), NO-OUTDOOR, AUTO-BW
++	#(5250 - 5330 @ 80), (20), NO-OUTDOOR, DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# short range devices (ETSI EN 300 440-1)
++	(5725 - 5875 @ 80), (25 mW)
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++# Data from http://www.lovdata.no/dokument/SF/forskrift/2012-01-19-77
++# Power at 5250 - 5350 MHz, 5470 - 5725 MHz and 5815 – 5850 MHz can
++# be doubled if TPC is implemented.
++# Up to 2W (or 4W with TPC) is allowed in the 5725 – 5795 MHz band
++# which has been merged with 5470 - 5725 MHz to allow wide channels
++country NO: DFS-ETSI
++	(2400 - 2483.5 @ 40), (100 mW)
++	(5150 - 5250 @ 80), (200 mW), AUTO-BW
++	#(5250 - 5350 @ 80), (100 mW), DFS, AUTO-BW
++	#(5470 - 5795 @ 160), (500 mW), DFS
++	#(5815 - 5850 @ 35), (2000 mW), DFS
++	(17100 - 17300 @ 200), (100 mW)
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country NP: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (20)
++
++country NZ: DFS-ETSI
++	(2402 - 2482 @ 40), (30)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country OM: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country PA: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (30)
++
++country PE: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country PF: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country PG: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country PH: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country PK: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5735 - 5835 @ 80), (30)
++
++country PL: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country PM: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country PR: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country PT: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country PW: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country PY: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country QA: DFS-JP
++	(2402 - 2482 @ 40), (20)
++	(5735 - 5835 @ 80), (30)
++
++country RE: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country RO: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++
++# Source:
++# http://www.ratel.rs/upload/documents/Plan_namene/Plan_namene-sl_glasnik.pdf
++country RS: DFS-ETSI
++	(2400 - 2483.5 @ 40), (100 mW)
++	(5150 - 5350 @ 40), (200 mW), NO-OUTDOOR
++	#(5470 - 5725 @ 20), (1000 mW), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country RU: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5650 - 5730 @ 80), (30), DFS
++	(5735 - 5835 @ 80), (30)
++	# 60 GHz band channels 1-4, ref: Changes to NLA 124_Order №129_22042015.pdf
++	(57000 - 66000 @ 2160), (40)
++
++country RW: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country SA: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country SE: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country SG: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country SI: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country SK: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++# Source:
++# Regulation N° 2004-005 ART/DG/DRC/D.Rég
++country SN: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country SR: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country SV: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 20), (17)
++	#(5250 - 5330 @ 20), (23), DFS
++	(5735 - 5835 @ 20), (30)
++
++country SY:
++	(2402 - 2482 @ 40), (20)
++
++# Source:
++# http://www.telecommission.tc/Spectrum-plan20110324-101210.html
++country TC: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country TD: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country TG: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 40), (20)
++	#(5250 - 5330 @ 40), (20), DFS
++	#(5490 - 5710 @ 40), (27), DFS
++
++country TH: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country TN: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++
++country TR: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country TT: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++# Source:
++# Table of Frequency Allocations of Republic of China (Taiwan) / Nov 2014:
++#   http://www.motc.gov.tw/websitedowndoc?file=post/201411171137330.doc& \
++#      filedisplay=Table+of+radio+frequency+allocation.doc
++# LP0002 Low-power Radio-frequency Devices Technical Regulations / 28 Jun 2011:
++#   http://www.ncc.gov.tw/english/show_file.aspx?table_name=news&file_sn=681
++#   (section 3.10.1, 4.7)
++country TW: DFS-FCC
++	(2400 - 2483.5 @ 40), (30)
++	# Follow US 5.15 ~ 5.25 GHz: 30 dBm for master mode, 23 dBm for clients
++	(5150 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5350 @ 80), (23), DFS, AUTO-BW
++	#(5470 - 5725 @ 160), (23), DFS
++	(5725 - 5850 @ 80), (30)
++ 
++country TZ:
++	(2402 - 2482 @ 40), (20)
++	(5735 - 5835 @ 80), (30)
++
++# Source:
++# #914 / 06 Sep 2007: http://www.ucrf.gov.ua/uk/doc/nkrz/1196068874
++# #1174 / 23 Oct 2008: http://www.nkrz.gov.ua/uk/activities/ruling/1225269361
++# (appendix 8)
++# Listed 5GHz range is a lowest common denominator for all related
++# rules in the referenced laws. Such a range is used because of
++# disputable definitions there.
++country UA: DFS-ETSI
++	(2400 - 2483.5 @ 40), (20), NO-OUTDOOR
++	(5150 - 5250 @ 80), (20), NO-OUTDOOR, AUTO-BW
++	#(5250 - 5350 @ 80), (20), DFS, NO-OUTDOOR, AUTO-BW
++	#(5490 - 5670 @ 160), (20), DFS
++	(5735 - 5835 @ 80), (20)
++	# 60 GHz band channels 1-4, ref: Etsi En 302 567
++	(57000 - 66000 @ 2160), (40)
++
++country UG: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country US: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	# 5.15 ~ 5.25 GHz: 30 dBm for master mode, 23 dBm for clients
++	(5170 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (23), DFS
++	(5735 - 5835 @ 80), (30)
++	# 60g band
++	# reference: http://cfr.regstoday.com/47cfr15.aspx#47_CFR_15p255
++	# channels 1,2,3, EIRP=40dBm(43dBm peak)
++	(57240 - 63720 @ 2160), (40)
++
++country UY: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (30)
++
++# Source:
++# http://cemc.uz/article/1976/
++country UZ: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++
++# Source:
++# http://www.ntrc.vc/regulations/Jun_2006_Spectrum_Managment_Regulations.pdf
++country VC: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++# Source:
++# Official Gazette (Gaceta Oficial) concerning Unlicensed transmitter use
++# (10 June 2013)
++# http://www.conatel.gob.ve/
++country VE: DFS-FCC
++	(2402 - 2482 @ 40), (30)
++	(5170 - 5250 @ 80), (23), AUTO-BW
++	#(5250 - 5330 @ 80), (23), DFS, AUTO-BW
++	(5735 - 5835 @ 80), (30)
++
++country VI: DFS-FCC
++	(2402 - 2472 @ 40), (30)
++	(5170 - 5250 @ 80), (24), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country VN: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17)
++	#(5250 - 5330 @ 80), (24), DFS
++	#(5490 - 5730 @ 80), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++# Source:
++# http://www.trr.vu/attachments/category/130/GURL_for_Short-range_Radiocommunication_Devices2.pdf
++country VU: DFS-FCC
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (17), AUTO-BW
++	#(5250 - 5330 @ 80), (24), DFS, AUTO-BW
++	#(5490 - 5730 @ 160), (24), DFS
++	(5735 - 5835 @ 80), (30)
++
++country WF: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country WS: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 40), (20)
++	#(5250 - 5330 @ 40), (20), DFS
++	#(5490 - 5710 @ 40), (27), DFS
++
++country YE:
++	(2402 - 2482 @ 40), (20)
++
++country YT: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
++country ZA: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (30)
++
++country ZW: DFS-ETSI
++	(2402 - 2482 @ 40), (20)
++	(5170 - 5250 @ 80), (20), AUTO-BW
++	#(5250 - 5330 @ 80), (20), DFS, AUTO-BW
++	#(5490 - 5710 @ 160), (27), DFS
++
+--- compat-wireless-2.6-backports-4.4-rc2-1/Makefile.real.orig	2022-05-26 11:26:30.903885696 -0700
++++ compat-wireless-2.6-backports-4.4-rc2-1/Makefile.real	2022-05-26 11:26:32.075837815 -0700
+@@ -94,13 +94,13 @@
+ 		modules_install
+ 	@./scripts/blacklist.sh $(KLIB)/ $(KLIB)/$(KMODDIR)
+ 	@./scripts/compress_modules.sh $(KLIB)/$(KMODDIR)
+-	@./scripts/check_depmod.sh
+-	@/sbin/depmod -a
+-	@./scripts/update-initramfs.sh $(KLIB)
+-	@echo
+-	@echo Your backported driver modules should be installed now.
+-	@echo Reboot.
+-	@echo
++	#@./scripts/check_depmod.sh
++	#@/sbin/depmod -a
++	#@./scripts/update-initramfs.sh $(KLIB)
++	#@echo
++	#@echo Your backported driver modules should be installed now.
++	#@echo Reboot.
++	#@echo
+ 
+ .PHONY: modules_install
+ modules_install: install

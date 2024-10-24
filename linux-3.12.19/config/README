@@ -1,0 +1,52 @@
+README for kernel.config
+This dir holds the scripts WatchGuard kernel config files, and some utility scripts
+
+=======
+CONFIGS
+=======
+i386/*   : config file for all 32-bit x86 platforms
+
+x86_64/* : config file for all 64-bit x86 platforms
+
+powerpc/*: config file for all 32-bit powerpc platforms
+
+powerpc_64/*: config file for all 64-bit powerpc platforms
+
+=======
+SCRIPTS
+=======
+
+oldconfig-all.sh
+================
+This script does the following:
+a) check out every kernel.config and kdump.config
+b) run "make oldconfig" for every kernel.config and kdump.config
+c) copies the new .config file back to its original location.
+
+Use this if:  You have made changes to Kconfig, like adding a new CONFIG_XXXX value.
+This script will then validate it against every platform we build.
+
+oldconfig-opened.sh
+===================
+Does the following:
+a) for every kernel.config and kdump.config that is checked out
+b) runs "make oldconfig" on every currently p4 opened kernel.config and kdump.config
+c) checks that the new config isn't different from the p4 opened .config
+
+Use this if: you have changed the kernel.config in someway.  Sometimes changing a
+kernel.config will have ripple effects.  This script will catch that.
+
+split-config.sh
+===============
+This script finds any arch differences in a kernel.config file.  Tracks how configs are
+different, at the global, arch, and platform level.
+
+Use this if: you have changed a vashon kernel.config and it is now different from the
+spokane kernel.config
+
+audit-config.sh
+===============
+Runs split-config.sh to audit kernel.config file changes.  Tracks what config files
+are different at what level (global, arch, platform) and emails a watchlist if the
+there are more differences than the last time the audit ran.
+

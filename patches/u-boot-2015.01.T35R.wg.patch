@@ -1,0 +1,936 @@
+WatchGuard patches to sources for u-boot-2015.01.T35R as of
+Thu May 26 11:46:41 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- u-boot-2015.01.T35R/include/configs/T102xRDB.h.orig	2022-05-26 11:45:52.480306674 -0700
++++ u-boot-2015.01.T35R/include/configs/T102xRDB.h	2022-05-26 11:45:54.636218258 -0700
+@@ -11,6 +11,8 @@
+ #ifndef __T1024RDB_H
+ #define __T1024RDB_H
+ 
++#define CONFIG_T35
++#define CONFIG_WG_BOOTMENU
+ /* High Level Configuration Options */
+ #define CONFIG_SYS_GENERIC_BOARD
+ #define CONFIG_DISPLAY_BOARDINFO
+@@ -34,6 +36,11 @@
+ #define CONFIG_FSL_LAW			/* Use common FSL init code */
+ #define CONFIG_ENV_OVERWRITE
+ 
++/* WG:Enable the 'boot from /boot' option on uboot menu */
++#ifdef CONFIG_WG_BOOTMENU
++ #define ADD_WGMENU_BOOTBOOT
++#endif
++
+ /* support deep sleep */
+ #ifdef CONFIG_PPC_T1024
+ #define CONFIG_DEEP_SLEEP
+@@ -264,10 +271,9 @@
+ #endif
+ 
+ /* EEPROM */
+-#define CONFIG_ID_EEPROM
+ #define CONFIG_SYS_I2C_EEPROM_NXID
+ #define CONFIG_SYS_EEPROM_BUS_NUM	0
+-#define CONFIG_SYS_I2C_EEPROM_ADDR	0x50
++#define CONFIG_SYS_I2C_EEPROM_ADDR	0x51
+ #define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	2
+ #define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS 3
+ #define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS 5
+@@ -285,7 +291,7 @@
+ #define CONFIG_DDR_SPD
+ #define CONFIG_SYS_FSL_DDR3
+ #define CONFIG_SYS_SPD_BUS_NUM	0
+-#define SPD_EEPROM_ADDRESS	0x51
++#define SPD_EEPROM_ADDRESS	0x50
+ #define CONFIG_SYS_SDRAM_SIZE	4096	/* for fixed parameter use */
+ #elif defined(CONFIG_T1023RDB)
+ #define CONFIG_SYS_FSL_DDR4
+@@ -418,7 +424,6 @@
+ #define CONFIG_SYS_NAND_BASE_LIST	{ CONFIG_SYS_NAND_BASE }
+ #define CONFIG_SYS_MAX_NAND_DEVICE	1
+ #define CONFIG_MTD_NAND_VERIFY_WRITE
+-#define CONFIG_CMD_NAND
+ 
+ #if defined(CONFIG_NAND)
+ #define CONFIG_SYS_CSPR0_EXT		CONFIG_SYS_NAND_CSPR_EXT
+@@ -581,6 +586,24 @@
+ #define CONFIG_SPI_FLASH_BAR
+ #define CONFIG_SF_DEFAULT_SPEED	10000000
+ #define CONFIG_SF_DEFAULT_MODE	0
++#define CONFIG_SPI_FLASH_WINBOND
++
++/*
++ * SATA
++ */
++
++#define CONFIG_FSL_SATA_V2
++#ifdef CONFIG_FSL_SATA_V2
++#define CONFIG_LIBATA
++#define CONFIG_FSL_SATA
++#define CONFIG_SYS_SATA_MAX_DEVICE	1
++#define CONFIG_SATA1
++#define CONFIG_SYS_SATA1			CONFIG_SYS_MPC85xx_SATA1_ADDR
++#define CONFIG_SYS_SATA1_FLAGS		FLAGS_DMA
++#define CONFIG_LBA48
++#define CONFIG_SATA
++#define CONFIG_CMD_SATA
++#endif
+ 
+ /*
+  * General PCIe
+@@ -705,7 +728,6 @@
+ /*
+  * SDHC
+  */
+-#define CONFIG_MMC
+ #ifdef CONFIG_MMC
+ #define CONFIG_FSL_ESDHC
+ #define CONFIG_SYS_FSL_ESDHC_ADDR	CONFIG_SYS_MPC85xx_ESDHC_ADDR
+@@ -810,6 +832,8 @@
+ #define CONFIG_PHY_REALTEK
+ #define CONFIG_PHY_AQUANTIA
+ #if defined(CONFIG_T1024RDB)
++#define MARVELL_SWITCH_PORT5_ADDR      0x15
++#define MARVELL_SWITCH_PORT6_ADDR      0x16
+ #define RGMII_PHY1_ADDR		0x2
+ #define RGMII_PHY2_ADDR		0x6
+ #define SGMII_AQR_PHY_ADDR	0x2
+@@ -916,12 +940,13 @@
+ 
+ #ifdef CONFIG_PPC_T1024
+ #define CONFIG_BOARDNAME t1024rdb
+-#define BANK_INTLV cs0_cs1
++#define BANK_INTLV auto
+ #else
+ #define CONFIG_BOARDNAME t1023rdb
+ #define BANK_INTLV  null
+ #endif
+ 
++#if 0   /*SENAO*/
+ #define	CONFIG_EXTRA_ENV_SETTINGS				\
+ 	"hwconfig=fsl_ddr:ctlr_intlv=cacheline,"		\
+ 	"bank_intlv=" __stringify(BANK_INTLV) "\0"		\
+@@ -951,7 +976,95 @@
+ 	"setenv fdtaddr 0x00c00000;"			\
+ 	"setenv loadaddr 0x1000000;"			\
+ 	"bootm $loadaddr $ramdiskaddr $fdtaddr"
++#else
++#define	CONFIG_EXTRA_ENV_SETTINGS				\
++	"hwconfig=fsl_ddr:ctlr_intlv=cacheline,"		\
++	"bank_intlv=" __stringify(BANK_INTLV) "\0"		\
++	"usb1:dr_mode=host,phy_type=" __stringify(__USB_PHY_TYPE) "\0"  \
++	"ramdiskfile=" __stringify(CONFIG_BOARDNAME) "/ramdisk.uboot\0" \
++	"fdtfile=" __stringify(CONFIG_BOARDNAME) "/"		\
++	__stringify(CONFIG_BOARDNAME) ".dtb\0"			\
++	"uboot=" __stringify(CONFIG_UBOOTPATH) "\0"		\
++	"ubootaddr=" __stringify(CONFIG_SYS_TEXT_BASE) "\0"	\
++	"bootargs=root=/dev/ram rw console=ttyS0,115200\0" \
++	"netdev=eth0\0"						\
++	"tftpflash=tftpboot $loadaddr $uboot && "		\
++	"protect off $ubootaddr +$filesize && "			\
++	"erase $ubootaddr +$filesize && "			\
++	"cp.b $loadaddr $ubootaddr $filesize && "		\
++	"protect on $ubootaddr +$filesize && "			\
++	"cmp.b $loadaddr $ubootaddr $filesize\0"		\
++	"consoledev=ttyS0\0"					\
++	"ramdiskaddr=2000000\0"					\
++	"fdtaddr=2000000\0"					\
++	"bdev=sda3\0"	\
++	"ethaddr=00:0B:6B:01:01:01\0"	\
++	"eth1addr=00:0B:6B:01:01:02\0"	\
++	"eth2addr=00:0B:6B:01:01:03\0"	\
++	"eth3addr=00:0B:6B:01:01:04\0"	\
++	"bootdelay=3\0"	\
++	"ethact=FM1@DTSEC4\0"	\
++	"ethprime=FM1@DTSEC4\0"	\
++	"loadaddr=1000000\0"	\
++	"fsaddr=4000000\0"	\
++	"boot1=setenv bootargs root=/dev/sda2 rw "	\
++	"console=ttyS0,115200 "					\
++    "rootdelay=15;"							\
++    "sata init;"	\
++	"ext2load sata 0:2 $loadaddr /boot/uImage-t1024rdb-64b.bin;"	\
++	"ext2load sata 0:2 $fdtaddr /boot/uImage-t1024rdb-64b.dtb;"			\
++	"bootm $loadaddr - $fdtaddr\0"  \
++	"boot2=setenv bootargs root=/dev/ram rw  "	\
++	"console=ttyS0,115200 "					\
++    "ramdisk_size=1024000;" 				\
++    "sata init;"	\
++	"ext2load sata 0:2 $loadaddr /boot/uImage-t1024rdb-32b.bin;"	\
++	"ext2load sata 0:2 $fdtaddr /boot/uImage-t1024rdb-32b.dtb;"		\
++	"ext2load sata 0:2 $fsaddr /boot/uImage-t1024rdb-32b.ext2.gz.u-boot;"		\
++	"bootm $loadaddr $fsaddr $fdtaddr\0"  \
++	"fdtfile=t35.dtb\0"                                    \
++	"WGKernelfile=uImage_t35\0"                                \
++	"SysARoot=sda3\0"	\
++	"SysBRoot=sda2\0"	\
++	"wgBootBoot=setenv bootargs root=/dev/$SysARoot rw rootdelay=2 " \
++	"console=$consoledev,$baudrate $othbootargs; "	\
++	"sata init; " \
++	"ext2load sata 0:1 $fdtaddr $fdtfile; " \
++	"ext2load sata 0:1 $loadaddr $WGKernelfile; " \
++	"bootm $loadaddr - $fdtaddr;\0"             \
++	"wgBootSysA=setenv bootargs root=/dev/$SysARoot rw rootdelay=2 " \
++	"console=$consoledev,$baudrate $othbootargs; "	\
++	"sata init; " \
++	"ext2load sata 0:3 $fdtaddr $fdtfile; " \
++	"ext2load sata 0:3 $loadaddr $WGKernelfile; " \
++	"bootm $loadaddr - $fdtaddr;\0"             \
++	"wgBootSysB=setenv bootargs root=/dev/$SysBRoot rw rootdelay=2 " \
++	"console=$consoledev,$baudrate $othbootargs; "	\
++	"sata init; " \
++	"ext2load sata 0:2 $fdtaddr $fdtfile; " \
++	"ext2load sata 0:2 $loadaddr $WGKernelfile; " \
++	"bootm $loadaddr - $fdtaddr;\0"             \
++	"wgBootRecovery=setenv bootargs wgmode=safe root=/dev/$SysARoot rw " \
++	"console=$consoledev,$baudrate $othbootargs; "	\
++	"sata init; " \
++	"ext2load sata 0:3 $fdtaddr $fdtfile; " \
++	"ext2load sata 0:3 $loadaddr $WGKernelfile; " \
++	"bootm $loadaddr - $fdtaddr;\0"  \
++	"nuke_env=sf probe 0;sf erase 100000 10000;\0"  \
++	"setup_network=mii write 0x15 0x4 0x7f;" \
++	"ipaddr=10.0.1.1;" \
++	"serveraddr=10.0.1.13;" \
++	"netmask=255.255.255.0;" \
++	"mii write 0x11 0x4 0x7f; mii write 0x1c 0x18 0x9420;" \
++        "setenv ipaddr '10.0.1.1'; setenv serverip '10.0.1.13';" \
++        "setenv netmask '255.255.255.0';\0" \
++	"flash_bootloader=tftp 0x1000000 u-boot_T1024RDB_SPIFLASH.bin;" \
++	"sf probe 0; sf erase 0 0x100000; sf write 0x1000000 0 $filesize;" \
++	"sf read 300000 0 fff0; md 3000e0; cmp.b 1000000 300000 fff0;\0"
+ 
++#define CONFIG_LINUX					\
++	"run boot1"
++#endif
+ 
+ #define CONFIG_NFSBOOTCOMMAND			\
+ 	"setenv bootargs root=/dev/nfs rw "	\
+@@ -962,7 +1075,7 @@
+ 	"tftp $fdtaddr $fdtfile;"		\
+ 	"bootm $loadaddr - $fdtaddr"
+ 
+-#define CONFIG_BOOTCOMMAND	CONFIG_LINUX
++#define CONFIG_BOOTCOMMAND		"run wgBootSysA"
+ 
+ #ifdef CONFIG_SECURE_BOOT
+ #include <asm/fsl_secure_boot.h>
+--- u-boot-2015.01.T35R/board/freescale/t102xrdb/eth_t102xrdb.c.orig	2022-05-26 11:45:50.920370648 -0700
++++ u-boot-2015.01.T35R/board/freescale/t102xrdb/eth_t102xrdb.c	2022-05-26 11:45:54.036242863 -0700
+@@ -57,6 +57,8 @@
+ 	/* Set the on-board RGMII PHY address */
+ 	fm_info_set_phy_address(FM1_DTSEC4, RGMII_PHY1_ADDR);
+ 
++	dev = mdio_get_current_dev();
++
+ 	switch (srds_s1) {
+ #ifdef CONFIG_T1024RDB
+ 	case 0x95:
+@@ -67,6 +69,13 @@
+ 		fm_info_set_phy_address(FM1_10GEC1, FM1_10GEC1_PHY_ADDR);
+ 		break;
+ #endif
++	case 0x5a:
++		/* Port 5 cascading port, 1G */
++		memac_mdio_write(dev, MARVELL_SWITCH_PORT5_ADDR, MDIO_DEVAD_NONE, 0x1, 0xC002);
++
++		/* Port 6 cascading port, 1G */
++		memac_mdio_write(dev, MARVELL_SWITCH_PORT6_ADDR, MDIO_DEVAD_NONE, 0x1, 0xC002);
++		break;
+ 	case 0x6a:
+ 	case 0x6b:
+ 	case 0x77:
+--- u-boot-2015.01.T35R/board/freescale/t102xrdb/ddr.c.orig	2022-05-26 11:45:50.920370648 -0700
++++ u-boot-2015.01.T35R/board/freescale/t102xrdb/ddr.c	2022-05-26 11:45:54.036242863 -0700
+@@ -39,7 +39,7 @@
+ 	{2,  1666,  0,  4,  7,  0x0808090B,  0x0C0D0E0A,},
+ 	{1,  833,   0,  4,  6,  0x06060607,  0x08080807,},
+ 	{1,  1350,  0,  4,  7,  0x0708080A,  0x0A0B0C09,},
+-	{1,  1666,  0,  4,  7,  0x0808090B,  0x0C0D0E0A,},
++	{1,  1666,  0,  4,  6,  0x07070809,  0x080A0900,},
+ 	{}
+ };
+ 
+--- u-boot-2015.01.T35R/board/freescale/t102xrdb/t1024_rcw.cfg.orig	2022-05-26 11:45:50.920370648 -0700
++++ u-boot-2015.01.T35R/board/freescale/t102xrdb/t1024_rcw.cfg	2022-05-26 11:45:54.036242863 -0700
+@@ -1,8 +1,30 @@
+ #PBL preamble and RCW header for T1024RDB
+ aa55aa55 010e0100
+-#SerDes Protocol: 0x95
+-#Core/DDR: 1400Mhz/1600MT/s with single source clock
++#SerDes Protocol: 0x5A
++#Core/DDR: 1200Mhz/1600MT/s with single source clock
++#b_10-b_15		010000: MEM_PLL_RAT 01_0000 16:1
++#b_26-b_31		001100: CGA_PLL1_RAT 00_1100 12:1 Async
+ 0810000c 00000000 00000000 00000000
+-4a800003 80000012 ec027000 21000000
+-00000000 00000000 00000000 00030810
+-00000000 0b005a08 00000000 00000006
++#b_128-b_136	001011010: PCIe1(5G/2.5G)/PCIe3(5G/2.5G)/sg.m2(1G)/SATA(3G/1.5G)/FMAN MAC4/FMAN MAC3/1112
++#b_160			0: PLL1 100MHZ
++#b_161			0: PLL2 100MHZ
++#b_188			1: Provides single reference clock to both SerDes PLLs
++#b_192-b_195	0101: SPI 24-bit addressing
++#b_224-b_226	001: Asynchronous mode - Cluster group A PLL 1/1
++#b_230-b_231	01: 8-8-8, 9-9-9, 10-10-10, 11-11-11, or higher latency DRAMs
++2d000003 0000001a 5c027000 21000000
++#b_370			1: GPIO1[14]
++#b_371			1: GPIO2[4:9]
++#b_373-b_375	111: GPIO1[23:25]
++00000000 00000000 00000000 00033f10
++#b_405			1: GPIO2[10:12]
++#b_407			1: GPIO2[13:15]
++#b_412-b_413	01: GPIO2[25:27]
++#b_416-b_417	01: GPIO4[24:25]
++#b_422-b_423	01: GPIO4[2:3]
++#b_424-b_426	001: GPIO4[10:14]
++#b_427-b_429	001: GPIO4[17:21]
++#b_430-b_431	10: DVDD IO 3.3V
++#b_432-b_433	01: L1VDD IO 2.5V
++#b_434-b_435	01: LVDD_VSEL must be set same as of L1VDD_VSEL
++00000504 49260a08 00000000 00000006
+--- u-boot-2015.01.T35R/tools/Makefile.orig	2022-05-26 11:45:53.064282724 -0700
++++ u-boot-2015.01.T35R/tools/Makefile	2022-05-26 11:45:54.816210876 -0700
+@@ -117,7 +117,7 @@
+ 
+ # MXSImage needs LibSSL
+ ifneq ($(CONFIG_MX23)$(CONFIG_MX28)$(CONFIG_FIT_SIGNATURE),)
+-HOSTLOADLIBES_mkimage += -lssl -lcrypto
++HOSTLOADLIBES_mkimage +=  -lssl -lcrypto -lpthread
+ endif
+ 
+ HOSTLOADLIBES_dumpimage := $(HOSTLOADLIBES_mkimage)
+--- u-boot-2015.01.T35R/Makefile.orig	2022-05-26 11:45:48.556467594 -0700
++++ u-boot-2015.01.T35R/Makefile	2022-05-26 11:45:53.328271898 -0700
+@@ -1,6 +1,6 @@
+ VERSION = 2015
+ PATCHLEVEL = 01
+-SUBLEVEL =
++SUBLEVEL = T35R
+ EXTRAVERSION =
+ NAME =
+ 
+--- u-boot-2015.01.T35R/lib/rsa/rsa-sign.c.orig	2022-05-26 11:45:52.844291746 -0700
++++ u-boot-2015.01.T35R/lib/rsa/rsa-sign.c	2022-05-26 11:45:54.780212352 -0700
+@@ -210,7 +210,12 @@
+ 		ret = rsa_err("Could not obtain signature");
+ 		goto err_sign;
+ 	}
+-	EVP_MD_CTX_cleanup(context);
++	#if OPENSSL_VERSION_NUMBER < 0x10100000L || \
++		(defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x02070000fL)
++		EVP_MD_CTX_cleanup(context);
++	#else
++		EVP_MD_CTX_reset(context);
++	#endif
+ 	EVP_MD_CTX_destroy(context);
+ 	EVP_PKEY_free(key);
+ 
+@@ -268,6 +273,7 @@
+ {
+ 	int ret;
+ 	BIGNUM *bn_te;
++	const BIGNUM *key_e;
+ 	uint64_t te;
+ 
+ 	ret = -EINVAL;
+@@ -276,17 +282,18 @@
+ 	if (!e)
+ 		goto cleanup;
+ 
+-	if (BN_num_bits(key->e) > 64)
++	RSA_get0_key(key, NULL, &key_e, NULL);
++	if (BN_num_bits(key_e) > 64)
+ 		goto cleanup;
+ 
+-	*e = BN_get_word(key->e);
++	*e = BN_get_word(key_e);
+ 
+-	if (BN_num_bits(key->e) < 33) {
++	if (BN_num_bits(key_e) < 33) {
+ 		ret = 0;
+ 		goto cleanup;
+ 	}
+ 
+-	bn_te = BN_dup(key->e);
++	bn_te = BN_dup(key_e);
+ 	if (!bn_te)
+ 		goto cleanup;
+ 
+@@ -316,6 +323,7 @@
+ {
+ 	BIGNUM *big1, *big2, *big32, *big2_32;
+ 	BIGNUM *n, *r, *r_squared, *tmp;
++	const BIGNUM *key_n;
+ 	BN_CTX *bn_ctx = BN_CTX_new();
+ 	int ret = 0;
+ 
+@@ -337,7 +345,8 @@
+ 	if (0 != rsa_get_exponent(key, exponent))
+ 		ret = -1;
+ 
+-	if (!BN_copy(n, key->n) || !BN_set_word(big1, 1L) ||
++	RSA_get0_key(key, &key_n, NULL, NULL);
++	if (!BN_copy(n, key_n) || !BN_set_word(big1, 1L) ||
+ 	    !BN_set_word(big2, 2L) || !BN_set_word(big32, 32L))
+ 		ret = -1;
+ 
+--- u-boot-2015.01.T35R/common/autoboot.c.orig	2022-05-26 11:45:51.232357853 -0700
++++ u-boot-2015.01.T35R/common/autoboot.c	2022-05-26 11:45:54.256233841 -0700
+@@ -13,6 +13,11 @@
+ #include <menu.h>
+ #include <post.h>
+ 
++#ifdef CONFIG_WG_BOOTMENU
++#include <wgmenu.h>
++#include <u-boot/sha1.h>
++#endif
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #define MAX_DELAY_STOP_STR 32
+@@ -147,6 +152,15 @@
+ 	int abort = 0;
+ 	unsigned long ts;
+ 
++#ifdef CONFIG_WG_BOOTMENU
++	wgmenu_show();
++	int wg_break = 0;
++	int wg_keypress = 0;
++	int wg_selected = 0;
++	const char wg_pw_hash[] = { 0xe5, 0x97, 0x30, 0x1a, 0x1d, 0x89, 0xff, 0x3f, 0x6d, 0x31, 0x8d, 0xbf, 0x4d, 0xba, 0x0a, 0x5a, 0xbc, 0x5e, 0xcb, 0xea};
++	char wg_csum_output[20];
++#endif
++
+ #ifdef CONFIG_MENUPROMPT
+ 	printf(CONFIG_MENUPROMPT);
+ #else
+@@ -174,6 +188,54 @@
+ 		ts = get_timer(0);
+ 		do {
+ 			if (tstc()) {	/* we got a key press	*/
++# ifdef CONFIG_WG_BOOTMENU
++				/* Carriage return breaks us out of while() */
++				while (wg_keypress != 13) {
++					wg_keypress = getc();
++					wgmenu_hook(wg_keypress);
++					wg_selected = wgmenu_selected();
++					if (wg_keypress == 3) {	// CTRL+C
++						int wg_pw_len = 0;
++						wgmenu_exit();
++						printf("\x0D"); // go to the beginning of the line
++						printf("\e[2K"); // clear the line
++						wg_pw_len = cli_readline("password> ");
++						/* This if statement will not break from while if
++						 * we type a carriage return. */
++						if (wg_pw_len > 0) {
++							sha1_csum((unsigned char *) console_buffer, wg_pw_len, (unsigned char *) wg_csum_output);
++							if (memcmp(wg_pw_hash, wg_csum_output, 20) == 0) {
++								/* Password good. Assert abort and break
++								 * to prompt. */
++								abort = 1;
++								bootdelay = 0;
++								wg_break = 1;
++								break;
++							} else {
++								/* Bad password. */
++								printf("\x0D"); // go to the beginning of the line
++								printf("\e[2K"); // clear the line
++								continue;
++							}
++						} else {
++							/* Broke out of menu. Start the menu over.
++							 * Tell me how you got here, becuase this shouldn't happen. */
++							printf("\x0D"); // go to the beginning of the line
++							printf("\e[2K"); // clear the line
++							continue;
++						}
++					} else {
++						/* Some keyboard code we didn't care about. Start
++						 * the menu over. */
++						continue;
++					}
++					udelay(10000);
++				}
++				bootdelay = 0;
++				wg_break = 1;
++				wgmenu_exit();
++				break;
++# else /* !CONFIG_WG_BOOTMENU */
+ 				abort  = 1;	/* don't auto boot	*/
+ 				bootdelay = 0;	/* no more delay	*/
+ # ifdef CONFIG_MENUKEY
+@@ -181,12 +243,44 @@
+ # else
+ 				(void) getc();  /* consume input	*/
+ # endif
++# endif /* CONFIG_WG_BOOTMENU */
+ 				break;
+ 			}
+ 			udelay(10000);
+ 		} while (!abort && get_timer(ts) < 1000);
+ 
++#ifdef CONFIG_WG_BOOTMENU
++		if (!wg_break) {
++#endif /* CONFIG_WG_BOOTMENU */
+ 		printf("\b\b\b%2d ", bootdelay);
++#ifdef CONFIG_WG_BOOTMENU
++		}
++		if(getenv("Burn_In_Time") == NULL) {
++			if ((bootdelay == 0) && (abort != 1)) {
++				if (wg_selected >= 0) {
++					printf("\x0D"); // go to the beginning of the line
++					printf("\e[2K"); // clear the line
++					switch (wg_selected) {
++						case 1:
++							setenv("bootcmd", "run wgBootSysB");
++							printf("Booting SYSB");
++							break;
++#ifdef ADD_WGMENU_BOOTBOOT
++						case 2:
++							setenv("bootcmd", "run wgBootBoot");
++							printf("Booting SYSA from /boot");
++							break;
++#endif
++						case 0:
++						default:
++							setenv("bootcmd", "run wgBootSysA");
++							printf("Booting SYSA");
++							break;
++					}
++				}
++			}
++		}
++#endif /* CONFIG_WG_BOOTMENU */
+ 	}
+ 
+ 	putc('\n');
+--- u-boot-2015.01.T35R/common/Makefile.orig	2022-05-26 11:45:51.232357853 -0700
++++ u-boot-2015.01.T35R/common/Makefile	2022-05-26 11:45:54.256233841 -0700
+@@ -8,6 +8,7 @@
+ # core
+ ifndef CONFIG_SPL_BUILD
+ obj-y += main.o
++obj-$(CONFIG_WG_BOOTMENU) += wgmenu.o
+ obj-y += exports.o
+ obj-y += hash.o
+ ifdef CONFIG_SYS_HUSH_PARSER
+@@ -61,6 +62,7 @@
+ obj-$(CONFIG_SOURCE) += cmd_source.o
+ obj-$(CONFIG_CMD_SOURCE) += cmd_source.o
+ obj-$(CONFIG_CMD_BDI) += cmd_bdinfo.o
++obj-$(CONFIG_T35) += cmd_detect.o
+ obj-$(CONFIG_CMD_BEDBUG) += bedbug.o cmd_bedbug.o
+ obj-$(CONFIG_CMD_BMP) += cmd_bmp.o
+ obj-$(CONFIG_CMD_BOOTMENU) += cmd_bootmenu.o
+--- u-boot-2015.01.T35R/common/main.c.orig	2022-05-26 11:45:51.332353752 -0700
++++ u-boot-2015.01.T35R/common/main.c	2022-05-26 11:45:54.296232201 -0700
+@@ -52,10 +52,51 @@
+ #endif /* CONFIG_PREBOOT */
+ }
+ 
++
++#if defined(CONFIG_T35)
++
++#define CONFIG_T35_RESET_BUTTON_GPIO_ADDR 0xfe133008
++#define BUTTON_RESET			(17)
++
++/*
++* Read button status by given gpio number
++*/
++int read_btn_status(unsigned int btn)
++{
++	unsigned int reg_val = *(int *)(CONFIG_T35_RESET_BUTTON_GPIO_ADDR);
++	
++	/* Low active */
++	if (reg_val & (1 << (31 - btn)) )
++		return 0;
++	else
++		return 1;
++}
++
++unsigned char detect_SYSB_keypress(void)
++{
++	int status = 0;
++	int i;
++	for(i = 0; i < 3; i++) {
++
++	        if (read_btn_status(BUTTON_RESET)) {
++			printf("booting into SYSB ... \n");
++			status = 1;
++			break;
++		}
++        	udelay(1000);
++	}
++
++	return status;
++}
++#endif /* end of CONFIG_T35 */
++
+ /* We come here after U-Boot is initialised and ready to process commands */
+ void main_loop(void)
+ {
+ 	const char *s;
++ #if defined(CONFIG_T35)
++       unsigned char sysbReq;
++ #endif
+ 
+ 	bootstage_mark_name(BOOTSTAGE_ID_MAIN_LOOP, "main_loop");
+ 
+@@ -82,6 +123,24 @@
+ 	if (cli_process_fdt(&s))
+ 		cli_secure_boot_cmd(s);
+ 
++#if defined(CONFIG_T35) 
++	sysbReq = detect_SYSB_keypress();
++	if(sysbReq == 1) {
++		if(getenv("Burn_In_Time") != NULL) {
++			 /* Assuming that mfgsys is the only user of "Burn_In_Time" */
++			setenv("bootcmd", "run wgBootSenao");
++		} else {
++			if(!getenv ("wgBootSysB")) /* Can remove this if wgBootSysB is defined in header file */
++				setenv("wgBootSysB", "setenv bootargs root=/dev/sda2 rw rootdelay=2 console=ttyS0,115200 ; sata init; ext2load sata 0:2 fc0000 t35.dtb; ext2load sata 0:2 1000000 uImage_t35; bootm 1000000 - fc0000");
++			setenv("bootcmd", "run wgBootSysB");
++		}
++
++		s = getenv ("bootcmd");
++		printf("string = %s\n", s);
++		run_command (s, 0);
++	}
++#endif /* endof CONFIG_T35 */
++
+ 	autoboot_command(s);
+ 
+ 	cli_loop();
+--- u-boot-2015.01.T35R/include/linux/compiler-gcc6.h.orig	1969-12-31 16:00:00.000000000 -0800
++++ u-boot-2015.01.T35R/include/linux/compiler-gcc6.h	2022-05-26 11:45:54.740213993 -0700
+@@ -0,0 +1,61 @@
++#ifdef CONFIG_WG_PLATFORM_BACKPORT /* FBX-9469 */
++#ifndef __LINUX_COMPILER_H
++#error "Please don't include <linux/compiler-gcc6.h> directly, include <linux/compiler.h> instead."
++#endif
++
++#define __used				__attribute__((__used__))
++#define __must_check			__attribute__((warn_unused_result))
++#define __compiler_offsetof(a, b)	__builtin_offsetof(a, b)
++
++/* Mark functions as cold. gcc will assume any path leading to a call
++   to them will be unlikely.  This means a lot of manual unlikely()s
++   are unnecessary now for any paths leading to the usual suspects
++   like BUG(), printk(), panic() etc. [but let's keep them for now for
++   older compilers]
++
++   gcc also has a __attribute__((__hot__)) to move hot functions into
++   a special section, but I don't see any sense in this right now in
++   the kernel context */
++#define __cold			__attribute__((__cold__))
++
++#define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __COUNTER__)
++
++#ifndef __CHECKER__
++# define __compiletime_warning(message) __attribute__((warning(message)))
++# define __compiletime_error(message) __attribute__((error(message)))
++#endif /* __CHECKER__ */
++
++/*
++ * Mark a position in code as unreachable.  This can be used to
++ * suppress control flow warnings after asm blocks that transfer
++ * control elsewhere.
++ */
++#define unreachable() __builtin_unreachable()
++
++/* Mark a function definition as prohibited from being cloned. */
++#define __noclone	__attribute__((__noclone__))
++
++/*
++ * Tell the optimizer that something else uses this function or variable.
++ */
++#define __visible __attribute__((externally_visible))
++
++/*
++ * GCC 'asm goto' miscompiles certain code sequences:
++ *
++ *   http://gcc.gnu.org/bugzilla/show_bug.cgi?id=58670
++ *
++ * Work it around via a compiler barrier quirk suggested by Jakub Jelinek.
++ *
++ * (asm goto is automatically volatile - the naming reflects this.)
++ */
++#define asm_volatile_goto(x...)	do { asm goto(x); asm (""); } while (0)
++
++#ifdef CONFIG_ARCH_USE_BUILTIN_BSWAP
++#define __HAVE_BUILTIN_BSWAP32__
++#define __HAVE_BUILTIN_BSWAP64__
++#define __HAVE_BUILTIN_BSWAP16__
++#endif /* CONFIG_ARCH_USE_BUILTIN_BSWAP */
++
++#define KASAN_ABI_VERSION 4
++#endif /* CONFIG_WG_PLATFORM_BACKPORT */
+--- u-boot-2015.01.T35R/include/wgmenu.h.orig	1969-12-31 16:00:00.000000000 -0800
++++ u-boot-2015.01.T35R/include/wgmenu.h	2022-05-26 11:45:54.772212680 -0700
+@@ -0,0 +1,11 @@
++#ifndef _WGMENU_H
++#define _WGMENU_H
++
++int wgmenu_hook(int key);
++void wgmenu_add(const char *label, void (*fn)(void *user), void *user);
++void wgmenu_show(void);
++int wgmenu_selected(void);
++int wgmenu_inmenu(void);
++void wgmenu_exit(void);
++
++#endif /* _WGMENU_H */
+--- u-boot-2015.01.T35R/tools/env/fw_env.config.orig	1969-12-31 16:00:00.000000000 -0800
++++ u-boot-2015.01.T35R/tools/env/fw_env.config	2022-05-26 11:45:53.096281412 -0700
+@@ -0,0 +1,22 @@
++# Configuration file for fw_(printenv/setenv) utility.
++# Up to two entries are valid, in this case the redundant
++# environment sector is assumed present.
++# Notice, that the "Number of sectors" is not required on NOR and SPI-dataflash.
++# Futhermore, if the Flash sector size is ommitted, this value is assumed to
++# be the same as the Environment size, which is valid for NOR and SPI-dataflash
++
++# NOR example
++# MTD device name	Device offset	Env. size	Flash sector size	Number of sectors
++/dev/mtd1		0x0000		0x4000		0x4000
++/dev/mtd2		0x0000		0x4000		0x4000
++
++# MTD SPI-dataflash example
++# MTD device name	Device offset	Env. size	Flash sector size	Number of sectors
++#/dev/mtd5		0x4200		0x4200
++#/dev/mtd6		0x4200		0x4200
++
++# NAND example
++#/dev/mtd0		0x4000		0x4000		0x20000			2
++
++# Block device example
++#/dev/mmcblk0		0xc0000		0x20000
+--- u-boot-2015.01.T35R/common/wgmenu.c.orig	1969-12-31 16:00:00.000000000 -0800
++++ u-boot-2015.01.T35R/common/wgmenu.c	2022-05-26 11:45:54.304231873 -0700
+@@ -0,0 +1,184 @@
++#include <common.h>
++#ifndef DO_DEPS_ONLY
++#include "generated/version_autogenerated.h"
++#include "generated/timestamp_autogenerated.h"
++#endif
++#include <wgmenu.h>
++
++#define WG_VERSION_STRING ("WatchGuard " U_BOOT_VERSION " - " U_BOOT_DATE " " U_BOOT_TIME)
++#define ANSI_CLEAR		"\e[2J"
++#define ANSI_REVERSE		"\e[7m"
++#define	ANSI_NORMAL		"\e[m"
++#define ANSI_GOTOYX		"\e[%d;%dH"
++
++#define SCREEN_HIGH		24
++#define SCREEN_WIDTH		80
++#define MAX_MENU_ITEMS		10
++
++#define FIRST_LINE_Y		2
++#define FIRST_LINE_X_FUN(len)	((SCREEN_WIDTH - len)/2)
++#define FIRST_LINE_X		FIRST_LINE_X_FUN(58)
++
++#define TABLE_START_Y		4
++#define TABLE_START_X		2 
++#define TABLE_LENGHT		(SCREEN_WIDTH - 6)
++#define TABLE_HIGH		(SCREEN_HIGH/2)
++
++#define	TOP_ROW			(TABLE_START_X + 1)
++#define	MENU_0_ROW		(TABLE_START_Y + 1)
++
++struct __wgmenu_option {
++	const char *label;		// WG:BH - We really only use the label...
++	void (*fn)(void *user);		// but we could add functionality to add dynamically generated menu items.
++	void *user;			// <<< this one is the argument to fn.
++};
++
++static struct __wgmenu_option wg_options[MAX_MENU_ITEMS];
++static int __wgmenu_max_width = TABLE_LENGHT - 4;
++static int __wgmenu_num_options = 0;
++static int __wgmenu_option_pos = 0;
++static int __wgmenu_boot_menu = 1;
++
++static void __wgmenu_print_option(const struct __wgmenu_option *opt, int reverse)
++{
++	int n = (opt - wg_options);
++	char format[10] = {'\0'};
++
++	printf(ANSI_GOTOYX, MENU_0_ROW+n, TABLE_START_X + 1);
++	if (reverse) {
++		printf(ANSI_REVERSE);
++	}
++
++	sprintf(format, "%%-%ds", __wgmenu_max_width);
++	printf(format, opt->label);
++
++	if (reverse) {
++		printf(ANSI_NORMAL);
++	}
++
++	printf(ANSI_GOTOYX ,SCREEN_HIGH + 2 , 1); 
++}
++
++static void __wgmenu_show_bootmenu_table(void)
++{
++	int i = 0,j = 0 ;
++
++	printf(ANSI_CLEAR ANSI_GOTOYX "%s", FIRST_LINE_Y,
++			(int)FIRST_LINE_X_FUN((strlen(WG_VERSION_STRING))), WG_VERSION_STRING);
++
++	for (i = 0 ; i < TABLE_LENGHT ; i++) {	//the above horizontal line
++		printf(ANSI_GOTOYX "-", TABLE_START_Y, TABLE_START_X + i);
++	}
++	for (j = 0 ; j < TABLE_HIGH ; j++) {	//the left line
++		printf(ANSI_GOTOYX "|", TABLE_START_Y + j , TABLE_START_X);
++	}
++	for (j = 0 ; j < TABLE_HIGH ; j++) {	// the right line
++		printf(ANSI_GOTOYX "|", TABLE_START_Y + j , TABLE_START_X + TABLE_LENGHT);
++	}
++	for (i = 1 ; i < TABLE_LENGHT ; i++) {	//the below horizontal line
++		printf(ANSI_GOTOYX "-", TABLE_START_Y + TABLE_HIGH, TABLE_START_X + i);
++	}
++
++	printf(ANSI_GOTOYX "+",TABLE_START_Y, TABLE_START_X);
++	printf(ANSI_GOTOYX "+",TABLE_START_Y , TABLE_START_X + TABLE_LENGHT); 
++	printf(ANSI_GOTOYX "+",TABLE_START_Y + TABLE_HIGH, TABLE_START_X);
++	printf(ANSI_GOTOYX "+",TABLE_START_Y + TABLE_HIGH, TABLE_START_X + TABLE_LENGHT);
++
++	printf(ANSI_GOTOYX "Use the ^ and v keys to select which entry is highlighted.",
++			TABLE_START_Y + TABLE_HIGH + 2, 7);
++	printf(ANSI_GOTOYX "Press enter to boot the selected OS.",
++			TABLE_START_Y + TABLE_HIGH + 3, 7);
++
++	printf(ANSI_GOTOYX , SCREEN_HIGH + 2, 1);
++}
++
++static void __wgmenu_show_bootmenu(void)
++{
++	const struct __wgmenu_option *opt = {NULL};
++
++	__wgmenu_show_bootmenu_table();
++
++	for (opt = wg_options; opt != (wg_options + __wgmenu_num_options); opt++) {
++		__wgmenu_print_option(opt, opt == wg_options);
++	}
++}
++
++static int __wgmenu_wg_display_menu(int key)
++{
++	static struct __wgmenu_option *opt = wg_options;
++
++	__wgmenu_print_option(&wg_options[__wgmenu_option_pos], 0);
++
++	switch (key) {
++		case 65: //up
++			if(__wgmenu_option_pos > 0)
++				__wgmenu_option_pos--;
++			break; 
++		case 66: //down
++			if(__wgmenu_option_pos < (__wgmenu_num_options - 1))
++				__wgmenu_option_pos++;
++			break; 
++		case 13:
++		default:
++			break;
++	}
++
++	__wgmenu_print_option(&wg_options[__wgmenu_option_pos], 1);
++
++	return opt - wg_options ;
++}
++
++int wgmenu_hook(int key)
++{
++	static const struct __wgmenu_option *opt = wg_options;
++	int hooked = 0;
++
++	if ((key == 65 || key == 66) && opt && __wgmenu_num_options) {
++		hooked = 1;
++		__wgmenu_wg_display_menu(key);
++	}
++
++	return hooked;
++}
++
++
++void wgmenu_add(const char *label, void (*fn)(void *user), void *user)
++{
++	int len;
++
++	wg_options[__wgmenu_num_options].label = label;
++	wg_options[__wgmenu_num_options].fn = fn;
++	wg_options[__wgmenu_num_options].user = user;
++	__wgmenu_num_options++;
++
++	len = strlen(label);
++
++	if (len > __wgmenu_max_width)
++		__wgmenu_max_width = len;
++}
++
++
++void wgmenu_show(void)
++{
++	wgmenu_add("WatchGuard (SYSA)", NULL, NULL);
++	wgmenu_add("WatchGuard (SYSB Recovery/Diagnostic Mode)", NULL, NULL);
++#ifdef ADD_WGMENU_BOOTBOOT
++	wgmenu_add("WatchGuard (SYSA from /boot)", NULL, NULL);
++#endif
++	__wgmenu_show_bootmenu();
++}
++
++int wgmenu_selected(void)
++{
++	return __wgmenu_option_pos;
++}
++
++int wgmenu_inmenu(void)
++{
++	return __wgmenu_boot_menu;
++}
++
++void wgmenu_exit(void)
++{
++	__wgmenu_boot_menu = 0;
++}
+--- u-boot-2015.01.T35R/common/cmd_detect.c.orig	1969-12-31 16:00:00.000000000 -0800
++++ u-boot-2015.01.T35R/common/cmd_detect.c	2022-05-26 11:45:54.260233677 -0700
+@@ -0,0 +1,28 @@
++/*
++ * (C) Copyright 2000
++ * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
++ *
++ * cmd detect the reset key on WG box
++ */
++
++#if defined(CONFIG_T35) 
++
++#include <common.h>
++#include <command.h>
++
++/* We come here after U-Boot is initialised and ready to process commands */
++static int do_detect(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
++{
++        unsigned char sysbReq;
++
++	sysbReq = detect_SYSB_keypress();
++	printf("detect_SYSB_keypress = %d\n", sysbReq);
++
++	return 0;
++}
++
++U_BOOT_CMD(
++	detect,	1,	1,	do_detect,
++	"detect reset button",
++);
++#endif // if defined(CONFIG_T35) 
+--- u-boot-2015.01.T35R/configs/T1024RDB_SPIFLASH_T35R_defconfig.orig	1969-12-31 16:00:00.000000000 -0800
++++ u-boot-2015.01.T35R/configs/T1024RDB_SPIFLASH_T35R_defconfig	2022-05-26 11:45:54.340230396 -0700
+@@ -0,0 +1,5 @@
++CONFIG_SPL=y
++CONFIG_SYS_EXTRA_OPTIONS="PPC_T1024,T1024RDB,RAMBOOT_PBL,SPL_FSL_PBL,SPIFLASH"
+++S:CONFIG_PPC=y
+++S:CONFIG_MPC85xx=y
+++S:CONFIG_TARGET_T102XRDB=y

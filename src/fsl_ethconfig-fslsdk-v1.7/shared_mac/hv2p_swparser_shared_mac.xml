@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ Copyright (c) 2012 Freescale Semiconductor, Inc.
+ All rights reserved.
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+     * Neither the name of Freescale Semiconductor nor the
+       names of its contributors may be used to endorse or promote products
+       derived from this software without specific prior written permission.
+
+
+ ALTERNATIVELY, this software may be distributed under the terms of the
+ GNU General Public License ("GPL") as published by the Free Software
+ Foundation, either version 2 of that License or (at your option) any
+ later version.
+
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+ NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+
+<netpdl name="ARP" description="ARP Example">
+	<!-- ARP program is an extension to the Ethernet hard shell -->
+	<protocol name="arp" longname="ARP" prevproto="ethernet">
+		<!-- fields in ARP header used for validation and calculating length -->
+		<format>
+			<fields>
+				<field type="fixed" name="hw_type" longname="Hardware Type" size="2" />
+				<field type="fixed" name="p_type" longname="Protocol Type" size="2" />
+				<field type="fixed" name="hw_len" size="1" longname="Hardware Address Length"></field>
+				<field type="fixed" name="p_len" size="1" longname="Protocol Address Length" />
+				<field type="fixed" name="op" size="2" longname="OPcode" />
+				<field type="fixed" name="hw_src" size="6" longname="Source Hardware Address"></field>
+				<field type="fixed" name="p_src" size="4" longname="Source protocol address" />
+				<field type="fixed" name="hw_dst" size="6" longname="Destination Hardware Address"></field>
+				<field type="fixed" name="p_dst" size="4" longname="Destination protocol address" />
+			</fields>
+		</format>
+		<execute-code>
+			<!-- Check that Eth/vlan type is 0806-->
+			<before confirm="yes">
+				<if expr="(ethernet.type == 0x0806)">
+					<if-true />
+					<if-false>
+						<!-- Confirms Eth layer and exits-->
+						<action type="exit" confirm="yes" advance="no" nextproto="return" />
+					</if-false>
+				</if>
+			</before>
+			<!-- Done after Eth layer is confirmed-->
+			<!--All fields to verify Eth, IP, ARP request-->
+			<after confirm="no">
+				<if expr="(arp.hw_type == 0001) and (arp.p_type==0x0800) and (arp.hw_len==06) and (arp.p_len==04) and (arp.op==0001)">
+					<if-true>
+						<assign-variable name="$shimoffset_1" value="$NxtHdrOffset" />
+						<assign-variable name="$nxthdroffset" value="$NxtHdrOffset+28"/>
+						<action type="exit" confirm="no" confirmcustom="shim1" nextproto="end_parse" advance="no"></action>
+					</if-true>
+					<if-false>
+						<assign-variable name="$nxthdroffset" value="$NxtHdrOffset+28"/>
+						<assign-variable name="$ShimR" value="0x3">
+						<!--0x23 = Error bit + ARP Coding(3)-->
+						</assign-variable>
+						<action type="exit" confirm="no" confirmcustom="no" nextproto="end_parse" />
+					</if-false>
+				</if>
+			</after>
+		</execute-code>
+	</protocol>
+	<!-- ARP program is an extension to the Ethernet hard shell -->
+	<protocol name="arp1" longname="ARP" prevproto="vlan">
+		<!-- fields in ARP header used for validation and calculating length -->
+		<format>
+			<fields>
+				<field type="fixed" name="hw_type" longname="Hardware Type" size="2" />
+				<field type="fixed" name="p_type" longname="Protocol Type" size="2" />
+				<field type="fixed" name="hw_len" size="1" longname="Hardware Address Length"></field>
+				<field type="fixed" name="p_len" size="1" longname="Protocol Address Length" />
+				<field type="fixed" name="op" size="2" longname="OPcode" />
+				<field type="fixed" name="hw_src" size="6" longname="Source Hardware Address"></field>
+				<field type="fixed" name="p_src" size="4" longname="Source protocol address" />
+				<field type="fixed" name="hw_dst" size="6" longname="Destination Hardware Address"></field>
+				<field type="fixed" name="p_dst" size="4" longname="Destination protocol address" />
+			</fields>
+		</format>
+		<execute-code>
+			<!-- Check that Eth/vlan type is 0806-->
+			<before confirm="yes">
+				<if expr="(vlan.type == 0x0806)">
+					<if-true />
+					<if-false>
+						<!-- Confirms Eth layer and exits-->
+						<action type="exit" confirm="yes" advance="no" nextproto="return" />
+					</if-false>
+				</if>
+			</before>
+			<!-- Done after Eth layer is confirmed-->
+			<!--All fields to verify Eth, IP, ARP request-->
+			<after confirm="no">
+				<if expr="(arp1.hw_type == 0001) and (arp1.p_type==0x0800) and (arp1.hw_len==06) and (arp1.p_len==4) and (arp1.op==0001)">
+					<if-true>
+						<assign-variable name="$shimoffset_1" value="$NxtHdrOffset" />
+						<assign-variable name="$nxthdroffset" value="$NxtHdrOffset+28"/>
+						<action type="exit" confirm="no" confirmcustom="shim1" nextproto="end_parse" advance="no"></action>
+					</if-true>
+					<if-false>
+						<assign-variable name="$nxthdroffset" value="$NxtHdrOffset+28"/>
+						<assign-variable name="$ShimR" value="0x3">
+						<!--0x23 = Error bit + ARP Coding(3)-->
+						</assign-variable>
+						<action type="exit" confirm="no" confirmcustom="no" nextproto="end_parse" />
+					</if-false>
+				</if>
+			</after>
+		</execute-code>
+	</protocol>
+</netpdl>

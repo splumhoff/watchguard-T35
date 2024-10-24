@@ -1,0 +1,19 @@
+setenv bootdelay 5
+
+setenv bootcmd  run sysaboot
+setenv bootfile uImage_m200
+setenv fdtfile  m200.dtb
+
+setenv bootboot 'setenv bootargs $sysaargs; run bootsys; run bootdtb; bootm 1000000 - fc0000'
+setenv bootdtb  ext2load mmc 0:1 fc0000 m200.dtb
+setenv bootsys  ext2load mmc 0:1 1000000 uImage_m200
+
+setenv sysaargs root=/dev/mmcblk0p3 rw rootdelay=2 console=ttyS0,115200
+setenv sysaboot 'setenv bootargs $sysaargs; run sysasys; run sysadtb; bootm 1000000 - fc0000'
+setenv sysadtb  ext2load mmc 0:3 fc0000 m200.dtb
+setenv sysasys  ext2load mmc 0:3 1000000 uImage_m200
+
+setenv sysbargs root=/dev/mmcblk0p2 rw rootdelay=2 console=ttyS0,115200
+setenv sysbboot 'setenv bootargs $sysbargs; run sysbsys; run sysbdtb; bootm 1000000 - fc0000'
+setenv sysbdtb  ext2load mmc 0:2 fc0000 m200.dtb
+setenv sysbsys  ext2load mmc 0:2 1000000 uImage_m200

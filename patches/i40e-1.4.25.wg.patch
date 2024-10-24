@@ -1,0 +1,2797 @@
+WatchGuard patches to sources for i40e-1.4.25 as of
+Thu May 26 11:32:56 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- i40e-1.4.25/i40e.spec.orig	2022-05-26 11:32:55.296161075 -0700
++++ i40e-1.4.25/i40e.spec	1969-12-31 16:00:00.000000000 -0800
+@@ -1,402 +0,0 @@
+-Name: i40e
+-Summary: Intel(R) Ethernet Connection XL710 Linux Driver
+-Version: 1.4.25
+-Release: 1
+-Source: %{name}-%{version}.tar.gz
+-Vendor: Intel Corporation
+-License: GPL
+-ExclusiveOS: linux
+-Group: System Environment/Kernel
+-Provides: %{name}
+-URL: http://www.intel.com/network/connectivity/products/server_adapters.htm
+-BuildRoot: %{_tmppath}/%{name}-%{version}-root
+-# do not generate debugging packages by default - newer versions of rpmbuild
+-# may instead need:
+-#%define debug_package %{nil}
+-%debug_package %{nil}
+-# macros for finding system files to update at install time (pci.ids, pcitable)
+-%define find() %(for f in %*; do if [ -e $f ]; then echo $f; break; fi; done)
+-%define _pciids   /usr/share/pci.ids        /usr/share/hwdata/pci.ids
+-%define _pcitable /usr/share/kudzu/pcitable /usr/share/hwdata/pcitable /dev/null
+-%define pciids    %find %{_pciids}
+-%define pcitable  %find %{_pcitable}
+-Requires: kernel, fileutils, findutils, gawk, bash
+-
+-%description
+-This package contains the Linux driver for the Intel(R) Ethernet Connection XL710 Family of devices.
+-
+-%prep
+-%setup
+-
+-%build
+-make -C src clean
+-make -C src
+-
+-%install
+-make -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} install
+-# Append .new to driver name to avoid conflict with kernel RPM
+-cd %{buildroot}
+-find lib -name "i40e.*o" -exec mv {} {}.new \; \
+-         -fprintf %{_builddir}/%{name}-%{version}/file.list "/%p.new\n"
+-find lib/modules -name modules.* -exec rm -f {} \;
+-
+-
+-%clean
+-rm -rf %{buildroot}
+-
+-%files -f file.list
+-%defattr(-,root,root)
+-%{_mandir}/man7/i40e.7.gz
+-%doc COPYING
+-%doc README
+-%doc file.list
+-%doc pci.updates
+-
+-%post
+-FL="%{_docdir}/%{name}-%{version}/file.list
+-    %{_docdir}/%{name}/file.list"
+-FL=$(for d in $FL ; do if [ -e $d ]; then echo $d; break; fi;  done)
+-
+-if [ -d /usr/local/lib/%{name} ]; then
+-	rm -rf /usr/local/lib/%{name}
+-fi
+-if [ -d /usr/local/share/%{name} ]; then
+-	rm -rf /usr/local/share/%{name}
+-fi
+-
+-# Save old drivers (aka .ko and .ko.gz)
+-echo "original pci.ids saved in /usr/local/share/%{name}";
+-if [ "%{pcitable}" != "/dev/null" ]; then
+-	echo "original pcitable saved in /usr/local/share/%{name}";
+-fi
+-for k in $(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-\+]*\).*/\1/' $FL) ;
+-do
+-	d_drivers=/lib/modules/$k
+-	d_usr=/usr/local/share/%{name}/$k
+-	mkdir -p $d_usr
+-	cd $d_drivers; find . -name %{name}.*o -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}_*.*o -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}.*o.gz -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}_*.*o.gz -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cp --parents %{pciids} /usr/local/share/%{name}/
+-	if [ "%{pcitable}" != "/dev/null" ]; then
+-		cp --parents %{pcitable} /usr/local/share/%{name}/
+-	fi
+-done
+-
+-# Add driver link
+-for f in $(sed 's/\.new$//' $FL) ; do
+-	ln -f $f.new $f
+-done
+-
+-# Check if kernel version rpm was built on IS the same as running kernel
+-BK_LIST=$(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-\+]*\).*/\1/' $FL)
+-MATCH=no
+-for i in $BK_LIST
+-do
+-	if [ $(uname -r) == $i ] ; then
+-		MATCH=yes
+-		break
+-	fi
+-done
+-if [ $MATCH == no ] ; then
+-	echo -n "WARNING: Running kernel is $(uname -r).  "
+-	echo -n "RPM supports kernels (  "
+-	for i in $BK_LIST
+-	do
+-		echo -n "$i  "
+-	done
+-	echo ")"
+-fi
+-
+-LD="%{_docdir}/%{name}";
+-if [ -d %{_docdir}/%{name}-%{version} ]; then
+-	LD="%{_docdir}/%{name}-%{version}";
+-fi
+-
+-#Yes, this really needs bash
+-bash -s %{pciids} \
+-	%{pcitable} \
+-	$LD/pci.updates \
+-	$LD/pci.ids.new \
+-	$LD/pcitable.new \
+-	%{name} \
+-<<"END"
+-#! /bin/bash
+-# $1 = system pci.ids file to update
+-# $2 = system pcitable file to update
+-# $3 = file with new entries in pci.ids file format
+-# $4 = pci.ids output file
+-# $5 = pcitable output file
+-# $6 = driver name for use in pcitable file
+-
+-exec 3<$1
+-exec 4<$2
+-exec 5<$3
+-exec 6>$4
+-exec 7>$5
+-driver=$6
+-IFS=
+-
+-# pattern matching strings
+-ID="[[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]]"
+-VEN="${ID}*"
+-DEV="	${ID}*"
+-SUB="		${ID}*"
+-TABLE_DEV="0x${ID}	0x${ID}	\"*"
+-TABLE_SUB="0x${ID}	0x${ID}	0x${ID}	0x${ID}	\"*"
+-
+-line=
+-table_line=
+-ids_in=
+-table_in=
+-vendor=
+-device=
+-ids_device=
+-table_device=
+-subven=
+-ids_subven=
+-table_subven=
+-subdev=
+-ids_subdev=
+-table_subdev=
+-ven_str=
+-dev_str=
+-sub_str=
+-
+-# force a sub-shell to fork with a new stdin
+-# this is needed if the shell is reading these instructions from stdin
+-while true
+-do
+-	# get the first line of each data file to jump start things
+-	exec 0<&3
+-	read -r ids_in
+-	if [ "$2" != "/dev/null" ];then
+-	exec 0<&4
+-	read -r table_in
+-	fi
+-
+-	# outer loop reads lines from the updates file
+-	exec 0<&5
+-	while read -r line
+-	do
+-		# vendor entry
+-		if [[ $line == $VEN ]]
+-		then
+-			vendor=0x${line:0:4}
+-			ven_str=${line#${line:0:6}}
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $VEN ||
+-				 0x${ids_in:0:4} < $vendor ]]
+-			do
+-				echo "$ids_in"
+-				read -r ids_in
+-			done
+-			echo "$line"
+-			if [[ 0x${ids_in:0:4} == $vendor ]]
+-			then
+-				read -r ids_in
+-			fi
+-
+-		# device entry
+-		elif [[ $line == $DEV ]]
+-		then
+-			device=`echo ${line:1:4} | tr "[:upper:]" "[:lower:]"`
+-			table_device=0x${line:1:4}
+-			dev_str=${line#${line:0:7}}
+-			ids_device=`echo ${ids_in:1:4} | tr "[:upper:]" "[:lower:]"`
+-			table_line="$vendor	$table_device	\"$driver\"	\"$ven_str|$dev_str\""
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $DEV ||
+-				 $ids_device < $device ]]
+-			do
+-				if [[ $ids_in == $VEN ]]
+-				then
+-					break
+-				fi
+-				if [[ $ids_device != ${ids_in:1:4} ]]
+-				then
+-					echo "${ids_in:0:1}$ids_device${ids_in#${ids_in:0:5}}"
+-				else
+-					echo "$ids_in"
+-				fi
+-				read -r ids_in
+-				ids_device=`echo ${ids_in:1:4} | tr "[:upper:]" "[:lower:]"`
+-			done
+-			if [[ $device != ${line:1:4} ]]
+-			then
+-				echo "${line:0:1}$device${line#${line:0:5}}"
+-			else
+-				echo "$line"
+-			fi
+-			if [[ $ids_device == $device ]]
+-			then
+-				read -r ids_in
+-			fi
+-			# add entry to pcitable
+-			if [ "$2" != "/dev/null" ];then
+-			exec 0<&4
+-			exec 1>&7
+-			while [[ $table_in != $TABLE_DEV ||
+-				 ${table_in:0:6} < $vendor ||
+-				 ( ${table_in:0:6} == $vendor &&
+-				   ${table_in:7:6} < $table_device ) ]]
+-			do
+-				echo "$table_in"
+-				read -r table_in
+-			done
+-			echo "$table_line"
+-			if [[ ${table_in:0:6} == $vendor &&
+-			      ${table_in:7:6} == $table_device ]]
+-			then
+-				read -r table_in
+-			fi
+-			fi
+-		# subsystem entry
+-		elif [[ $line == $SUB ]]
+-		then
+-			subven=`echo ${line:2:4} | tr "[:upper:]" "[:lower:]"`
+-			subdev=`echo ${line:7:4} | tr "[:upper:]" "[:lower:]"`
+-			table_subven=0x${line:2:4}
+-			table_subdev=0x${line:7:4}
+-			sub_str=${line#${line:0:13}}
+-			ids_subven=`echo ${ids_in:2:4} | tr "[:upper:]" "[:lower:]"`
+-			ids_subdev=`echo ${ids_in:7:4} | tr "[:upper:]" "[:lower:]"`
+-			table_line="$vendor	$table_device	$table_subven	$table_subdev	\"$driver\"	\"$ven_str|$sub_str\""
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $SUB ||
+-				 $ids_subven < $subven ||
+-				 ( $ids_subven == $subven && 
+-				   $ids_subdev < $subdev ) ]]
+-			do
+-				if [[ $ids_in == $VEN ||
+-				      $ids_in == $DEV ]]
+-				then
+-					break
+-				fi
+-				if [[ ! (${ids_in:2:4} == "1014" &&
+-					 ${ids_in:7:4} == "052C") ]]
+-				then
+-					if [[ $ids_subven != ${ids_in:2:4} || $ids_subdev != ${ids_in:7:4} ]]
+-					then
+-						echo "${ids_in:0:2}$ids_subven $ids_subdev${ids_in#${ids_in:0:11}}"
+-					else
+-						echo "$ids_in"
+-					fi
+-				fi
+-				read -r ids_in
+-				ids_subven=`echo ${ids_in:2:4} | tr "[:upper:]" "[:lower:]"`
+-				ids_subdev=`echo ${ids_in:7:4} | tr "[:upper:]" "[:lower:]"`
+-			done
+-			if [[ $subven != ${line:2:4} || $subdev != ${line:7:4} ]]
+-			then
+-				echo "${line:0:2}$subven $subdev${line#${line:0:11}}"
+-			else
+-				echo "$line"
+-			fi
+-			if [[ $ids_subven == $subven  &&
+-			      $ids_subdev == $subdev ]]
+-			then
+-				read -r ids_in
+-			fi
+-			# add entry to pcitable
+-			if [ "$2" != "/dev/null" ];then
+-			exec 0<&4
+-			exec 1>&7
+-			while [[ $table_in != $TABLE_SUB ||
+-				 ${table_in:14:6} < $table_subven ||
+-				 ( ${table_in:14:6} == $table_subven &&
+-				   ${table_in:21:6} < $table_subdev ) ]]
+-			do
+-				if [[ $table_in == $TABLE_DEV ]]
+-				then
+-					break
+-				fi
+-				if [[ ! (${table_in:14:6} == "0x1014" &&
+-					 ${table_in:21:6} == "0x052C") ]]
+-				then
+-					echo "$table_in"
+-				fi
+-				read -r table_in
+-			done
+-			echo "$table_line"
+-			if [[ ${table_in:14:6} == $table_subven &&
+-			      ${table_in:21:6} == $table_subdev ]]
+-			then
+-				read -r table_in
+-			fi
+-			fi
+-		fi
+-
+-		exec 0<&5
+-	done
+-
+-	# print the remainder of the original files
+-	exec 0<&3
+-	exec 1>&6
+-	echo "$ids_in"
+-	while read -r ids_in
+-	do
+-		echo "$ids_in"
+-	done
+-
+-	if [ "$2" != "/dev/null" ];then
+-	exec 0>&4
+-	exec 1>&7
+-	echo "$table_in"
+-	while read -r table_in
+-	do
+-		echo "$table_in"
+-	done
+-	fi
+-
+-	break
+-done <&5
+-
+-exec 3<&-
+-exec 4<&-
+-exec 5<&-
+-exec 6>&-
+-exec 7>&-
+-
+-END
+-
+-mv -f $LD/pci.ids.new  %{pciids}
+-if [ "%{pcitable}" != "/dev/null" ]; then
+-mv -f $LD/pcitable.new %{pcitable}
+-fi
+-
+-uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+-
+-echo "Updating initrd..."
+-dracut --force
+-
+-%preun
+-# If doing RPM un-install
+-if [ $1 -eq 0 ] ; then
+-	FL="%{_docdir}/%{name}-%{version}/file.list
+-    		%{_docdir}/%{name}/file.list"
+-	FL=$(for d in $FL ; do if [ -e $d ]; then echo $d; break; fi;  done)
+-
+-	# Remove driver link
+-	for f in $(sed 's/\.new$//' $FL) ; do
+-		rm -f $f
+-	done
+-
+-	# Restore old drivers
+-	if [ -d /usr/local/share/%{name} ]; then
+-		cd /usr/local/share/%{name}; find . -name '%{name}.*o*' -exec cp --parents {} /lib/modules/ \;
+-		cd /usr/local/share/%{name}; find . -name '%{name}_*.*o*' -exec cp --parents {} /lib/modules/ \;
+-		rm -rf /usr/local/share/%{name}
+-	fi
+-fi
+-
+-%postun
+-uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+-
+--- i40e-1.4.25/README.orig	2022-05-26 11:32:55.272162058 -0700
++++ i40e-1.4.25/README	1969-12-31 16:00:00.000000000 -0800
+@@ -1,1032 +0,0 @@
+-
+-i40e Linux* Base Driver for the Intel(R) XL710 Ethernet Controller Family
+-===============================================================================
+-
+-===============================================================================
+-
+-December 16, 2015
+-
+-===============================================================================
+-
+-Contents
+---------
+-
+-- Overview
+-- Identifying Your Adapter
+-- Building and Installation
+-- Command Line Parameters
+-- Intel(R) i40e Ethernet Flow Director
+-- Additional Features & Configurations
+-- Known Issues
+-
+-
+-================================================================================
+-
+-
+-Important Notes
+----------------
+-
+-Enabling a VF link if the port is disconnected
+-----------------------------------------------
+-
+-If the physical function (PF) link is down, you can force link up (from the host
+-PF) on any virtual functions (VF) bound to the PF. Note that this requires
+-kernel support (Redhat kernel 3.10.0-327 or newer, upstream kernel 3.11.0 or
+-newer, and associated iproute2 user space support). If the following command
+-does not work, it may not be supported by your system. The following command
+-forces link up on VF 0 bound to PF eth0:
+-  ip link set eth0 vf 0 state enable
+-
+-
+-Do not unload port driver if VF with active VM is bound to it
+--------------------------------------------------------------
+-
+-Do not unload a port's driver if a Virtual Function (VF) with an active Virtual
+-Machine (VM) is bound to it. Doing so will cause the port to appear to hang.
+-Once the VM shuts down, or otherwise releases the VF, the command will complete.
+-
+-
+-Configuring SR-IOV for improved network security
+-------------------------------------------------
+-
+-In a virtualized environment, on Intel(R) Server Adapters that support SR-IOV,
+-the virtual function (VF) may be subject to malicious behavior. Software-
+-generated layer two frames, like IEEE 802.3x (link flow control), IEEE 802.1Qbb
+-(priority based flow-control), and others of this type, are not expected and
+-can throttle traffic between the host and the virtual switch, reducing
+-performance. To resolve this issue, configure all SR-IOV enabled ports for
+-VLAN tagging. This configuration allows unexpected, and potentially malicious,
+-frames to be dropped.
+-
+-
+-
+-Overview
+---------
+-
+-This document describes the i40e Linux* Base Driver
+-for the XL710 Ethernet Controller Family of Adapters.
+-
+-The Linux* base driver supports the following kernel versions:
+-2.6.32 and newer
+-
+-It includes support for Linux supported x86_64 systems.
+-
+-This driver is only supported as a loadable module at this time. Intel is
+-not supplying patches against the kernel source to allow for static linking of
+-the drivers.
+-
+-For questions related to hardware requirements, refer to the documentation
+-supplied with your Intel adapter. All hardware requirements listed apply to
+-use with Linux.
+-
+-The following features are now available in supported kernels:
+-- Native VLANs
+-- Channel Bonding (teaming)
+-- SNMP
+-- Generic Receive Offload
+-
+-Adapter teaming is implemented using the native Linux Channel bonding
+-module. This is included in supported Linux kernels.
+-Channel Bonding documentation can be found in the Linux kernel source:
+-/documentation/networking/bonding.txt
+-
+-The driver information previously displayed in the /proc file system is not
+-supported in this release.
+-
+-Driver information can be obtained using ethtool, lspci, and ifconfig.
+-Instructions on updating ethtool can be found in the section Additional 
+-Configurations later in this document.
+-
+-
+-
+-Identifying Your Adapter
+-------------------------
+-The driver in this release is compatible with XL710 and X710-based Intel
+-Ethernet Network Connections.
+-
+-For information on how to identify your adapter, go to the Adapter &
+-Driver ID Guide at:
+-http://support.intel.com/support/go/network/adapter/proidguide.htm
+-
+-For the best performance, make sure the latest NVM/FW is installed on your device
+- and that you are using the newest drivers.
+-
+-For the latest NVM/FW images and Intel network drivers, refer to the
+-following website and select your adapter.
+-http://www.intel.com/support
+-
+-
+-SFP+ Devices with Pluggable Optics
+-----------------------------------
+-
+-SR Modules
+-----------
+-  Intel	DUAL RATE 1G/10G SFP+ SR (bailed)	E10GSFPSR
+-
+-LR Modules
+----------- 
+-  Intel	DUAL RATE 1G/10G SFP+ LR (bailed	E10GSFPLR
+-
+-1G SFP Modules
+---------------
+-The following is a list of 3rd party SFP modules that have received some
+-testing. Not all modules are applicable to all devices.
+-
+-Supplier	Type		Part Numbers
+-Finisar		1000BASE-T	SFP FCLF-8251-3
+-Kinnex A	1000BASE-T	SFP XSFP-T-RJ12-0101-DLL
+-Avago		1000BASE-T	SFP ABCU-5710RZ
+-
+-QSFP+ Modules
+--------------
+-NOTE: Intel branded network adapters based on the X710/XL710 controller
+-  (for example, Intel(R) Ethernet Converged Network Adapter XL710-Q1) support
+-  the E40GQSFPLR module. For other connections based on the X710/XL710
+-  controller, support is dependent on your system board. Please see your vendor
+-  for details.
+-
+-  Intel	TRIPLE RATE 1G/10G/40G QSFP+ SR (bailed)	E40GQSFPSR
+-  Intel	TRIPLE RATE 1G/10G/40G QSFP+ LR (bailed)	E40GQSFPLR
+-    QSFP+ 1G speed is not supported on XL710 based devices.
+-
+-X710/XL710 Based SFP+ adapters support passive QSFP+ Direct Attach cables.
+-Intel recommends using Intel optics and cables. Other modules may function
+-but are not validated by Intel. Contact Intel for supported media types.
+-
+-
+-================================================================================
+-
+-
+-Building and Installation
+--------------------------
+-
+-To build a binary RPM* package of this driver, run 'rpmbuild -tb
+-i40e-<x.x.x>.tar.gz', where <x.x.x> is the version number for the driver tar file.
+-
+-NOTES:
+-
+-- For the build to work properly, the currently running kernel MUST match
+-  the version and configuration of the installed kernel sources. If you have
+-  just recompiled the kernel reboot the system before building.
+-- RPM functionality has only been tested in Red Hat distributions.
+-
+-1. Move the base driver tar file to the directory of your choice. For
+-   example, use '/home/username/i40e' or '/usr/local/src/i40e'.
+-
+-2. Untar/unzip the archive, where <x.x.x> is the version number for the
+-   driver tar file:
+-   tar zxf i40e-<x.x.x>.tar.gz
+-
+-3. Change to the driver src directory, where <x.x.x> is the version number
+-   for the driver tar:
+-   cd i40e-<x.x.x>/src/
+-
+-4. Compile the driver module:
+-   # make install
+-   The binary will be installed as:
+-   /lib/modules/<KERNEL VERSION>/updates/drivers/net/ethernet/intel/i40e/i40e.ko
+-
+-   The install location listed above is the default location. This may differ
+-   for various Linux distributions.
+-
+-5. Load the module using the modprobe command:
+-   modprobe <i40e> [parameter=port1_value,port2_value]
+-
+-   Make sure that any older i40e drivers are removed from the kernel before
+-   loading the new module:
+-   rmmod i40e; modprobe i40e
+-
+-6. Assign an IP address to the interface by entering the following,
+-   where ethX is the interface name that was shown in dmesg after modprobe:
+-   
+-   ip address add <IP_address>/<netmask bits> dev ethX
+-
+-7. Verify that the interface works. Enter the following, where IP_address
+-   is the IP address for another machine on the same subnet as the interface
+-   that is being tested:
+-   ping <IP_address>
+-
+-NOTE:
+-   For certain distributions like (but not limited to) RedHat Enterprise
+-   Linux 7 and Ubuntu, once the driver is installed the initrd/initramfs
+-   file may need to be updated to prevent the OS loading old versions
+-   of the i40e driver. The dracut utility may be used on RedHat
+-   distributions:
+-	# dracut --force
+-   For Ubuntu:
+-	# update-initramfs -u
+-
+-
+-================================================================================
+-
+-
+-Command Line Parameters
+------------------------
+-In general, ethtool and other OS specific commands are used to configure user
+-changeable parameters after the driver is loaded. The i40e driver only supports
+-the max_vfs kernel parameter on older kernels that do not have the standard
+-sysfs interface. The only other module parameter supported is the debug
+-parameter that can control the default logging verbosity of the driver.
+-
+-If the driver is built as a module, the following optional parameters are used
+-by entering them on the command line with the modprobe command using this
+-syntax:
+-modprobe i40e [<option>=<VAL1>]
+-
+-There needs to be a <VAL#> for each network port in the system supported by
+-this driver. The values will be applied to each instance, in function order.
+-For example:
+-modprobe i40e max_vfs=7
+-
+-The default value for each parameter is generally the recommended setting,
+-unless otherwise noted.
+-
+-
+-
+-max_vfs
+--------
+-Valid Range:
+-1-32 (X710 based devices)
+-1-64 (XL710 based devices)
+-
+-NOTE: This parameter is only used on kernel 3.7.x and below. On kernel 3.8.x
+-and above, use sysfs to enable VFs. For example:
+-#echo $num_vf_enabled > /sys/class/net/$dev/device/sriov_numvfs	//enable VFs
+-#echo 0 > /sys/class/net/$dev/device/sriov_numvfs	//disable VFs
+-
+-The parameters for the driver are referenced by position. Thus, if you have a
+-dual port adapter, or more than one adapter in your system, and want N virtual
+-functions per port, you must specify a number for each port with each parameter
+-separated by a comma. For example:
+-  modprobe i40e max_vfs=4,1
+-NOTE: Caution must be used in loading the driver with these parameters.
+-Depending on your system configuration, number of slots, etc., it is impossible
+-to predict in all cases where the positions would be on the command line.
+-This parameter adds support for SR-IOV. It causes the driver to spawn up to
+-max_vfs worth of virtual functions.
+-Some hardware configurations support fewer SR-IOV instances, as the whole
+-XL710 controller (all functions) is limited to 128 SR-IOV interfaces in total.
+-NOTE: When SR-IOV mode is enabled, hardware VLAN
+-filtering and VLAN tag stripping/insertion will remain enabled. Please remove
+-the old VLAN filter before the new VLAN filter is added. For example,
+-ip link set eth0 vf 0 vlan 100	// set vlan 100 for VF 0
+-ip link set eth0 vf 0 vlan 0	// Delete vlan 100
+-ip link set eth0 vf 0 vlan 200	// set a new vlan 200 for VF 0
+-
+-
+-Configuring SR-IOV for improved network security
+-------------------------------------------------
+-
+-In a virtualized environment, on Intel(R) Server Adapters that support SR-IOV,
+-the virtual function (VF) may be subject to malicious behavior. Software-
+-generated layer two frames, like IEEE 802.3x (link flow control), IEEE 802.1Qbb
+-(priority based flow-control), and others of this type, are not expected and
+-can throttle traffic between the host and the virtual switch, reducing
+-performance. To resolve this issue, configure all SR-IOV enabled ports for
+-VLAN tagging. This configuration allows unexpected, and potentially malicious,
+-frames to be dropped.
+-
+-
+-Configuring VLAN tagging on SR-IOV enabled adapter ports
+---------------------------------------------------------
+-
+-To configure VLAN tagging for the ports on an SR-IOV enabled adapter,
+-use the following command. The VLAN configuration should be done 
+-before the VF driver is loaded or the VM is booted.
+-
+-$ ip link set dev <PF netdev id> vf <id> vlan <vlan id>
+-
+-For example, the following instructions will configure PF eth0 and 
+-the first VF on VLAN 10.
+-$ ip link set dev eth0 vf 0 vlan 10
+-.
+-
+-Intel(R) Ethernet Flow Director
+--------------------------------
+-NOTE: Flow director parameters are only supported on kernel versions 2.6.30 or
+-newer.
+-
+-The Flow Director performs the following tasks:
+-
+-  - Directs receive packets according to their flows to different queues.
+-  - Enables tight control on routing a flow in the platform.
+-  - Matches flows and CPU cores for flow affinity.
+-  - Supports multiple parameters for flexible flow classification and load
+-    balancing.
+-
+-NOTES:
+-
+-  - The Flow Director is enabled only if the kernel supports multiple
+-    transmit queues.
+-  - An included script (set_irq_affinity) automates setting the IRQ to
+-    CPU affinity.
+-  - The i40e Linux driver does not support configuration of the mask field.
+-    It only accepts rules that completely qualify a certain flow type.
+-
+-ethtool commands:
+-
+-  - To enable or disable the Flow Director
+-
+-	# ethtool -K ethX ntuple <on|off>
+-
+-	When disabling ntuple filters all the user programed filters are flushed
+-	from the driver cache and hardware. Filters must be re-added if they are
+-	needed when ntuple is re-enabled.
+-
+-  - To add a filter that directs packet to queue 2, use -U or -N switch
+-
+-	# ethtool -N ethX flow-type tcp4 src-ip 192.168.10.1 dst-ip \
+-	192.168.10.2 src-port 2000 dst-port 2001 action 2 [loc 1]
+-
+-  - To see the list of filters currently present
+-	# ethtool <-u|-n> ethX
+-
+-Application Targeted Routing (ATR) Perfect Filters
+---------------------------------------------------
+-ATR is enabled by default when the kernel is in multiple transmit queue mode.
+-An ATR flow director filter rule is added when a TCP-IP flow starts and is
+-deleted when the flow ends. When a TCP-IP Flow Director rule is added from
+-ethtool (Sideband filter), ATR is turned off by the driver. To re-enable ATR,
+-the sideband can be disabled with the ethtool -K option. If sideband is
+-re-enabled after ATR is re-enabled, ATR remains enabled until a TCP-IP flow
+-is added. When all TCP-IP sideband rules are deleted, ATR is automatically
+-re-enabled.
+-
+-Packets that match the ATR rules are counted in fdir_atr_match stats in
+-ethtool, which also can be used to verify whether ATR rules still exist.
+-
+-Sideband Perfect Filters
+-------------------------
+-Sideband Perfect Filters is an interface for loading the filter table that
+-funnels all flow into queue_0 unless an alternative queue is specified
+-using "action." If action is used, any flow that matches the filter criteria
+-will be directed to the appropriate queue. Rules may be deleted from the
+-table. This is done via
+-
+-  ethtool -U ethX delete N
+-
+-  where N is the rule number to be deleted, as specified in the loc value in
+-  the filter add command.
+-
+-  If the queue is defined as -1, the filter drops matching packets. To account
+-  for Sideband filter matches, the fdir_sb_match stats in ethtool can be used.
+-
+-  In addition, rx-N.rx_packets shows the number of packets processed by the
+-  Nth queue.
+-
+-NOTES:
+-Receive Packet Steering (RPS) and Receive Flow Steering (RFS) are not compatible
+-with Flow Director. If Flow Director is enabled, these will be disabled.
+-
+-The VLAN field for Flow Director is not explicitly supported in the i40e
+-driver.
+-
+-When filter rules are added from Sideband or ATR and the Flow Director filter
+-table is full, the ATR rule is turned off by the driver. Subsequently, the
+-Sideband filter rule is then turned off. When space becomes available in the
+-filter table through filter rule deletion (i.e., an ATR rule or Sideband rule
+-is deleted), the Sideband and ATR rule additions are turned back on.
+-
+-Occasionally, when the filter table is full, you will notice HW errors when
+-you try to add new rules. The i40e driver will call for a filter flush and
+-sideband filter list replay. This will help flush any stale ATR rules and
+-create space.
+-
+-
+-================================================================================
+-
+-
+-Additional Features and Configurations
+--------------------------------------------
+-
+-
+-Configuring the Driver on Different Distributions
+--------------------------------------------------
+-
+-Configuring a network driver to load properly when the system is started is
+-distribution dependent. Typically, the configuration process involves adding
+-an alias line to /etc/modules.conf or /etc/modprobe.conf as well as editing
+-other system startup scripts and/or configuration files. Many popular Linux
+-distributions ship with tools to make these changes for you. To learn the
+-proper way to configure a network device for your system, refer to your
+-distribution documentation. If during this process you are asked for the
+-driver or module name, the name for the Base Driver is i40e.
+-
+-
+-Viewing Link Messages
+----------------------
+-
+-Link messages will not be displayed to the console if the distribution is
+-restricting system messages. In order to see network driver link messages on
+-your console, set dmesg to eight by entering the following:
+-dmesg -n 8
+-
+-NOTE: This setting is not saved across reboots.
+-
+-
+-Jumbo Frames
+-------------
+-Jumbo Frames support is enabled by changing the Maximum Transmission Unit
+-(MTU) to a value larger than the default value of 1500.
+-
+-Use the ifconfig command to increase the MTU size. For example, enter the
+-following where <x> is the interface number:
+-
+-   ifconfig eth<x> mtu 9000 up
+-
+-This setting is not saved across reboots. The setting change can be made
+-permanent by adding 'MTU=9000' to the file:
+-/etc/sysconfig/network-scripts/ifcfg-eth<x> for RHEL or to the file
+-/etc/sysconfig/network/<config_file> for SLES.
+-
+-NOTES:
+-- The maximum MTU setting for Jumbo Frames is 9706. This value coincides
+-  with the maximum Jumbo Frames size of 9728 bytes.
+-- This driver will attempt to use multiple page sized buffers to receive
+-  each jumbo packet. This should help to avoid buffer starvation issues
+-  when allocating receive packets.
+-
+-
+-ethtool
+--------
+-The driver utilizes the ethtool interface for driver configuration and
+-diagnostics, as well as displaying statistical information. The latest
+-ethtool version is required for this functionality. Download it at
+-http://ftp.kernel.org/pub/software/network/ethtool/
+-
+-Supported ethtool Commands and Options
+---------------------------------------
+--n --show-nfc
+-  Retrieves the receive network flow classification configurations.
+-
+-rx-flow-hash tcp4|udp4|ah4|esp4|sctp4|tcp6|udp6|ah6|esp6|sctp6
+-  Retrieves the hash options for the specified network traffic type.
+-
+--N --config-nfc
+-  Configures the receive network flow classification.
+-
+-rx-flow-hash tcp4|udp4|ah4|esp4|sctp4|tcp6|udp6|ah6|esp6|sctp6 m|v|t|s|d|f|n|r...
+-  Configures the hash options for the specified network traffic type.
+-
+-  udp4 UDP over IPv4
+-  udp6 UDP over IPv6
+-
+-  f Hash on bytes 0 and 1 of the Layer 4 header of the rx packet.
+-  n Hash on bytes 2 and 3 of the Layer 4 header of the rx packet.
+-
+-
+-NAPI
+-----
+-NAPI (Rx polling mode) is supported in the i40e driver.
+-For more information on NAPI, see
+-https://www.linuxfoundation.org/collaborate/workgroups/networking/napi
+-
+-
+-Flow Control
+-------------
+-
+-Ethernet Flow Control (IEEE 802.3x) can be configured with ethtool to enable
+-receiving and transmitting pause frames for i40e. When transmit is enabled,
+-pause frames are generated when the receive packet buffer crosses a predefined
+-threshold. When receive is enabled, the transmit unit will halt for the time
+-delay specified when a pause frame is received. 
+-
+-Flow Control is disabled by default.
+-
+-Use ethtool to change the flow control settings.
+-
+-ethtool:
+-ethtool -A eth? autoneg off rx on tx on
+-
+-NOTE: You must have a flow control capable link partner.
+-
+-
+-MAC and VLAN anti-spoofing feature
+-----------------------------------
+-
+-When a malicious driver attempts to send a spoofed packet, it is dropped by
+-the hardware and not transmitted.
+-NOTE: This feature can be disabled for a specific Virtual Function (VF).
+-ip link set <pf dev> vf <vf id> spoofchk {off|on}
+-
+-
+-Support for UDP RSS
+--------------------
+-
+-This feature adds an ON/OFF switch for hashing over certain flow types. Only
+-UDP can be turned on. The default setting is enabled .
+-
+-
+-IEEE 1588 Precision Time Protocol (PTP) Hardware Clock (PHC)
+-------------------------------------------------------------
+-
+-Precision Time Protocol (PTP) is used to synchronize clocks in a computer
+-network and is supported in the i40e driver.
+-
+-
+-
+-VXLAN Overlay HW Offloading
+----------------------------
+-
+-Virtual Extensible LAN (VXLAN) allows you to extend an L2 network over an L3
+-network, which may be useful in a virtualized or cloud environment. Some Intel(R)
+-Ethernet Network devices perform VXLAN processing, offloading it from the
+-operating system. This reduces CPU utilization.
+- 
+-VXLAN offloading is controlled by the tx and rx checksum offload options
+-provided by ethtool. That is, if tx checksum offload is enabled, and the adapter
+-has the capability, VXLAN offloading is also enabled. If rx checksum offload is
+-enabled, then the VXLAN packets rx checksum will be offloaded, unless the module
+-parameter vxlan_rx=0,0 was used to specifically disable the VXLAN rx offload.
+- 
+-VXLAN Overlay HW Offloading is enabled by default. To view and configure VXLAN
+-on a VXLAN-overlay offload enabled device, use the following
+-command:
+-
+-  # ethtool -k ethX
+-   (This command displays the offloads and their current state.)
+-
+-i40e support for VXLAN HW offloading is dependent on
+-kernel support of the HW offloading features.
+-
+-For more information on configuring your network for overlay HW offloading
+-support, refer to the Intel Technical Brief, "Creating Overlay Networks
+-Using Intel Ethernet Converged Network Adapters" (Intel Networking Division,
+-August 2013):
+-
+-http://www.intel.com/content/dam/www/public/us/en/documents/technology-briefs/
+-overlay-networks-using-converged-network-adapters-brief.pdf
+-
+-
+-Multiple Functions per Port
+----------------------------
+-
+-On X710/XL710 based adapters that support it, you can set up multiple functions
+-on each physical port. You configure these functions through the System
+-Setup/BIOS.
+-
+-Minimum TX Bandwidth is the guaranteed minimum data transmission bandwidth, as
+-a percentage of the full physical port link speed, that the partition will
+-receive. The bandwidth the partition is awarded will never fall below the level
+-you specify here.
+-
+-The range for the minimum bandwidth values is:
+-1 to ((100 minus # of partitions on the physical port) plus 1)
+-For example, if a physical port has 4 partitions, the range would be
+-1 to ((100 - 4) + 1 = 97)
+-
+-The Maximum Bandwidth percentage represents the maximum transmit
+-bandwidth allocated to the partition as a percentage of the full physical port
+-link speed. The accepted range of values is 1-100. The value can be used as a
+-limiter, should you chose that any one particular function not be able to
+-consume 100% of a port's bandwidth (should it be available). The sum of
+-all the values for Maximum Bandwidth is not restricted, because no more than
+-100% of a port's bandwidth can ever be used.
+-
+-Once the initial configuration is complete, you can set different
+-bandwidth allocations on each function as follows:
+-1. Make a new directory named /config
+-2. edit etc/fstab to include:
+-
+-	configfs /config configfs defaults
+-
+-3. Mount /config
+-4. Load (or reload) the i40e driver
+-5. Make a new directory under config/i40e for each partition upon which you
+-   wish to configure the bandwidth.
+-6. The following files will appear under the config/partition directory:
+-   - max_bw
+-   - min_bw
+-   - commit
+-   - ports
+-   - partitions
+-   read from max_bw to get display the current maximum bandwidth setting.
+-   write to max_bw to set the maximum bandwidth for this function.
+-   read from min_bw to display the current minimum bandwidth setting.
+-   Write to min_bw to set the minimum bandwidth for this function.
+-   Write a '1' to commit to save your changes.
+-
+-Notes: -commit is write only. Attempting to read it will result in an
+-	 error.
+-	-Writing to commit is only supported on the first function of
+-	 a given port. Writing to a subsequent function will result in an
+-	 error.
+-	-Oversubscribing the minimum bandwidth is not supported. The underlying
+-	 device's NVM will set the minimum bandwidth to supported values in an
+-	 indeterminate manner. Remove all of the directories under config and
+-	 reload them to see what the actual values are.
+-	-To unload the driver you must first remove the directories created in
+-	 step 5, above.
+-
+-Example of Setting the minimum and maximum bandwidth (assume there are four
+-function on the port eth6-eth9, and that eth6 is the first function on
+-the port):
+-
+- # mkdir /config/eth6
+- # mkdir /config/eth7
+- # mkdir /config/eth8
+- # mkdir /config/eth9
+-
+- # echo 50 > /config/eth6/min_bw
+- # echo 100 > /config/eth6/max_bw
+- # echo 20 > /config/eth7/min_bw
+- # echo 100 > /config/eth7/max_bw
+- # echo 20 > /config/eth8/min_bw
+- # echo 100 > /config/eth8/max_bw
+- # echo 10 > /config/eth9/min_bw
+- # echo 25 > /config/eth9/max_bw
+-
+- # echo 1 > /config/eth6/commit
+-
+-
+-Data Center Bridging (DCB)
+---------------------------
+-DCB is a configuration Quality of Service implementation in hardware.
+-It uses the VLAN priority tag (802.1p) to filter traffic. That means
+-that there are 8 different priorities that traffic can be filtered into.
+-It also enables priority flow control (802.1Qbb) which can limit or
+-eliminate the number of dropped packets during network stress. Bandwidth
+-can be allocated to each of these priorities, which is enforced at the
+-hardware level (802.1Qaz).
+-
+-Adapter firmware implements LLDP and DCBX protocol agents as per 802.1AB
+-and 802.1Qaz respectively. The firmware based DCBX agent runs in willing
+-mode only and can accept settings from a DCBX capable peer. Software
+-configuration of DCBX parameters via dcbtool/lldptool are not supported.
+-
+-The i40e driver implements the DCB netlink interface layer to allow
+-user-space to communicate with the driver and query DCB configuration for
+-the port.
+-
+-
+-Interrupt Rate Limiting
+------------------------
+-
+-The Intel(R) Ethernet Controller XL710 family supports an interrupt rate
+-limiting mechanism. The user can control, via ethtool, the number of
+-microseconds between interrupts.
+-
+-Syntax:
+-# ethtool -C ethX rx-usecs-high N
+-
+-Valid Range: 0-235 (0=no limit)
+-
+-The range of 0-235 microseconds provides an effective range of 4,310 to
+-250,000 interrupts per second. The value of rx-usecs-high can be set
+-independently of rx-usecs and tx-usecs in the same ethtool command, and
+-is also independent of the adaptive interrupt moderation algorithm. The
+-underlying hardware supports granularity in 4-microsecond intervals, so
+-adjacent values may result in the same interrupt rate.
+-
+-One possible use case is the following:
+-# ethtool -C ethX adaptive-rx off adaptive-tx off rx-usecs-high 20 rx-usecs 5
+-tx-usecs 5
+-
+-The above command would disable adaptive interrupt moderation, and allow a
+-maximum of 5 microseconds before indicating a receive or transmit was complete.
+- However, instead of resulting in as many as 200,000 interrupts per second, it
+-limits total interrupts per second to 50,000 via the rx-usecs-high parameter.
+-
+-
+-Performance Optimization:
+--------------------------
+-
+-Driver defaults are meant to fit a wide variety of workloads, but if further
+-optimization is required we recommend experimenting with the following
+-settings.
+-
+-Pin the adapter's IRQs to specific cores by disabling the irqbalance service
+-and using the included set_irq_affinity script. Please see the script's help
+-text for further options.
+-
+-  - The following settings will distribute the IRQs across all the cores
+-    evenly:
+-
+-    # scripts/set_irq_affinity -x all <interface1> , [ <interface2>, ... ]
+-
+-  - The following settings will distribute the IRQs across all the cores that
+-    are local to the adapter (same NUMA node):
+-
+-    # scripts/set_irq_affinity -x local <interface1> ,[ <interface2>, ... ]
+-
+-For very CPU intensive workloads, we recommend pinning the IRQs to all cores.
+-
+-For IP Forwarding: Disable Adaptive ITR and lower rx and tx interrupts per
+-queue using ethtool.
+-
+-  - Setting rx-usecs and tx-usecs to 125 will limit interrupts to about 8000
+-    interrupts per second per queue.
+-
+-    # ethtool -C <interface> adaptive-rx off adaptive-tx off rx-usecs 125 
+-    tx-usecs 125
+-
+-For lower CPU utilization: Disable Adaptive ITR and lower rx and tx interrupts
+-per queue using ethtool.
+-
+-  - Setting rx-usecs and tx-usecs to 250 will limit interrupts to about 4000
+-    interrupts per second per queue.
+-
+-    # ethtool -C <interface> adaptive-rx off adaptive-tx off rx-usecs 250 
+-    tx-usecs 250
+-
+-For lower latency: Disable Adaptive ITR and ITR by setting rx and tx to 0
+-using ethtool.
+-
+-    # ethtool -C <interface> adaptive-rx off adaptive-tx off rx-usecs 0 
+-    tx-usecs 0
+-
+-
+-================================================================================
+-
+-
+-Known Issues/Troubleshooting
+-----------------------------
+-
+-
+-Fixing Performance Issues When Using IOMMU in Virtualized Environments
+-----------------------------------------------------------------------
+-The IOMMU feature of the processor prevents I/O devices from accessing memory
+-outside the boundaries set by the OS. It also allows devices to be directly
+-assigned to a Virtual Machine. However, IOMMU may affect performance, both
+-in latency (each DMA access by the device must be translated by the IOMMU)
+-and in CPU utilization (each buffer assigned to every device must be mapped
+-in the IOMMU).
+-
+-If you experience significant performance issues with IOMMU, try using it in
+-“passthrough” mode by adding the following to the kernel boot command line:
+-  intel_iommu=on iommu=pt
+-
+-NOTE: This mode enables remapping for assigning devices to VMs, providing
+-near-native I/O performance, but does not provide the additional memory
+-protection.
+-
+-
+-Transmit hangs leading to no traffic
+-------------------------------------
+-
+-Disabling flow control while the device is under stress may cause tx hangs and
+-eventually lead to the device no longer passing traffic. You must reboot the
+-system to resolve this issue.
+-
+-
+-Incomplete messages in the system log
+--------------------------------------
+-
+-The NVMUpdate utility may write several incomplete messages in the system log.
+-These messages take the form:
+-  in the driver Pci Ex config function byte index 114
+-  in the driver Pci Ex config function byte index 115
+-These messages can be ignored.
+-
+-
+-Bad checksum counter incorrectly increments when using VxLAN
+-------------------------------------------------------------
+-
+-When passing non-UDP traffic over a VxLAN interface, the port.rx_csum_bad
+-counter increments for the packets.
+-
+-
+-Statistic counters reset when promiscuous mode is changed
+----------------------------------------------------------
+-
+-Changing promiscuous mode triggers a reset of the physical function driver.
+-This will reset the statistic counters.
+-
+-
+-Virtual machine does not get link
+----------------------------------
+-
+-If the virtual machine has more than one virtual port assigned to it, and those
+-virtual ports are bound to different physical ports, you may not get link on all
+-of the virtual ports. The following command may work around the issue:
+-ethtool -r <PF>
+-Where <PF> is the PF interface in the host, for example: p5p1. You may need to
+-run the command more than once to get link on all virtual ports.
+-
+-
+-MAC address of Virtual Function changes unexpectedly
+-----------------------------------------------------
+-
+-If a Virtual Function's MAC address is not assigned in the host, then the
+-VF (virtual function) driver will use a random MAC address. This random MAC
+-address may change each time the VF driver is reloaded. You can assign a
+-static MAC address in the host machine. This static MAC address will survive
+-a VF driver reload.
+-
+-
+-Enabling TSO may cause data integrity issues
+---------------------------------------------
+-
+-Enabling TSO on kernel 3.14 or newer may cause data integrity issues.
+-Kernel 3.10 and older do not exhibit this behavior.
+-
+-
+-Changing the number of Rx or Tx queues with ethtool -L may cause a kernel panic
+--------------------------------------------------------------------------------
+-
+-Changing the number of Rx or Tx queues with ethtool -L while traffic is flowing
+-and the interface is up may cause a kernel panic. Bring the interface down first
+-to avoid the issue. For example:
+-  ip link set ethx down
+-  ethtool -L ethx combined 4
+-
+-
+-Adding a Flow Director Sideband rule fails incorrectly
+-------------------------------------------------------
+-
+-If you try to add a Flow Director rule when no more sideband rule space is
+-available, i40e logs an error that the rule could not be added, but ethtool
+-returns success. You can remove rules to free up space. In addition, remove
+-the rule that failed. This will evict it from the driver's cache.
+-
+-
+-Flow Director Sideband Logic adds duplicate filter
+---------------------------------------------------
+-
+-The Flow Director Sideband Logic adds a duplicate filter in the software filter
+-list if the location is not specified or the specified location differs from
+-the previous location but has the same filter criteria. In this case, the
+-second of the two filters that appear is the valid one in hardware and it
+-decides the filter action.
+-
+-
+-Multiple Interfaces on Same Ethernet Broadcast Network
+-------------------------------------------------------
+-
+-Due to the default ARP behavior on Linux, it is not possible to have one
+-system on two IP networks in the same Ethernet broadcast domain
+-(non-partitioned switch) behave as expected. All Ethernet interfaces will
+-respond to IP traffic for any IP address assigned to the system. This results
+-in unbalanced receive traffic.
+-
+-If you have multiple interfaces in a server, either turn on ARP filtering by
+-entering:
+-echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
+-
+-This only works if your kernel's version is higher than 2.4.5.
+-
+-
+-NOTE: This setting is not saved across reboots. The configuration change can
+-be made permanent by adding the following line to the file /etc/sysctl.conf:
+-net.ipv4.conf.all.arp_filter = 1
+-
+-Another alternative is to install the interfaces in separate broadcast domains
+-(either in different switches or in a switch partitioned to VLANs).
+-
+-
+-UDP Stress Test Dropped Packet Issue
+-------------------------------------
+-
+-Under small packet UDP stress with the i40edriver, the system may
+-drop UDP packets due to socket buffers being full. Setting the driver Flow
+-Control variables to the minimum may resolve the issue. You may also try
+-increasing the kernel's default buffer sizes by changing the values in
+-
+-  /proc/sys/net/core/rmem_default and rmem_max
+-
+-
+-Unplugging Network Cable While ethtool -p is Running
+-----------------------------------------------------
+-
+-In kernel versions 2.6.32 and newer, unplugging the network cable while
+-ethtool -p is running will cause the system to become unresponsive to
+-keyboard commands, except for control-alt-delete. Restarting the system
+-appears to be the only remedy.
+-
+-
+-Rx Page Allocation Errors
+--------------------------
+-
+-'Page allocation failure. order:0' errors may occur under stress with kernels
+-2.6.25 and newer. This is caused by the way the Linux kernel reports this
+-stressed condition.
+-
+-
+-
+-Disable GRO when routing/bridging
+----------------------------------
+-
+-Due to a known kernel issue, GRO must be turned off when routing/bridging. GRO
+-can be turned off via ethtool.
+-ethtool -K ethX gro off
+-
+-where ethX is the ethernet interface being modified.
+-
+-
+-Lower than expected performance
+--------------------------------
+-
+-Some PCIe x8 slots are actually configured as x4 slots. These slots have
+-insufficient bandwidth for full line rate with dual port and quad port
+-devices. In addition, if you put a PCIe Generation 3-capable adapter
+-into a PCIe Generation 2 slot, you cannot get full bandwidth. The driver
+-detects this situation and writes the following message in the system log:
+-
+-"PCI-Express bandwidth available for this card is not sufficient for optimal
+-performance. For optimal performance a x8 PCI-Express slot is required."
+-
+-If this error occurs, moving your adapter to a true PCIe Generation 3 x8 slot
+- will resolve the issue.
+-
+-
+-ethtool may incorrectly display SFP+ fiber module as direct attached cable
+---------------------------------------------------------------------------
+-
+-Due to kernel limitations, port type can only be correctly displayed on kernel
+-2.6.33 or greater.
+-
+-
+-Running ethtool -t ethX command causes break between PF and test client
+------------------------------------------------------------------------
+-
+-When there are active VFs, "ethtool -t" performs a full diagnostic. In the
+-process, it resets itself and all attached VFs. The VF drivers encouter a
+-disruption, but are able to recover.
+-
+-
+-Enabling SR-IOV in a 64-bit Microsoft* Windows Server* 2012/R2 guest OS
+-under Linux KVM
+-------------------------------------------------------------------------
+-
+-KVM Hypervisor/VMM supports direct assignment of a PCIe device to a VM. This
+-includes traditional PCIe devices, as well as SR-IOV-capable devices using
+-Intel XL710-based controllers.
+-
+-
+-Unable to obtain DHCP lease on boot with RedHat
+------------------------------------------------
+-
+-For configurations where the auto-negotiation process takes more than 5
+-seconds, the boot script may fail with the following message:
+-"ethX: failed. No link present. Check cable?"
+-
+-If this error appears even though the presence of a link can be confirmed
+-using ethtool ethX, try setting "LINKDELAY=5" in
+-/etc/sysconfig/network-scripts/ifcfg-ethX.
+-
+-NOTE: Link time can take up to 30 seconds. Adjust LINKDELAY value accordingly.
+-
+-Alternatively, NetworkManager can be used to configure the interfaces, which
+-avoids the set timeout. For configuration instructions of NetworkManager
+-refer to the documentation provided by your distribution.
+-
+-
+-Loading i40e driver in 3.2.x and newer kernels displays kernel tainted message
+-------------------------------------------------------------------------------
+-
+-Due to recent kernel changes, loading an out of tree driver causes the kernel
+-to be tainted.
+-
+-
+-================================================================================
+-
+-
+-Support
+--------
+-For general information, go to the Intel support website at:
+-www.intel.com/support/
+-
+-or the Intel Wired Networking project hosted by Sourceforge at:
+-http://sourceforge.net/projects/e1000
+-If an issue is identified with the released source code on a supported
+-kernel with a supported adapter, email the specific information related to the
+-issue to e1000-devel@lists.sf.net.
+-
+-
+-================================================================================
+-
+-
+-License
+--------
+-
+-This program is free software; you can redistribute it and/or modify it under
+-the terms and conditions of the GNU General Public License, version 2, as
+-published by the Free Software Foundation.
+-
+-This program is distributed in the hope it will be useful, but WITHOUT ANY
+-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+-A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+-
+-You should have received a copy of the GNU General Public License along with
+-this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
+-St - Fifth Floor, Boston, MA 02110-1301 USA.
+-
+-The full GNU General Public License is included in this distribution in the
+-file called "COPYING".
+-
+-Intel(R) XL710/X710 Network Driver
+-Intel(R) XL710/X710 Virtual Function Network Driver
+-Copyright(c) 2014-2015 Intel Corporation.
+-================================================================================
+-
+-
+-
+-Trademarks
+-----------
+-
+-Intel, Itanium, and Pentium are trademarks or registered trademarks of Intel
+-Corporation or its subsidiaries in the United States and other countries.
+-
+-* Other names and brands may be claimed as the property of others.
+-
+-
+--- i40e-1.4.25/SUMS.orig	2022-05-26 11:32:55.296161075 -0700
++++ i40e-1.4.25/SUMS	1969-12-31 16:00:00.000000000 -0800
+@@ -1,47 +0,0 @@
+-55663     4 i40e-1.4.25/pci.updates
+-09576     6 i40e-1.4.25/scripts/set_irq_affinity
+-53852     2 i40e-1.4.25/scripts/dump_tables
+-05363     3 i40e-1.4.25/i40e.7
+-23673     6 i40e-1.4.25/src/i40e/i40e_diag.c
+-44542    45 i40e-1.4.25/src/i40e/i40e_nvm.c
+-64566     6 i40e-1.4.25/src/i40e/i40e_virtchnl_pf.h
+-29128     6 i40e-1.4.25/src/i40e/i40e_lan_hmc.h
+-60546    76 i40e-1.4.25/src/i40e/i40e_debugfs.c
+-19314     9 i40e-1.4.25/src/i40e/i40e_dcb_nl.c
+-65207     5 i40e-1.4.25/src/i40e/i40e_fcoe.h
+-23231    11 i40e-1.4.25/src/i40e/i40e_hmc.c
+-46221    73 i40e-1.4.25/src/i40e/i40e_adminq_cmd.h
+-03802    37 i40e-1.4.25/src/i40e/i40e_dcb.c
+-02237    30 i40e-1.4.25/src/i40e/i40e_adminq.c
+-33767     2 i40e-1.4.25/src/i40e/Kbuild
+-59718    68 i40e-1.4.25/src/i40e/i40e_virtchnl_pf.c
+-42138     9 i40e-1.4.25/src/i40e/i40e_hmc.h
+-29883    23 i40e-1.4.25/src/i40e/i40e_ptp.c
+-60649     2 i40e-1.4.25/src/i40e/i40e_diag.h
+-06701    47 i40e-1.4.25/src/i40e/i40e_fcoe.c
+-24387    54 i40e-1.4.25/src/i40e/i40e_type.h
+-44688    52 i40e-1.4.25/src/i40e/kcompat.c
+-44588     1 i40e-1.4.25/src/i40e/Module.supported
+-19927    24 i40e-1.4.25/src/i40e/i40e_prototype.h
+-18956   191 i40e-1.4.25/src/i40e/i40e_common.c
+-07400     3 i40e-1.4.25/src/i40e/i40e_alloc.h
+-09866   364 i40e-1.4.25/src/i40e/i40e_register.h
+-34433    13 i40e-1.4.25/src/i40e/i40e_txrx.h
+-46778   143 i40e-1.4.25/src/i40e/kcompat.h
+-49179   109 i40e-1.4.25/src/i40e/i40e_ethtool.c
+-00348    95 i40e-1.4.25/src/i40e/i40e_txrx.c
+-52476     5 i40e-1.4.25/src/i40e/i40e_adminq.h
+-11873     7 i40e-1.4.25/src/i40e/i40e_dcb.h
+-58812    42 i40e-1.4.25/src/i40e/i40e_lan_hmc.c
+-22745     4 i40e-1.4.25/src/i40e/i40e_status.h
+-47611    32 i40e-1.4.25/src/i40e/i40e.h
+-24881   329 i40e-1.4.25/src/i40e/i40e_main.c
+-09060     4 i40e-1.4.25/src/i40e/i40e_helper.h
+-48921    13 i40e-1.4.25/src/i40e/i40e_virtchnl.h
+-40865    11 i40e-1.4.25/src/i40e/i40e_configfs.c
+-29354     2 i40e-1.4.25/src/i40e/i40e_devids.h
+-10087     5 i40e-1.4.25/src/i40e/i40e_osdep.h
+-57129    12 i40e-1.4.25/src/Makefile
+-19248    10 i40e-1.4.25/i40e.spec
+-02733    18 i40e-1.4.25/COPYING
+-03988    38 i40e-1.4.25/README
+--- i40e-1.4.25/src/i40e/i40e_virtchnl_pf.c.orig	2022-05-26 11:32:55.352158783 -0700
++++ i40e-1.4.25/src/i40e/i40e_virtchnl_pf.c	2022-05-26 11:32:55.456154524 -0700
+@@ -2154,8 +2154,13 @@
+  *
+  * program VF vlan id and/or qos
+  **/
++#ifdef	CONFIG_WG_KERNEL_4_14
++int i40e_ndo_set_vf_port_vlan(struct net_device *netdev,
++			      int vf_id, u16 vlan_id, u8 qos, __be16 proto)
++#else
+ int i40e_ndo_set_vf_port_vlan(struct net_device *netdev,
+ 			      int vf_id, u16 vlan_id, u8 qos)
++#endif
+ {
+ 	u16 vlanprio = vlan_id | (qos << I40E_VLAN_PRIORITY_SHIFT);
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
+--- i40e-1.4.25/src/i40e/i40e_main.c.orig	2022-05-26 11:32:55.344159110 -0700
++++ i40e-1.4.25/src/i40e/i40e_main.c	2022-05-26 11:32:55.448154852 -0700
+@@ -43,6 +43,10 @@
+ #include <net/gre.h>
+ #endif /* HAVE_GRE_ENCAP_OFFLOAD */
+ 
++#ifdef	CONFIG_WG_KERNEL_4_14 // WG:JB We don't need these even tho they're in 4.14
++#undef  HAVE_SETUP_TC
++#endif
++
+ char i40e_driver_name[] = "i40e";
+ static const char i40e_driver_string[] =
+ 		"Intel(R) 40-10 Gigabit Ethernet Connection Network Driver";
+@@ -298,7 +302,11 @@
+ 		unsigned long trans_start;
+ 
+ 		q = netdev_get_tx_queue(netdev, i);
++#ifdef	CONFIG_WG_KERNEL_4_14
++		trans_start = q->trans_start;
++#else
+ 		trans_start = q->trans_start ? : netdev->trans_start;
++#endif
+ 		if (netif_xmit_stopped(q) && time_after(jiffies,
+ 			(trans_start + netdev->watchdog_timeo))) {
+ 			hung_queue = i;
+@@ -427,10 +435,16 @@
+ 					     struct net_device *netdev,
+ 					     struct rtnl_link_stats64 *stats)
+ #else
++#ifdef	CONFIG_WG_KERNEL_4_14
++void i40e_get_netdev_stats_struct(
++                                  struct net_device *netdev,
++                                  struct rtnl_link_stats64 *stats)
++#else
+ static struct rtnl_link_stats64 *i40e_get_netdev_stats_struct(
+ 					     struct net_device *netdev,
+ 					     struct rtnl_link_stats64 *stats)
+ #endif
++#endif
+ {
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
+ 	struct i40e_ring *tx_ring, *rx_ring;
+@@ -439,10 +453,18 @@
+ 	int i;
+ 
+ 	if (test_bit(__I40E_DOWN, &vsi->state))
++#ifdef	CONFIG_WG_KERNEL_4_14
++		return;
++#else
+ 		return stats;
++#endif
+ 
+ 	if (!vsi->tx_rings)
++#ifdef	CONFIG_WG_KERNEL_4_14
++		return;
++#else
+ 		return stats;
++#endif
+ 
+ 	rcu_read_lock();
+ 	for (i = 0; i < vsi->num_queue_pairs; i++) {
+@@ -483,7 +505,11 @@
+ 	stats->rx_crc_errors	= vsi_stats->rx_crc_errors;
+ 	stats->rx_length_errors	= vsi_stats->rx_length_errors;
+ 
++#ifdef	CONFIG_WG_KERNEL_4_14
++	return;
++#else
+ 	return stats;
++#endif
+ }
+ #else
+ #ifdef I40E_FCOE
+@@ -12020,6 +12046,13 @@
+ #endif
+ };
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Make stubs if this is not defined
++#ifndef	CONFIG_CONFIGFS_FS
++#define	i40e_configfs_init()
++#define	i40e_configfs_exit()
++#endif
++#endif
++
+ /**
+  * i40e_init_module - Driver registration routine
+  *
+--- i40e-1.4.25/src/i40e/i40e_virtchnl_pf.h.orig	2022-05-26 11:32:55.352158783 -0700
++++ i40e-1.4.25/src/i40e/i40e_virtchnl_pf.h	2022-05-26 11:32:55.456154524 -0700
+@@ -132,8 +132,13 @@
+ 
+ /* VF configuration related iplink handlers */
+ int i40e_ndo_set_vf_mac(struct net_device *netdev, int vf_id, u8 *mac);
++#ifdef	CONFIG_WG_KERNEL_4_14
++int i40e_ndo_set_vf_port_vlan(struct net_device *netdev,
++			      int vf_id, u16 vlan_id, u8 qos, __be16 proto);
++#else
+ int i40e_ndo_set_vf_port_vlan(struct net_device *netdev,
+ 			      int vf_id, u16 vlan_id, u8 qos);
++#endif
+ #ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
+ int i40e_ndo_set_vf_bw(struct net_device *netdev, int vf_id, int min_tx_rate,
+ 		       int max_tx_rate);
+--- i40e-1.4.25/src/Makefile.orig	2022-05-26 11:32:55.296161075 -0700
++++ i40e-1.4.25/src/Makefile	1969-12-31 16:00:00.000000000 -0800
+@@ -1,307 +0,0 @@
+-###########################################################################
+-#
+-# Intel Ethernet Controller XL710 Family Linux Driver
+-# Copyright(c) 2013 - 2015 Intel Corporation.
+-#
+-# This program is free software; you can redistribute it and/or modify it
+-# under the terms and conditions of the GNU General Public License,
+-# version 2, as published by the Free Software Foundation.
+-#
+-# This program is distributed in the hope it will be useful, but WITHOUT
+-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+-# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+-# more details.
+-#
+-# You should have received a copy of the GNU General Public License along
+-# with this program.  If not, see <http://www.gnu.org/licenses/>.
+-#
+-# The full GNU General Public License is included in this distribution in
+-# the file called "COPYING".
+-#
+-# Contact Information:
+-# e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
+-# Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
+-###########################################################################
+-# Environment tests
+-
+-ifeq (,$(BUILD_KERNEL))
+-BUILD_KERNEL=$(shell uname -r)
+-endif
+-
+-ifeq (,$(wildcard build.mk))
+-	DRIVERS :=  $(shell ls -ld i40e* | awk '/^d/ { print $$9 }')
+-else
+-	DRIVERS :=  $(shell ls -ld i40e i40evf | awk '/^d/ { print $$9 }')
+-endif
+-DIRS :=  $(patsubst %,%/,$(DRIVERS))
+-SOURCES := $(shell find $(DRIVERS) -name "*.[ch]" | grep -v "\.mod\.c")
+-MODULES := $(patsubst %,%.ko,$(DRIVERS))
+-TARGETS := $(join $(DIRS), $(MODULES))
+-MANFILES := $(patsubst %,%.7,$(DRIVERS))
+-MANFILES := $(patsubst %,../%,$(MANFILES))
+-###########################################################################
+-# Environment tests
+-
+-# Kernel Search Path
+-# All the places we look for kernel source
+-KSP :=  /lib/modules/$(BUILD_KERNEL)/build \
+-        /lib/modules/$(BUILD_KERNEL)/source \
+-        /usr/src/linux-$(BUILD_KERNEL) \
+-        /usr/src/linux-$($(BUILD_KERNEL) | sed 's/-.*//') \
+-        /usr/src/kernel-headers-$(BUILD_KERNEL) \
+-        /usr/src/kernel-source-$(BUILD_KERNEL) \
+-        /usr/src/linux-$($(BUILD_KERNEL) | sed 's/\([0-9]*\.[0-9]*\)\..*/\1/') \
+-        /usr/src/linux
+-
+-# prune the list down to only values that exist
+-# and have an include/config sub-directory
+-# as of last check, everything beyond 2.6.32 should have include/config
+-# even in the SLES12 /lib/modules/`uname -r`/build
+-test_dir = $(shell [ -e $(dir)/include/config ] && echo $(dir))
+-KSP := $(foreach dir, $(KSP), $(test_dir))
+-
+-# we will use this first valid entry in the search path
+-ifeq (,$(KSRC))
+-  KSRC := $(firstword $(KSP))
+-endif
+-
+-ifeq (,$(KSRC))
+-  $(warning *** Kernel header files not in any of the expected locations.)
+-  $(warning *** Install the appropriate kernel development package, e.g.)
+-  $(error kernel-devel, for building kernel modules and try again)
+-else
+-ifeq (/lib/modules/$(BUILD_KERNEL)/source, $(KSRC))
+-  KOBJ :=  /lib/modules/$(BUILD_KERNEL)/build
+-else
+-  KOBJ :=  $(KSRC)
+-endif
+-endif
+-
+-# Version file Search Path
+-VSP :=  $(KOBJ)/include/generated/utsrelease.h \
+-        $(KOBJ)/include/linux/utsrelease.h \
+-        $(KOBJ)/include/linux/version.h \
+-        $(KOBJ)/include/generated/uapi/linux/version.h \
+-        /boot/vmlinuz.version.h
+-
+-# Config file Search Path
+-CSP :=  $(KOBJ)/include/generated/autoconf.h \
+-        $(KOBJ)/include/linux/autoconf.h \
+-        /boot/vmlinuz.autoconf.h
+-
+-# prune the lists down to only files that exist
+-test_file = $(shell [ -f $(file) ] && echo $(file))
+-VSP := $(foreach file, $(VSP), $(test_file))
+-CSP := $(foreach file, $(CSP), $(test_file))
+-
+-ifneq ($(wildcard ./gcc-i-sys.sh),)
+-GCC_I_SYS := $(shell readlink -e ./gcc-i-sys.sh)
+-$(shell chmod +x $(GCC_I_SYS))
+-ISYS_OPTS := CC="$(GCC_I_SYS)"
+-endif
+-
+-# and use the first valid entry in the Search Paths
+-ifeq (,$(VERSION_FILE))
+-  VERSION_FILE := $(firstword $(VSP))
+-endif
+-ifeq (,$(CONFIG_FILE))
+-  CONFIG_FILE := $(firstword $(CSP))
+-endif
+-
+-ifeq (,$(wildcard $(VERSION_FILE)))
+-  $(error Linux kernel source not configured - missing version header file)
+-endif
+-
+-ifeq (,$(wildcard $(CONFIG_FILE)))
+-  $(error Linux kernel source not configured - missing autoconf.h)
+-endif
+-
+-# Some helper functions for converting kernel version to version codes
+-get_kver = $(or $(word ${2},$(subst ., ,${1})),0)
+-get_kvercode = $(shell [ "${1}" -ge 0 -a "${1}" -le 255 2>/dev/null ] && \
+-                       [ "${2}" -ge 0 -a "${2}" -le 255 2>/dev/null ] && \
+-                       [ "${3}" -ge 0 -a "${3}" -le 255 2>/dev/null ] && \
+-                       printf %d $$(( ( ${1} << 16 ) + ( ${2} << 8 ) + ( ${3} ) )) )
+-
+-# Convert LINUX_VERSION into LINUX_VERSION_CODE
+-ifneq (${LINUX_VERSION},)
+-  LINUX_VERSION_CODE=$(call get_kvercode,$(call get_kver,${LINUX_VERSION},1),$(call get_kver,${LINUX_VERSION},2),$(call get_kver,${LINUX_VERSION},3))
+-endif
+-
+-# Honor LINUX_VERSION_CODE
+-ifneq (${LINUX_VERSION_CODE},)
+-  $(info Setting LINUX_VERSION_CODE to ${LINUX_VERSION_CODE}$(if ${LINUX_VERSION}, from LINUX_VERSION=${LINUX_VERSION}))
+-  KVER_CODE := ${LINUX_VERSION_CODE}
+-  EXTRA_CFLAGS += -DLINUX_VERSION_CODE=${LINUX_VERSION_CODE}
+-endif
+-
+-EXTRA_CFLAGS += $(CFLAGS_EXTRA)
+-
+-# get the kernel version - we use this to find the correct install path
+-KVER := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VERSION_FILE) | grep UTS_RELEASE | \
+-        awk '{ print $$3 }' | sed 's/\"//g')
+-
+-# assume source symlink is the same as build, otherwise adjust KOBJ
+-ifneq (,$(wildcard /lib/modules/$(KVER)/build))
+-ifneq ($(KSRC),$(shell readlink /lib/modules/$(KVER)/build))
+-  KOBJ=/lib/modules/$(KVER)/build
+-endif
+-endif
+-
+-ifeq (${KVER_CODE},)
+-  KVER_CODE := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VSP) 2> /dev/null |\
+-                 grep -m 1 LINUX_VERSION_CODE | awk '{ print $$3 }' | sed 's/\"//g')
+-endif
+-
+-############################
+-# Module Install Directory #
+-# ############################
+-
+-# Default to using updates/drivers/net/ethernet/intel/ path, since depmod since
+-# v3.1 defaults to checking updates folder first, and only checking kernel/
+-# and extra/ afterwards. We use updates instead of kernel/* due to desire to
+-# prevent over-writing built-in modules files, and this neatly solves
+-# the problem of knowing a-priori where the original driver was installed,
+-# and how to uninstall cleanly.
+-INSTDIR ?= /lib/modules/${KVER}/updates/drivers/net/ethernet/intel
+-
+-# figure out how to update the initrd
+-INITRD_COMMAND = $(shell \
+-			if which dracut > /dev/null 2>&1 ; then \
+-				echo "dracut --force"; \
+-			elif which mkinitrd > /dev/null 2>&1 ; then \
+-				echo "mkinitrd"; \
+-			elif which update-initramfs > /dev/null 2>&1 ; then \
+-				echo "update-initramfs -u"; \
+-			fi )
+-				
+-# abort the build on kernels older than 2.6.32
+-ifneq (1,$(shell [ $(KVER_CODE) -ge 132640 ] && echo 1 || echo 0))
+-  $(error *** Aborting the build. \
+-          *** This driver is not supported on kernel versions older than 2.6.32)
+-endif
+-
+-MANSECTION = 7
+-
+-ifeq (,$(MANDIR))
+-  # find the best place to install the man page
+-  MANPATH := $(shell (manpath 2>/dev/null || echo $MANPATH) | sed 's/:/ /g')
+-  ifneq (,$(MANPATH))
+-    # test based on inclusion in MANPATH
+-    test_dir = $(findstring $(dir), $(MANPATH))
+-  else
+-    # no MANPATH, test based on directory existence
+-    test_dir = $(shell [ -e $(dir) ] && echo $(dir))
+-  endif
+-  # our preferred install path
+-  # should /usr/local/man be in here ?
+-  MANDIR := /usr/share/man /usr/man
+-  MANDIR := $(foreach dir, $(MANDIR), $(test_dir))
+-  MANDIR := $(firstword $(MANDIR))
+-endif
+-ifeq (,$(MANDIR))
+-  # fallback to /usr/man
+-  MANDIR := /usr/man
+-endif
+-
+-# kernel build function
+-# $1 is the relative path of the subdir to build in
+-# $2 is the kernel build target
+-kernelbuild = $(shell (\
+-		export REAL_CC=$(CC); \
+-		if [ -n "$(KOBJ)" ]; then \
+-			$(MAKE) $(ISYS_OPTS) ccflags-y:="$(CFLAGS_EXTRA)" -C $(KSRC) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=$(realpath $(1)) INSTALL_MOD_PATH=$(INSTALL_MOD_PATH) $(2) ; \
+-		else \
+-			$(MAKE) $(ISYS_OPTS) ccflags-y:="$(CFLAGS_EXTRA)" -C $(KSRC) -O $(KOBJ) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=$(realpath $(1)) INSTALL_MOD_PATH=$(INSTALL_MOD_PATH) $(2) ; \
+-		fi > .tmp ; rm .tmp))
+-
+-
+-###########################################################################
+-# Build rules
+-
+-# We can't use the kernelbuild macro in verbose targets because it gobbles the
+-# output of the shell.
+-
+-$(MODULES): $(TARGETS)
+-	@cp $(TARGETS) .
+-
+-$(TARGETS): $(SOURCES)
+-	@for s in $(DRIVERS) ; do \
+-		export REAL_CC=$(CC); \
+-		if [ -n "$(KOBJ)" ]; then \
+-			$(MAKE) $(ISYS_OPTS) ccflags-y+="$(CFLAGS_EXTRA)" -C $(KSRC) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=`pwd`/$$s modules ; \
+-		else \
+-			$(MAKE) $(ISYS_OPTS) ccflags-y+="$(CFLAGS_EXTRA)" -C $(KSRC) -O $(KOBJ) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=`pwd`/$$s modules ; \
+-		fi ; \
+-	done
+-
+-noisy: $(SOURCES)
+-	@for s in $(DRIVERS) ; do \
+-		export REAL_CC=$(CC); \
+-		if [ -n "$(KOBJ)" ]; then \
+-			$(MAKE) -C $(KSRC) $(ISYS_OPTS) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=`pwd`/$$s V=1 modules ; \
+-		else \
+-			$(MAKE) -C $(KSRC) -O $(KOBJ) $(ISYS_OPTS) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=`pwd`/$$s V=1 modules ; \
+-		fi ; \
+-	done
+-	@cp $(TARGETS) .
+-
+-silent: $(SOURCES)
+-	$(foreach d, $(DRIVERS), $(call kernelbuild,$(d),modules))
+-	@cp $(TARGETS) .
+-
+-sparse: clean $(SOURCES)
+-	@for s in $(DRIVERS) ; do \
+-		export REAL_CC=$(CC); \
+-		if [ -n "$(KOBJ)" ]; then \
+-			$(MAKE) $(ISYS_OPTS) ccflags-y+="$(CFLAGS_EXTRA)" -C $(KSRC) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=`pwd`/$$s C=2 CF="-D__CHECK_ENDIAN__ -Wbitwise -Wcontext" modules ; \
+-		else \
+-			$(MAKE) $(ISYS_OPTS) ccflags-y+="$(CFLAGS_EXTRA)" -C $(KSRC) -O $(KOBJ) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=`pwd`/$$s C=2 CF="-D__CHECK_ENDIAN_ -Wbitwise -Wcontext" modules ; \
+-		fi ; \
+-	done
+-
+-ccc: clean $(SOURCES)
+-	@for s in $(DRIVERS) ; do \
+-		export REAL_CC=$(CC); \
+-		if [ -n "$(KOBJ)" ]; then \
+-			$(MAKE) $(ISYS_OPTS) ccflags-y+="$(CFLAGS_EXTRA)" -C $(KSRC) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=`pwd`/$$s coccicheck MODE=report; \
+-		else \
+-			$(MAKE) $(ISYS_OPTS) ccflags-y+="$(CFLAGS_EXTRA)" -C $(KSRC) -O $(KOBJ) CONFIG_I40E=m CONFIG_I40EVF=m SUBDIRS=`pwd`/$$s coccicheck MODE=report; \
+-		fi ; \
+-	done
+-
+-manfile:
+-	$(foreach m, $(DRIVERS), $(shell gzip -c ../$(m).$(MANSECTION) > $(m).$(MANSECTION).gz))
+-
+-clean:
+-	$(foreach d, $(DRIVERS), $(call kernelbuild,$(d),clean))
+-	@-rm -rf *.$(MANSECTION).gz *.ko
+-
+-install: $(MODULES) manfile
+-	@echo "Copying modules..."
+-	$(foreach m, $(DRIVERS), $(shell \
+-		install -D -m 644 $(m).$(MANSECTION).gz $(INSTALL_MOD_PATH)$(MANDIR)/man$(MANSECTION)/$(m).$(MANSECTION).gz ; \
+-		install -D -m 644 $(m).ko $(INSTALL_MOD_PATH)$(INSTDIR)/$(m)/$(m).ko))
+-ifeq (,$(INSTALL_MOD_PATH))
+-	@echo "Running depmod..."
+-	@-/sbin/depmod -a $(KVER) || true
+-ifeq (,$(INITRD_COMMAND))
+-	@echo "Unable to update initrd. You may need to do this manually."
+-else
+-	@echo "Updating initrd..."
+-	@$(INITRD_COMMAND)
+-endif
+-endif
+-uninstall:
+-	$(foreach d, $(DRIVERS), $(shell rm -f $(INSTALL_MOD_PATH)$(INSTDIR)/$(d)/$(d).ko))
+-	$(foreach d, $(DRIVERS), $(shell rm -f $(INSTALL_MOD_PATH)$(INSTDIR)/$(d)/$(d).gz))
+-	$(foreach d, $(DRIVERS), $(shell rm -f $(INSTALL_MOD_PATH)$(INSTDIR)/$(d)/$(d).ko.xz))
+-	@-/sbin/depmod -a $(KVER)
+-	$(foreach m, $(DRIVERS), $(shell \
+-		if [ -e $(INSTALL_MOD_PATH)$(MANDIR)/man$(MANSECTION)/$(m).$(MANSECTION).gz ] ; then \
+-			rm -f $(INSTALL_MOD_PATH)$(MANDIR)/man$(MANSECTION)/$(m).$(MANSECTION).gz ; \
+-		fi))
+-
+-.PHONY: noisy clean manfile silent sparse ccc install uninstall
+-.NOTPARALLEL:
+-
+--- i40e-1.4.25/scripts/dump_tables.orig	2022-05-26 11:32:55.296161075 -0700
++++ i40e-1.4.25/scripts/dump_tables	1969-12-31 16:00:00.000000000 -0800
+@@ -1,69 +0,0 @@
+-#!/bin/bash
+-# Dump Tables script
+-# Copyright (C) 2015 Intel Corporation
+-#
+-# This script is used to generate a dump of the hardware state for
+-# sending to linux.nics@intel.com for debugging purposes.  This
+-# script will generate a dump_tables.gz output file that can be
+-# uploaded or emailed.
+-
+-# Usage: dump_tables eth1
+-
+-DEV=$1
+-. /sys/class/net/$DEV/device/uevent
+-# DRIVER=i40e
+-# PCI_CLASS=20000
+-# PCI_ID=8086:1583
+-# PCI_SUBSYS_ID=8086:0002
+-# PCI_SLOT_NAME=0000:06:00.0
+-# MODALIAS=pci:v00008086d00001583sv00008086sd00000002bc02sc00i00
+-
+-if [ "$DEV" == "" ]; then
+-	echo Usage: $0 "<i40e ethernet interface>"
+-	exit -1
+-fi
+-
+-if [ "$PCI_SLOT_NAME" == "" ]; then
+-	echo kernel version `uname -r` is not supported, please report the bug at e1000.sourceforge.net
+-	exit -2
+-fi
+-
+-CLUSTER=1
+-TABLE=0
+-INDEX=0
+-
+-OUTFILE=`mktemp`
+-TMPFILE=`mktemp`
+-
+-# check for the debugfs directory being mounted
+-if [ -d "/sys/kernel/debug/i40e" ]; then
+-	echo debugfs found
+-else
+-	echo -n "mounting debugfs as /sys/kernel/debug: "
+-	mount -t debugfs none /sys/kernel/debug && echo Success || (echo Failure ; exit -3)
+-fi
+-
+-dmesg -c > /dev/null
+-until [ "$TABLE" == "0xff" ]; do
+-	until [ "$INDEX" == "0xffffffff" ]; do
+-		echo dump debug fwdata $CLUSTER $TABLE $INDEX > /sys/kernel/debug/i40e/$PCI_SLOT_NAME/command
+-		# check output, exit if no good
+-		dmesg | grep -q unknown && (echo error encountered, see log; exit -4)
+-		# store it, without modification
+-		dmesg >> $OUTFILE
+-		# erase it and prepare for parse
+-		dmesg -c > $TMPFILE
+-		TABLE=`grep rlen $TMPFILE | sed -e 's/.*next_table=\(.*\) .*\$/\1/'`
+-		INDEX=`grep rlen $TMPFILE | sed -e 's/.*next_index=\(.*\)\$/\1/'`
+-		echo -n .
+-	done
+-	INDEX=0
+-done
+-
+-gzip $OUTFILE
+-cp $OUTFILE.gz dump_tables.gz
+-
+-rm $OUTFILE.gz
+-rm $TMPFILE
+-
+-echo Please send the file dump_tables.gz to linux.nics@intel.com or your Intel Support representative.
+--- i40e-1.4.25/scripts/set_irq_affinity.orig	2022-05-26 11:32:55.296161075 -0700
++++ i40e-1.4.25/scripts/set_irq_affinity	1969-12-31 16:00:00.000000000 -0800
+@@ -1,229 +0,0 @@
+-#!/bin/bash
+-#
+-# Copyright (c) 2014, Intel Corporation
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are met:
+-#
+-#     * Redistributions of source code must retain the above copyright notice,
+-#       this list of conditions and the following disclaimer.
+-#     * Redistributions in binary form must reproduce the above copyright
+-#       notice, this list of conditions and the following disclaimer in the
+-#       documentation and/or other materials provided with the distribution.
+-#     * Neither the name of Intel Corporation nor the names of its contributors
+-#       may be used to endorse or promote products derived from this software
+-#       without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-#
+-# Affinitize interrupts to cores
+-#
+-# typical usage is (as root):
+-# set_irq_affinity -x local eth1 <eth2> <eth3>
+-#
+-# to get help:
+-# set_irq_affinity
+-
+-usage()
+-{
+-	echo
+-	echo "Usage: $0 [-x] {all|local|remote|one|custom} [ethX] <[ethY]>"
+-	echo "	options: -x		Configure XPS as well as smp_affinity"
+-	echo "	options: {remote|one} can be followed by a specific node number"
+-	echo "	Ex: $0 local eth0"
+-	echo "	Ex: $0 remote 1 eth0"
+-	echo "	Ex: $0 custom eth0 eth1"
+-	echo "	Ex: $0 0-7,16-23 eth0"
+-	echo
+-	exit 1
+-}
+-
+-if [ "$1" == "-x" ]; then
+-	XPS_ENA=1
+-	shift
+-fi
+-
+-num='^[0-9]+$'
+-# Vars
+-AFF=$1
+-shift
+-
+-case "$AFF" in
+-    remote)	[[ $1 =~ $num ]] && rnode=$1 && shift ;;
+-    one)	[[ $1 =~ $num ]] && cnt=$1 && shift ;;
+-    all)	;;
+-    local)	;;
+-    custom)	;;
+-    [0-9]*)	;;
+-    -h|--help)	usage ;;
+-    "")		usage ;;
+-    *)		IFACES=$AFF && AFF=all ;;	# Backwards compat mode
+-esac
+-
+-# append the interfaces listed to the string with spaces
+-while [ "$#" -ne "0" ] ; do
+-	IFACES+=" $1"
+-	shift
+-done
+-
+-# for now the user must specify interfaces
+-if [ -z "$IFACES" ]; then
+-	usage
+-	exit 1
+-fi
+-
+-# support functions
+-
+-set_affinity()
+-{
+-	VEC=$core
+-	if [ $VEC -ge 32 ]
+-	then
+-		MASK_FILL=""
+-		MASK_ZERO="00000000"
+-		let "IDX = $VEC / 32"
+-		for ((i=1; i<=$IDX;i++))
+-		do
+-			MASK_FILL="${MASK_FILL},${MASK_ZERO}"
+-		done
+-
+-		let "VEC -= 32 * $IDX"
+-		MASK_TMP=$((1<<$VEC))
+-		MASK=$(printf "%X%s" $MASK_TMP $MASK_FILL)
+-	else
+-		MASK_TMP=$((1<<$VEC))
+-		MASK=$(printf "%X" $MASK_TMP)
+-	fi
+-
+-	printf "%s" $MASK > /proc/irq/$IRQ/smp_affinity
+-	printf "%s %d %s -> /proc/irq/$IRQ/smp_affinity\n" $IFACE $core $MASK
+-	if ! [ -z "$XPS_ENA" ]; then
+-		printf "%s %d %s -> /sys/class/net/%s/queues/tx-%d/xps_cpus\n" $IFACE $core $MASK $IFACE $((n-1))
+-		printf "%s" $MASK > /sys/class/net/$IFACE/queues/tx-$((n-1))/xps_cpus
+-	fi
+-}
+-
+-# Allow usage of , or -
+-#
+-parse_range () {
+-        RANGE=${@//,/ }
+-        RANGE=${RANGE//-/..}
+-        LIST=""
+-        for r in $RANGE; do
+-		# eval lets us use vars in {#..#} range
+-                [[ $r =~ '..' ]] && r="$(eval echo {$r})"
+-		LIST+=" $r"
+-        done
+-	echo $LIST
+-}
+-
+-# Affinitize interrupts
+-#
+-setaff()
+-{
+-	CORES=$(parse_range $CORES)
+-	ncores=$(echo $CORES | wc -w)
+-	n=1
+-
+-	# this script only supports interrupt vectors in pairs,
+-	# modification would be required to support a single Tx or Rx queue
+-	# per interrupt vector
+-
+-	queues="${IFACE}-.*TxRx"
+-
+-	irqs=$(grep "$queues" /proc/interrupts | cut -f1 -d:)
+-	[ -z "$irqs" ] && irqs=$(grep $IFACE /proc/interrupts | cut -f1 -d:)
+-	[ -z "$irqs" ] && irqs=$(for i in `ls -Ux /sys/class/net/$IFACE/device/msi_irqs` ;\
+-	                         do grep "$i:.*TxRx" /proc/interrupts | grep -v fdir | cut -f 1 -d : ;\
+-	                         done)
+-	[ -z "$irqs" ] && echo "Error: Could not find interrupts for $IFACE"
+-
+-	echo "IFACE CORE MASK -> FILE"
+-	echo "======================="
+-	for IRQ in $irqs; do
+-		[ "$n" -gt "$ncores" ] && n=1
+-		j=1
+-		# much faster than calling cut for each
+-		for i in $CORES; do
+-			[ $((j++)) -ge $n ] && break
+-		done
+-		core=$i
+-		set_affinity
+-		((n++))
+-	done
+-}
+-
+-# now the actual useful bits of code
+-
+-# these next 2 lines would allow script to auto-determine interfaces
+-#[ -z "$IFACES" ] && IFACES=$(ls /sys/class/net)
+-#[ -z "$IFACES" ] && echo "Error: No interfaces up" && exit 1
+-
+-# echo IFACES is $IFACES
+-
+-CORES=$(</sys/devices/system/cpu/online)
+-[ "$CORES" ] || CORES=$(grep ^proc /proc/cpuinfo | cut -f2 -d:)
+-
+-# Core list for each node from sysfs
+-node_dir=/sys/devices/system/node
+-for i in $(ls -d $node_dir/node*); do
+-	i=${i/*node/}
+-	corelist[$i]=$(<$node_dir/node${i}/cpulist)
+-done
+-
+-for IFACE in $IFACES; do
+-	# echo $IFACE being modified
+-
+-	dev_dir=/sys/class/net/$IFACE/device
+-	[ -e $dev_dir/numa_node ] && node=$(<$dev_dir/numa_node)
+-	[ "$node" ] && [ "$node" -gt 0 ] || node=0
+-
+-	case "$AFF" in
+-	local)
+-		CORES=${corelist[$node]}
+-	;;
+-	remote)
+-		[ "$rnode" ] || { [ $node -eq 0 ] && rnode=1 || rnode=0; }
+-		CORES=${corelist[$rnode]}
+-	;;
+-	one)
+-		[ -n "$cnt" ] || cnt=0
+-		CORES=$cnt
+-	;;
+-	all)
+-		CORES=$CORES
+-	;;
+-	custom)
+-		echo -n "Input cores for $IFACE (ex. 0-7,15-23): "
+-		read CORES
+-	;;
+-	[0-9]*)
+-		CORES=$AFF
+-	;;
+-	*)
+-		usage
+-		exit 1
+-	;;
+-	esac
+-
+-	# call the worker function
+-	setaff
+-done
+-
+-# check for irqbalance running
+-IRQBALANCE_ON=`ps ax | grep -v grep | grep -q irqbalance; echo $?`
+-if [ "$IRQBALANCE_ON" == "0" ] ; then
+-	echo " WARNING: irqbalance is running and will"
+-	echo "          likely override this script's affinitization."
+-	echo "          Please stop the irqbalance service and/or execute"
+-	echo "          'killall irqbalance'"
+-fi
+--- i40e-1.4.25/i40e.7.orig	2022-05-26 11:32:55.296161075 -0700
++++ i40e-1.4.25/i40e.7	1969-12-31 16:00:00.000000000 -0800
+@@ -1,59 +0,0 @@
+-.\" LICENSE
+-.\"
+-.\" This software program is released under the terms of a license agreement between you ('Licensee') and Intel. Do not use or load this software or any associated materials (collectively, the 'Software') until you have carefully read the full terms and conditions of the LICENSE located in this software package. By loading or using the Software, you agree to the terms of this Agreement. If you do not agree with the terms of this Agreement, do not install or use the Software.
+-.\"
+-.\" * Other names and brands may be claimed as the property of others.
+-.\"
+-.
+-.TH i40e 1 "December 10, 2015"
+-.SH NAME
+-i40e \-This file describes the Linux* Base Driver
+-for the Intel Ethernet Controller XL710 Family of Controllers.
+-.SH SYNOPSIS
+-.PD 0.4v
+-modprobe i40e [<option>=<VAL1>,<VAL2>,...]
+-.PD 1v
+-.SH DESCRIPTION
+-This driver is intended for \fB2.6.32\fR and newer kernels. 
+-This driver includes support for any 64 bit Linux supported system, 
+-including Itanium(R)2, x86_64, PPC64,ARM, etc.
+-.LP
+-This driver is only supported as a loadable module at this time. Intel is
+-not supplying patches against the kernel source to allow for static linking of
+-the drivers.
+-
+-
+-For questions related to hardware requirements, refer to the documentation
+-supplied with your Intel adapter. All hardware requirements listed apply to
+-use with Linux.
+-.SH Jumbo Frames
+-.LP
+-Jumbo Frames support is enabled by changing the Maximum Transmission Unit
+-(MTU) to a value larger than the default value of 1500.
+-
+-Use the ifconfig command to increase the MTU size. For example, enter the
+-following where <x> is the interface number:
+-
+-   ifconfig eth<x> mtu 9000 up
+-
+-.LP
+-NOTES:
+-- The maximum MTU setting for Jumbo Frames is 9706. This value coincides
+-  with the maximum Jumbo Frames size of 9728 bytes.
+-- This driver will attempt to use multiple page sized buffers to receive
+-  each jumbo packet. This should help to avoid buffer starvation issues
+-  when allocating receive packets.
+-See the section "Jumbo Frames" in the Readme.
+-.SH SUPPORT
+-.LP
+-For additional information regarding building and installation,
+-see the
+-README
+-included with the driver.
+-For general information, go to the Intel support website at:
+-.B www.intel.com/support/
+-.LP
+-If an issue is identified with the released source code on a supported
+-kernel with a supported adapter, email the specific information related to the
+-issue to e1000-devel@lists.sf.net.
+-.LP
+--- i40e-1.4.25/pci.updates.orig	2022-05-26 11:32:55.296161075 -0700
++++ i40e-1.4.25/pci.updates	1969-12-31 16:00:00.000000000 -0800
+@@ -1,75 +0,0 @@
+-# updates for the system pci.ids file
+-#
+-# IMPORTANT!  Entries in this list must be sorted as they
+-#             would appear in the system pci.ids file.  Entries
+-#             are sorted by ven, dev, subven, subdev
+-#             (numerical order).
+-#
+-8086  Intel Corporation
+-	1572  Ethernet Controller X710 for 10GbE SFP+
+-		1028 0000  Ethernet 10G X710 rNDC
+-		1028 1f99  Ethernet 10G 4P X710/I350 rNDC
+-		1028 1f9c  Ethernet 10G 4P X710 SFP+ rNDC
+-		103c 0000  HPE Ethernet 10Gb 562SFP+ Adapter
+-		103c 22fc  HPE Ethernet 10Gb 2-port 562FLR-SFP+ Adapter
+-		103c 22fd  HPE Ethernet 10Gb 2-port 562SFP+ Adapter
+-		1137 0000  Cisco(R) Ethernet Converged NIC X710-4
+-		1137 013b  Cisco(R) Ethernet Converged NIC X710-4
+-		17aa 0000  Lenovo ThinkServer X710 AnyFabric for 10GbE SFP+
+-		17aa 4001  Lenovo ThinkServer X710-4 AnyFabric for 10GbE SFP+
+-		17aa 4002  Lenovo ThinkServer X710-2 AnyFabric for 10GbE SFP+
+-		8086 0000  Ethernet Converged Network Adapter X710
+-		8086 0001  Ethernet Converged Network Adapter X710-4
+-		8086 0002  Ethernet Converged Network Adapter X710-4
+-		8086 0004  Ethernet Converged Network Adapter X710-4
+-		8086 0005  Ethernet Converged Network Adapter X710
+-		8086 0006  Ethernet Converged Network Adapter X710
+-		8086 0007  Ethernet Converged Network Adapter X710-2
+-		8086 0008  Ethernet Converged Network Adapter X710-2
+-		8086 0009  Ethernet Controller X710 for 10GbE SFP+
+-		8086 000a  Ethernet Controller X710 for 10GbE SFP+
+-		8086 000d  Ethernet Controller X710 for 10GbE SFP+
+-		8086 4005  Ethernet Controller X710 for 10GbE SFP+
+-		8086 4006  Ethernet Controller X710 for 10GbE SFP+
+-	1574  Ethernet Controller XL710 Emulation
+-	1580  Ethernet Controller XL710 for 40GbE backplane
+-	1581  Ethernet Controller X710 for 10GbE backplane
+-		1028 0000  Ethernet 10G X710-k bNDC
+-		1028 1f98  Ethernet 10G 4P X710-k bNDC
+-		1028 1f9e  Ethernet 10G 2P X710-k bNDC
+-		8086 0000  Ethernet Converged Network Adapter XL710-Q2
+-	1583  Ethernet Controller XL710 for 40GbE QSFP+
+-		1028 0000  Ethernet 40G 2P XL710 QSFP+ rNDC
+-		1028 1f9f  Ethernet 40G 2P XL710 QSFP+ rNDC
+-		108e 0000  Oracle 10Gb/40Gb Ethernet Adapter
+-		108e 7b1d  Oracle 10Gb/40Gb Ethernet Adapter
+-		1137 0000  Cisco(R) Ethernet Converged NIC XL710-Q2
+-		1137 013c  Cisco(R) Ethernet Converged NIC XL710-Q2
+-		8086 0000  Ethernet Converged Network Adapter XL710-Q2
+-		8086 0001  Ethernet Converged Network Adapter XL710-Q2
+-		8086 0002  Ethernet Converged Network Adapter XL710-Q2
+-		8086 0003  Ethernet I/O Module XL710-Q2
+-		8086 0004  Ethernet Server Adapter XL710-Q2OCP
+-		8086 0006  Ethernet Converged Network Adapter XL710-Q2
+-	1584  Ethernet Controller XL710 for 40GbE QSFP+
+-		8086 0000  Ethernet Converged Network Adapter XL710-Q1
+-		8086 0001  Ethernet Converged Network Adapter XL710-Q1
+-		8086 0002  Ethernet Converged Network Adapter XL710-Q1
+-		8086 0003  Ethernet I/O Module XL710-Q1
+-		8086 0004  Ethernet Server Adapter XL710-Q1OCP
+-	1585  Ethernet Controller X710 for 10GbE QSFP+
+-	1586  Ethernet Controller X710 for 10GBASE-T
+-		108e 0000  Ethernet Controller X710 for 10GBASE-T
+-		108e 4857  Ethernet Controller X710 for 10GBASE-T
+-	1587  Ethernet Controller XL710 for 20GbE backplane
+-		103c 0000  HPE Flex-20 20Gb 2-port 660FLB Adapter
+-		103c 22fe  HPE Flex-20 20Gb 2-port 660FLB Adapter
+-	1588  Ethernet Controller XL710 for 20GbE backplane
+-		103c 0000  HPE Flex-20 20Gb 2-port 660M Adapter
+-		103c 22ff  HPE Flex-20 20Gb 2-port 660M Adapter
+-	1589  Ethernet Controller X710/X557-AT 10GBASE-T
+-		8086 0000  Ethernet Converged Network Adapter X710-T
+-		8086 0001  Ethernet Converged Network Adapter X710-T4
+-		8086 0002  Ethernet Converged Network Adapter X710-T4
+-	37d1  Ethernet Connection X722 for 1GbE
+-	37d2  Ethernet Connection X722 for 10GBASE-T
+--- i40e-1.4.25/src/i40e/Makefile.orig	1969-12-31 16:00:00.000000000 -0800
++++ i40e-1.4.25/src/i40e/Makefile	2022-05-26 11:32:55.412156326 -0700
+@@ -0,0 +1,425 @@
++################################################################################
++#
++# Intel 40 Gigabit PCI Express Linux driver
++# Copyright (c) 1999 - 2014 Intel Corporation.
++#
++# This program is free software; you can redistribute it and/or modify it
++# under the terms and conditions of the GNU General Public License,
++# version 2, as published by the Free Software Foundation.
++#
++# This program is distributed in the hope it will be useful, but WITHOUT
++# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++# more details.
++#
++# The full GNU General Public License is included in this distribution in
++# the file called "COPYING".
++#
++# Contact Information:
++# Linux NICS <linux.nics@intel.com>
++# e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
++# Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
++#
++################################################################################
++
++###########################################################################
++# Driver files
++
++# core driver files
++
++CFILES = i40e_main.c i40e_common.c i40e_adminq.c i40e_dcb.c i40e_diag.c \
++         i40e_hmc.c i40e_lan_hmc.c i40e_nvm.c i40e_txrx.c \
++         i40e_virtchnl_pf.c i40e_ethtool.c kcompat.c
++
++HFILES = i40e.h i40e_adminq_cmd.h i40e_adminq.h i40e_alloc.h i40e_dcb.h \
++         i40e_devids.h i40e_diag.h i40e_helper.h i40e_hmc.h i40e_lan_hmc.h \
++         i40e_osdep.h i40e_prototype.h i40e_register.h i40e_status.h \
++         i40e_txrx.h i40e_type.h i40e_virtchnl.h i40e_virtchnl_pf.h kcompat.h
++
++ifeq (,$(BUILD_KERNEL))
++BUILD_KERNEL=$(shell uname -r)
++endif
++
++DRIVER_NAME=i40e
++
++
++###########################################################################
++# Environment tests
++
++# Kernel Search Path
++# All the places we look for kernel source
++KSP :=  /lib/modules/$(BUILD_KERNEL)/build \
++        /lib/modules/$(BUILD_KERNEL)/source \
++        /usr/src/linux-$(BUILD_KERNEL) \
++        /usr/src/linux-$($(BUILD_KERNEL) | sed 's/-.*//') \
++        /usr/src/kernel-headers-$(BUILD_KERNEL) \
++        /usr/src/kernel-source-$(BUILD_KERNEL) \
++        /usr/src/linux-$($(BUILD_KERNEL) | sed 's/\([0-9]*\.[0-9]*\)\..*/\1/') \
++        /usr/src/linux
++
++# prune the list down to only values that exist
++# and have an include/linux sub-directory
++test_dir = $(shell [ -e $(dir)/include/linux ] && echo $(dir))
++KSP := $(foreach dir, $(KSP), $(test_dir))
++
++# we will use this first valid entry in the search path
++ifeq (,$(KSRC))
++  KSRC := $(firstword $(KSP))
++endif
++
++ifeq (,$(KSRC))
++  $(warning *** Kernel header files not in any of the expected locations.)
++  $(warning *** Install the appropriate kernel development package, e.g.)
++  $(error kernel-devel, for building kernel modules and try again)
++else
++ifeq (/lib/modules/$(BUILD_KERNEL)/source, $(KSRC))
++  KOBJ :=  /lib/modules/$(BUILD_KERNEL)/build
++else
++  KOBJ :=  $(KSRC)
++endif
++endif
++
++# Version file Search Path
++VSP :=  $(KOBJ)/include/generated/utsrelease.h \
++        $(KOBJ)/include/linux/utsrelease.h \
++        $(KOBJ)/include/linux/version.h \
++	$(KOBJ)/include/generated/uapi/linux/version.h \
++        /boot/vmlinuz.version.h
++
++# Config file Search Path
++CSP :=  $(KOBJ)/include/generated/autoconf.h \
++        $(KOBJ)/include/linux/autoconf.h \
++        /boot/vmlinuz.autoconf.h
++
++# prune the lists down to only files that exist
++test_file = $(shell [ -f $(file) ] && echo $(file))
++VSP := $(foreach file, $(VSP), $(test_file))
++CSP := $(foreach file, $(CSP), $(test_file))
++
++# and use the first valid entry in the Search Paths
++ifeq (,$(VERSION_FILE))
++  VERSION_FILE := $(firstword $(VSP))
++endif
++ifeq (,$(CONFIG_FILE))
++  CONFIG_FILE := $(firstword $(CSP))
++endif
++
++ifeq (,$(wildcard $(VERSION_FILE)))
++  $(error Linux kernel source not configured - missing version header file)
++endif
++
++ifeq (,$(wildcard $(CONFIG_FILE)))
++  $(error Linux kernel source not configured - missing autoconf.h)
++endif
++
++# pick a compiler
++ifneq (,$(findstring egcs-2.91.66, $(shell cat /proc/version)))
++  CC := kgcc gcc cc
++else
++  CC := gcc cc
++endif
++test_cc = $(shell $(cc) --version > /dev/null 2>&1 && echo $(cc))
++CC := $(foreach cc, $(CC), $(test_cc))
++CC := $(firstword $(CC))
++ifeq (,$(CC))
++  $(error Compiler not found)
++endif
++
++# we need to know what platform the driver is being built on
++# some additional features are only built on Intel platforms
++ARCH := $(shell uname -m | sed 's/i.86/i386/')
++ifeq ($(ARCH),alpha)
++  EXTRA_CFLAGS += -ffixed-8 -mno-fp-regs
++endif
++ifeq ($(ARCH),x86_64)
++  EXTRA_CFLAGS += -mcmodel=kernel -mno-red-zone
++endif
++ifeq ($(ARCH),ppc)
++  EXTRA_CFLAGS += -msoft-float
++endif
++ifeq ($(ARCH),ppc64)
++  EXTRA_CFLAGS += -m64 -msoft-float
++  LDFLAGS += -melf64ppc
++endif
++
++# extra flags for module builds
++EXTRA_CFLAGS += -DDRIVER_$(shell echo $(DRIVER_NAME) | tr '[a-z]' '[A-Z]')
++EXTRA_CFLAGS += -DDRIVER_NAME=$(DRIVER_NAME)
++EXTRA_CFLAGS += -DDRIVER_NAME_CAPS=$(shell echo $(DRIVER_NAME) | tr '[a-z]' '[A-Z]')
++# standard flags for module builds
++EXTRA_CFLAGS += -DLINUX -D__KERNEL__ -DMODULE -O2 -pipe -Wall
++EXTRA_CFLAGS += $(shell [ -d $(KSRC)/generated/uapi ] && \
++                        echo "$(KSRC)/generated/uapi")
++EXTRA_CFLAGS += -I$(KSRC)/include -I.
++EXTRA_CFLAGS += $(shell [ -f $(KSRC)/include/linux/modversions.h ] && \
++                        echo "-DMODVERSIONS -DEXPORT_SYMTAB \
++                              -include $(KSRC)/include/linux/modversions.h")
++
++# Some helper functions for converting kernel version to version codes
++get_kver = $(or $(word ${2},$(subst ., ,${1})),0)
++get_kvercode = $(shell [ "${1}" -ge 0 -a "${1}" -le 255 2>/dev/null ] && \
++                       [ "${2}" -ge 0 -a "${2}" -le 255 2>/dev/null ] && \
++                       [ "${3}" -ge 0 -a "${3}" -le 255 2>/dev/null ] && \
++                       printf %d $$(( ( ${1} << 16 ) + ( ${2} << 8 ) + ( ${3} ) )) )
++
++# The following command line parameter is intended for development of KCOMPAT
++# against upstream kernels such as net-next which have broken or non-updated
++# version codes in their Makefile. They are intended for debugging and
++# development purpose only so that we can easily test new KCOMPAT early. If you
++# don't know what this means, you do not need to set this flag. There is no
++# arcane magic here.
++
++# Convert LINUX_VERSION into LINUX_VERSION_CODE
++ifneq (${LINUX_VERSION},)
++  LINUX_VERSION_CODE=$(call get_kvercode,$(call get_kver,${LINUX_VERSION},1),$(call get_kver,${LINUX_VERSION},2),$(call get_kver,${LINUX_VERSION},3))
++endif
++
++# Honor LINUX_VERSION_CODE
++ifneq (${LINUX_VERSION_CODE},)
++  $(warning Forcing target kernel's LINUX_VERSION_CODE to ${LINUX_VERSION_CODE}$(if ${LINUX_VERSION}, from LINUX_VERSION=${LINUX_VERSION}). Do this at your owk risk.)
++  KVER_CODE := ${LINUX_VERSION_CODE}
++  EXTRA_CFLAGS += -DLINUX_VERSION_CODE=${LINUX_VERSION_CODE}
++endif
++
++EXTRA_CFLAGS += $(CFLAGS_EXTRA)
++
++RHC := $(KSRC)/include/linux/rhconfig.h
++ifneq (,$(wildcard $(RHC)))
++  # 7.3 typo in rhconfig.h
++  ifneq (,$(shell $(CC) $(CFLAGS) -E -dM $(RHC) | grep __module__bigmem))
++	EXTRA_CFLAGS += -D__module_bigmem
++  endif
++endif
++
++# get the kernel version - we use this to find the correct install path
++KVER := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VERSION_FILE) | grep UTS_RELEASE | \
++        awk '{ print $$3 }' | sed 's/\"//g')
++
++# assume source symlink is the same as build, otherwise adjust KOBJ
++ifneq (,$(wildcard /lib/modules/$(KVER)/build))
++ifneq ($(KSRC),$(shell readlink /lib/modules/$(KVER)/build))
++  KOBJ=/lib/modules/$(KVER)/build
++endif
++endif
++
++ifeq (${KVER_CODE},)
++  KVER_CODE := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VSP) 2>/dev/null |\
++                 grep -m 1 LINUX_VERSION_CODE | awk '{ print $$3 }' | sed 's/\"//g')
++endif
++
++ifeq ($(strip $(KVER_CODE)),)
++KVER_CODE := 0
++endif
++
++RHEL_CODE := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(VSP) 2>/dev/null |\
++	grep -m 1 RHEL_RELEASE_CODE | awk '{ print $$3 }')
++
++ifeq ($(strip $(RHEL_CODE)),)
++RHEL_CODE := 0
++endif
++
++# abort the build on kernels older than 2.4.0
++ifneq (1,$(shell [ $(KVER_CODE) -ge 132096 ] && echo 1 || echo 0))
++  $(error *** Aborting the build. \
++          *** This driver is not supported on kernel versions older than 2.4.0)
++endif
++
++# Add DCB netlink source if our kernel is 2.6.23 or newer
++ifeq (1,$(shell [ $(KVER_CODE) -ge 132631 ] && echo 1 || echo 0))
++  CFILES += i40e_dcb_nl.c
++endif
++
++# Add FCoE source if FCoE is supported by the kernel
++FCOE := $(shell grep -wE 'CONFIG_FCOE|CONFIG_FCOE_MODULE' $(CONFIG_FILE) | \
++	awk '{print $$3}')
++ifeq ($(FCOE), 1)
++  CFILES += i40e_fcoe.c
++  HFILES += i40e_fcoe.h
++endif
++
++# Add Debug FS source if DEBUG_FS is supported by the kernel
++DEBUGFS := $(shell grep -wE 'CONFIG_DEBUG_FS' $(CONFIG_FILE) | \
++	awk '{print $$3}')
++ifeq ($(DEBUGFS), 1)
++  CFILES += i40e_debugfs.c
++endif
++
++# Add Config FS source if CONFIGFS_FS is supported by the kernel
++CONFIGFS := $(shell grep -wE 'CONFIG_CONFIGFS_FS' $(CONFIG_FILE) | \
++	awk '{print $$3}')
++ifeq ($(CONFIGFS), 1)
++  CFILES += i40e_configfs.c
++endif
++
++# Use NO_PTP_SUPPORT flag to disable IEEE-1588 PTP (Documented in README)
++ifneq ($(filter %NO_PTP_SUPPORT,$(CFLAGS_EXTRA)),-DNO_PTP_SUPPORT)
++# Do not attempt to enable PTP in kernels which do not have support
++ifeq (1,$(shell ([ $(KVER_CODE) -ge 196608 ] || [ $(RHEL_CODE) -ge 1540 ]) && echo 1 || echo 0))
++include $(KOBJ)/include/config/auto.conf
++ifdef CONFIG_PTP_1588_CLOCK
++CFILES += i40e_ptp.c
++endif # CONFIG_PTP_1588_CLOCK
++endif # kernel version >= 3.0
++endif # !NO_PTP_SUPPORT
++
++# set the install path before and after 3.2.0
++ifeq (1,$(shell [ $(KVER_CODE) -lt 197120 ] && echo 1 || echo 0))
++INSTDIR := /lib/modules/$(KVER)/kernel/drivers/net/$(DRIVER_NAME)
++else
++INSTDIR := /lib/modules/$(KVER)/kernel/drivers/net/ethernet/intel/$(DRIVER_NAME)
++endif
++
++# look for SMP in config.h
++SMP := $(shell $(CC) $(EXTRA_CFLAGS) -E -dM $(CONFIG_FILE) | \
++         grep -w CONFIG_SMP | awk '{ print $$3 }')
++ifneq ($(SMP),1)
++  SMP := 0
++endif
++
++ifneq ($(SMP),$(shell uname -a | grep SMP > /dev/null 2>&1 && echo 1 || echo 0))
++  $(warning ***)
++  ifeq ($(SMP),1)
++    $(warning *** Warning: kernel source configuration (SMP))
++    $(warning *** does not match running kernel (UP))
++  else
++    $(warning *** Warning: kernel source configuration (UP))
++    $(warning *** does not match running kernel (SMP))
++  endif
++  $(warning *** Continuing with build,)
++  $(warning *** resulting driver may not be what you want)
++  $(warning ***)
++endif
++
++ifeq ($(SMP),1)
++  EXTRA_CFLAGS += -D__SMP__
++endif
++
++
++###########################################################################
++# Kernel Version Specific rules
++
++ifeq (1,$(shell [ $(KVER_CODE) -ge 132352 ] && echo 1 || echo 0))
++
++# Makefile for 2.5.x and newer kernel
++TARGET = $(DRIVER_NAME).ko
++
++# man page
++MANSECTION = 7
++MANFILE = $(TARGET:.ko=.$(MANSECTION))
++
++ifneq ($(PATCHLEVEL),)
++EXTRA_CFLAGS += $(CFLAGS_EXTRA)
++obj-m += $(DRIVER_NAME).o
++$(DRIVER_NAME)-objs := $(CFILES:.c=.o)
++else
++default:
++ifeq ($(KOBJ),$(KSRC))
++	$(MAKE) -C $(KSRC) SUBDIRS=$(shell pwd) modules
++else
++	$(MAKE) -C $(KSRC) O=$(KOBJ) SUBDIRS=$(shell pwd) modules
++endif
++endif
++
++else # ifeq (1,$(shell [ $(KVER_CODE) -ge 132352 ] && echo 1 || echo 0))
++
++# Makefile for 2.4.x kernel
++TARGET = $(DRIVER_NAME).o
++
++# man page
++MANSECTION = 7
++MANFILE = $(TARGET:.o=.$(MANSECTION))
++
++# Get rid of compile warnings in kernel header files from SuSE
++ifneq (,$(wildcard /etc/SuSE-release))
++  EXTRA_CFLAGS += -Wno-sign-compare -fno-strict-aliasing
++endif
++
++# Get rid of compile warnings in kernel header files from fedora
++ifneq (,$(wildcard /etc/fedora-release))
++  EXTRA_CFLAGS += -fno-strict-aliasing
++endif
++CFLAGS += $(EXTRA_CFLAGS)
++
++.SILENT: $(TARGET)
++$(TARGET): $(filter-out $(TARGET), $(CFILES:.c=.o))
++	$(LD) $(LDFLAGS) -r $^ -o $@
++	echo; echo
++	echo "**************************************************"
++	echo "** $(TARGET) built for $(KVER)"
++	echo -n "** SMP               "
++	if [ "$(SMP)" = "1" ]; \
++		then echo "Enabled"; else echo "Disabled"; fi
++	echo "**************************************************"
++	echo
++
++$(CFILES:.c=.o): $(HFILES) Makefile
++default:
++	$(MAKE)
++
++endif # ifeq (1,$(shell [ $(KVER_CODE) -ge 132352 ] && echo 1 || echo 0))
++
++ifeq (,$(MANDIR))
++  # find the best place to install the man page
++  MANPATH := $(shell (manpath 2>/dev/null || echo $MANPATH) | sed 's/:/ /g')
++  ifneq (,$(MANPATH))
++    # test based on inclusion in MANPATH
++    test_dir = $(findstring $(dir), $(MANPATH))
++  else
++    # no MANPATH, test based on directory existence
++    test_dir = $(shell [ -e $(dir) ] && echo $(dir))
++  endif
++  # our preferred install path
++  # should /usr/local/man be in here ?
++  MANDIR := /usr/share/man /usr/man
++  MANDIR := $(foreach dir, $(MANDIR), $(test_dir))
++  MANDIR := $(firstword $(MANDIR))
++endif
++ifeq (,$(MANDIR))
++  # fallback to /usr/man
++  MANDIR := /usr/man
++endif
++
++# depmod version for rpm builds
++DEPVER := $(shell /sbin/depmod -V 2>/dev/null | \
++          awk 'BEGIN {FS="."} NR==1 {print $$2}')
++
++###########################################################################
++# Build rules
++
++$(MANFILE).gz: ../$(MANFILE)
++	gzip -c $< > $@
++
++install: default $(MANFILE).gz
++	# remove all old versions of the driver
++	find $(INSTALL_MOD_PATH)/lib/modules/$(KVER) -name $(TARGET) -exec rm -f {} \; || true
++	find $(INSTALL_MOD_PATH)/lib/modules/$(KVER) -name $(TARGET).gz -exec rm -f {} \; || true
++	install -D -m 644 $(TARGET) $(INSTALL_MOD_PATH)$(INSTDIR)/$(TARGET)
++ifeq (,$(INSTALL_MOD_PATH))
++	/sbin/depmod -a $(KVER) || true
++else
++  ifeq ($(DEPVER),1 )
++	/sbin/depmod -r $(INSTALL_MOD_PATH) -a $(KVER) || true
++  else
++	/sbin/depmod -b $(INSTALL_MOD_PATH) -a -n $(KVER) > /dev/null || true
++  endif
++endif
++	install -D -m 644 $(MANFILE).gz $(INSTALL_MOD_PATH)$(MANDIR)/man$(MANSECTION)/$(MANFILE).gz
++
++uninstall:
++	if [ -e $(INSTDIR)/$(TARGET) ] ; then \
++	    rm -f $(INSTDIR)/$(TARGET) ; \
++	fi
++	/sbin/depmod -a
++	if [ -e $(MANDIR)/man$(MANSECTION)/$(MANFILE).gz ] ; then \
++		rm -f $(MANDIR)/man$(MANSECTION)/$(MANFILE).gz ; \
++	fi
++
++.PHONY: clean install
++
++clean:
++ifeq ($(KOBJ),$(KSRC))
++	$(MAKE) -C $(KSRC) SUBDIRS=$(shell pwd) clean
++else
++	$(MAKE) -C $(KSRC) O=$(KOBJ) SUBDIRS=$(shell pwd) clean
++endif
++	rm -rf $(TARGET) $(TARGET:.ko=.o) $(TARGET:.ko=.mod.c) $(TARGET:.ko=.mod.o) $(CFILES:.c=.o) $(MANFILE).gz .*cmd .tmp_versions

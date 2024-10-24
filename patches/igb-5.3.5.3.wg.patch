@@ -1,0 +1,3945 @@
+WatchGuard patches to sources for igb-5.3.5.3 as of
+Thu May 26 11:32:57 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- igb-5.3.5.3/src/igb.h.orig	2022-05-26 11:32:56.672104734 -0700
++++ igb-5.3.5.3/src/igb.h	2022-05-26 11:32:56.808099165 -0700
+@@ -667,6 +667,9 @@
+ 	u32 rss_indir_tbl_init;
+ 	u8 rss_indir_tbl[IGB_RETA_SIZE];
+ #endif
++#ifdef	CONFIG_WG_PLATFORM	// XD: BUG92243
++  int media_type_set;
++#endif
+ };
+ 
+ #ifdef CONFIG_IGB_VMDQ_NETDEV
+--- igb-5.3.5.3/src/kcompat.h.orig	2022-05-26 11:32:56.680104406 -0700
++++ igb-5.3.5.3/src/kcompat.h	2022-05-26 11:32:56.848097527 -0700
+@@ -65,6 +65,12 @@
+ #endif
+ #endif
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Not needed in newer kernels
++#if	(LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0))
++#undef	CONFIG_NETDEVICES_MULTIQUEUE
++#endif
++#endif	// CONFIG_PLATFORM
++
+ /* NAPI enable/disable flags here */
+ #define NAPI
+ 
+@@ -2574,11 +2580,13 @@
+ 
+ #else /* < 2.6.25 */
+ 
++#ifndef	CONFIG_WG_PLATFORM // WG:JB No need to enable hwmon support ... otherwise hwmon sensor paths will change for other hwmon devices
+ #if IS_ENABLED(CONFIG_HWMON)
+ #ifndef IGB_HWMON
+ #define IGB_HWMON
+ #endif /* IGB_HWMON */
+ #endif /* CONFIG_HWMON */
++#endif
+ 
+ #endif /* < 2.6.25 */
+ 
+--- igb-5.3.5.3/src/igb_main.c.orig	2022-05-26 11:32:56.676104570 -0700
++++ igb-5.3.5.3/src/igb_main.c	2022-05-26 11:32:56.840097855 -0700
+@@ -182,8 +182,13 @@
+ static void igb_process_mdd_event(struct igb_adapter *);
+ #ifdef IFLA_VF_MAX
+ static int igb_ndo_set_vf_mac(struct net_device *netdev, int vf, u8 *mac);
++#ifdef	CONFIG_WG_KERNEL_4_14
++static int igb_ndo_set_vf_vlan(struct net_device *netdev,
++			       int vf, u16 vlan, u8 qos, __be16 proto);
++#else
+ static int igb_ndo_set_vf_vlan(struct net_device *netdev,
+ 			       int vf, u16 vlan, u8 qos);
++#endif
+ #ifdef HAVE_VF_SPOOFCHK_CONFIGURE
+ static int igb_ndo_set_vf_spoofchk(struct net_device *netdev, int vf,
+ 				bool setting);
+@@ -318,6 +323,9 @@
+ module_param(debug, int, 0);
+ MODULE_PARM_DESC(debug, "Debug level (0=none, ..., 16=all)");
+ 
++extern	struct net_device* wg_dsa_dev[2];	// WG:JB Devices that the switch chips are attached to
++int			   wg_igb_serdes_only;	// WG:JB Lanner SFP fix
++
+ /**
+  * igb_init_module - Driver Registration Routine
+  *
+@@ -332,6 +340,13 @@
+ 	       igb_driver_string, igb_driver_version);
+ 
+ 	pr_info("%s\n", igb_copyright);
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Lanner SFP fix
++	if (wg_kirkland) {
++		wg_igb_serdes_only = 1;
++		printk(KERN_INFO "Setting SERDES only mode\n");
++	}
++#endif	// CONFIG_WG_PLATFORM
++
+ #ifdef IGB_HWMON
+ /* only use IGB_PROCFS if IGB_HWMON is not defined */
+ #else
+@@ -1536,12 +1551,14 @@
+ 	igb_configure_rx(adapter);
+ 
+ 	e1000_rx_fifo_flush_82575(&adapter->hw);
++#ifndef	CONFIG_WG_PLATFORM // WG:JB Don't use this
+ #ifdef CONFIG_NETDEVICES_MULTIQUEUE
+ 	if (adapter->num_tx_queues > 1)
+ 		netdev->features |= NETIF_F_MULTI_QUEUE;
+ 	else
+ 		netdev->features &= ~NETIF_F_MULTI_QUEUE;
+ #endif
++#endif
+ 
+ 	/* call igb_desc_unused which always leaves
+ 	 * at least 1 descriptor unused to make sure
+@@ -1854,7 +1871,13 @@
+ 	del_timer_sync(&adapter->phy_info_timer);
+ 
+ 	/* record the stats before reset*/
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG84635 XTM-2520 lockup
++	local_bh_disable();
++	igb_update_stats(adapter);
++	local_bh_enable();
++#else	// CONFIG_WG_PLATFORM
+ 	igb_update_stats(adapter);
++#endif	// CONFIG_WG_PLATFORM
+ 
+ 	adapter->link_speed = 0;
+ 	adapter->link_duplex = 0;
+@@ -1878,6 +1901,9 @@
+ 	WARN_ON(in_interrupt());
+ 	while (test_and_set_bit(__IGB_RESETTING, &adapter->state))
+ 		usleep_range(1000, 2000);
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG92243
++	adapter->media_type_set = 0;
++#endif
+ 	igb_down(adapter);
+ 	igb_up(adapter);
+ 	clear_bit(__IGB_RESETTING, &adapter->state);
+@@ -2085,6 +2111,10 @@
+ 	e1000_get_phy_info(hw);
+ 
+ 	adapter->devrc++;
++
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG92243
++	adapter->media_type_set = 0;
++#endif
+ }
+ 
+ #ifdef HAVE_NDO_SET_FEATURES
+@@ -3306,6 +3336,29 @@
+ 	adapter->max_frame_size = netdev->mtu + ETH_HLEN + ETH_FCS_LEN +
+ 					      VLAN_HLEN;
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Init switch device
++	if (wg_seattle) {
++		extern s32 e1000_init_98DX3035(struct e1000_hw *hw);
++		if (memcmp(netdev->name, "0000:00:14.",   11) == 0) {
++			adapter->max_frame_size += VLAN_HLEN;
++			printk(KERN_INFO "%s: sw%c Max Frame %d\n",
++			       __FUNCTION__, netdev->name[11], adapter->max_frame_size);
++		}
++		e1000_init_98DX3035(hw);
++	}
++#ifdef	CONFIG_WG_PLATFORM_DSA_MODULE
++	if (wg_westport) {
++		extern s32 e1000_init_88E6176(struct e1000_hw *hw);
++		if (memcmp(netdev->name, "0000:04:00.0",  12) == 0) {
++			adapter->max_frame_size += VLAN_HLEN;
++			printk(KERN_INFO "%s: sw%c Max Frame %d\n",
++			       __FUNCTION__, netdev->name[12], adapter->max_frame_size);
++		}
++		e1000_init_88E6176(hw);
++	}
++#endif	// CONFIG_WG_PLATFORM_DSA_MODULE
++#endif	// CONFIG_WG_PLATFORM
++
+ 	/* Initialize the hardware-specific values */
+ 	if (e1000_setup_init_funcs(hw, TRUE)) {
+ 		dev_err(pci_dev_to_dev(pdev), "Hardware Initialization Failure\n");
+@@ -3366,6 +3419,10 @@
+ 		return -EBUSY;
+ 	}
+ 
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG92243
++	adapter->media_type_set = 0;
++#endif
++
+ #ifdef CONFIG_PM_RUNTIME
+ 	if (!resuming)
+ 		pm_runtime_get_sync(&pdev->dev);
+@@ -3480,6 +3537,9 @@
+ 	struct pci_dev *pdev = adapter->pdev;
+ #endif /* CONFIG_PM_RUNTIME */
+ 
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG92243
++	adapter->media_type_set = 0;
++#endif
+ 	WARN_ON(test_bit(__IGB_RESETTING, &adapter->state));
+ 
+ #ifdef CONFIG_PM_RUNTIME
+@@ -4630,6 +4690,9 @@
+ #endif /* HAVE_SET_RX_MODE */
+ 		rctl |= E1000_RCTL_VFE;
+ 	}
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Force promisc mode on for DSA
++	if (netdev == wg_dsa_dev[0]) rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE | E1000_RCTL_SBP);
++#endif
+ 	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+ 
+ 	/*
+@@ -4779,6 +4842,18 @@
+ 	int i;
+ 	u32 connsw;
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB SFP patch from Lanner; BUG92247; FBX-6424
++	void e1000_get_current_media_type_82575(struct e1000_hw *hw);
++
++	if ((!wg_igb_serdes_only || wg_kirkland) && !adapter->media_type_set) {
++		if (hw->device_id == E1000_DEV_ID_I210_FIBER ||
++			hw->device_id == E1000_DEV_ID_I350_FIBER) {
++			e1000_get_current_media_type_82575(hw);
++			adapter->media_type_set = 1;
++		}
++	}
++#endif	// CONFIG_WG_PLATFORM
++
+ 	link = igb_has_link(adapter);
+ 
+ 	/* Force link down if we have fiber to swap to */
+@@ -4801,6 +4876,9 @@
+ 		if (hw->dev_spec._82575.media_changed) {
+ 			hw->dev_spec._82575.media_changed = false;
+ 			adapter->flags |= IGB_FLAG_MEDIA_RESET;
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG92243
++			adapter->media_type_set = 0;
++#endif
+ 			igb_reset(adapter);
+ 		}
+ 
+@@ -4815,6 +4893,9 @@
+ 						   &adapter->link_duplex);
+ 
+ 			ctrl = E1000_READ_REG(hw, E1000_CTRL);
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG92243
++			adapter->media_type_set = 0;
++#endif
+ 			/* Links status message must follow this format */
+ 			netdev_info(netdev,
+ 				"igb: %s NIC Link is Up %d Mbps %s, Flow Control: %s\n",
+@@ -4878,6 +4959,9 @@
+ 				}
+ 			}
+ 
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG92243
++			adapter->media_type_set = 0;
++#endif
+ 			/* Links status message must follow this format */
+ 			netdev_info(netdev, "igb: %s NIC Link is Down\n",
+ 			       netdev->name);
+@@ -4915,7 +4999,13 @@
+ 		}
+ 	}
+ 
++#ifdef	CONFIG_WG_PLATFORM	// WG:XD BUG84635 XTM-2520 lockup
++	local_bh_disable();
++	igb_update_stats(adapter);
++	local_bh_enable();
++#else	// CONFIG_WG_PLATFORM
+ 	igb_update_stats(adapter);
++#endif	// CONFIG_WG_PLATFORM
+ 
+ 	for (i = 0; i < adapter->num_tx_queues; i++) {
+ 		struct igb_ring *tx_ring = adapter->tx_ring[i];
+@@ -5541,6 +5631,15 @@
+ 	cmd_type |= size | IGB_TXD_DCMD;
+ 	tx_desc->read.cmd_type_len = cpu_to_le32(cmd_type);
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:XD JIRA EPA-238 sw10 (igb) Tx timeout
++	if (unlikely(wg_westport)) {
++		local_bh_disable();
++#ifndef CONFIG_WG_KERNEL_4_14 // WG:JB Removed in 4.14
++		netdev_ring(tx_ring)->trans_start = jiffies;
++#endif
++		txring_txq(tx_ring)->trans_start = jiffies;
++	}
++#endif
+ 	netdev_tx_sent_queue(txring_txq(tx_ring), first->bytecount);
+ 	/* set the timestamp */
+ 	first->time_stamp = jiffies;
+@@ -5570,6 +5669,11 @@
+ 	 * at a time, it syncronizes IO on IA64/Altix systems
+ 	 */
+ 	mmiowb();
++#ifdef	CONFIG_WG_PLATFORM // WG:XD JIRA EPA-238 sw10 (igb) Tx timeout
++	if (unlikely(wg_westport)) {
++		local_bh_enable();
++	}
++#endif
+ 
+ 	return;
+ 
+@@ -5806,8 +5910,16 @@
+ {
+ 	struct igb_adapter *adapter = netdev_priv(netdev);
+ 
++#ifndef	CONFIG_WG_PLATFORM	// WG:XD BUG84635 XTM-2520 lockup
+ 	if (!test_bit(__IGB_RESETTING, &adapter->state))
+ 		igb_update_stats(adapter);
++#else	// CONFIG_WG_PLATFORM
++	if (!test_bit(__IGB_RESETTING, &adapter->state)) {
++		local_bh_disable();
++		igb_update_stats(adapter);
++		local_bh_enable();
++	}
++#endif	// CONFIG_WG_PLATFORM
+ 
+ #ifdef HAVE_NETDEV_STATS_IN_NETDEV
+ 	/* only return the current stats */
+@@ -5832,6 +5944,15 @@
+ 	struct pci_dev *pdev = adapter->pdev;
+ 	int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Bump frame size on sw devices
++	if (max_frame < (VLAN_ETH_FRAME_LEN + ETH_FCS_LEN))
++		max_frame = VLAN_ETH_FRAME_LEN + ETH_FCS_LEN;
++	if (wg_seattle | wg_westport)
++	if (memcmp(netdev->name, "sw", 2) == 0)
++		max_frame += VLAN_HLEN;
++	printk(KERN_INFO "%s: %-5s Max Frame %d\n",
++	       __FUNCTION__, netdev->name, max_frame);
++#endif	// CONFIG_WG_PLATFORM
+ 	if ((new_mtu < 68) || (max_frame > MAX_JUMBO_FRAME_SIZE)) {
+ 		dev_err(pci_dev_to_dev(pdev), "Invalid MTU setting\n");
+ 		return -EINVAL;
+@@ -6614,8 +6735,13 @@
+ 		E1000_WRITE_REG(hw, E1000_VMVIR(vf), 0);
+ }
+ 
++#ifdef	CONFIG_WG_KERNEL_4_14
++static int igb_ndo_set_vf_vlan(struct net_device *netdev,
++			       int vf, u16 vlan, u8 qos, __be16 proto)
++#else
+ static int igb_ndo_set_vf_vlan(struct net_device *netdev,
+ 			       int vf, u16 vlan, u8 qos)
++#endif
+ {
+ 	int err = 0;
+ 	struct igb_adapter *adapter = netdev_priv(netdev);
+@@ -6781,9 +6907,15 @@
+ 	igb_clear_vf_vfta(adapter, vf);
+ #ifdef IFLA_VF_MAX
+ 	if (adapter->vf_data[vf].pf_vlan)
++#ifdef	CONFIG_WG_KERNEL_4_14
++		igb_ndo_set_vf_vlan(adapter->netdev, vf,
++				    adapter->vf_data[vf].pf_vlan,
++				    adapter->vf_data[vf].pf_qos, 0);
++#else
+ 		igb_ndo_set_vf_vlan(adapter->netdev, vf,
+ 				    adapter->vf_data[vf].pf_vlan,
+ 				    adapter->vf_data[vf].pf_qos);
++#endif
+ 	else
+ 		igb_clear_vf_vfta(adapter, vf);
+ #endif
+@@ -7491,6 +7623,19 @@
+ 		size -= IGB_TS_HDR_LEN;
+ 	}
+ #endif /* HAVE_PTP_1588_CLOCK */
++#ifdef	CONFIG_WG_PLATFORM
++	if (unlikely(wg_pss_untag)) {
++		int pss;
++		skb->len = size; // FBX-13194, set skb->len for wg_pss ports to calculate rx_bytes
++		pss = wg_pss_untag(skb, va);
++		skb->len = 0;	 // FBX-13194, skb->len will get officially set in skb_add_rx_frag()
++		if (likely(pss > 0)) {
++			// Skip past Marvell header
++			size -= pss;
++			va   += pss;
++		}
++	}
++#endif	// CONFIG_WG_PLATFORM
+ 
+ 	if (likely(size <= IGB_RX_HDR_LEN)) {
+ 		memcpy(__skb_put(skb, size), va, ALIGN(size, sizeof(long)));
+@@ -8072,6 +8217,8 @@
+ }
+ 
+ #endif /* IGB_NO_LRO */
++
++
+ /**
+  * igb_process_skb_fields - Populate skb header fields from Rx descriptor
+  * @rx_ring: rx descriptor ring packet is being transacted on
+@@ -8719,6 +8866,17 @@
+ 	enable = !!(features & NETIF_F_HW_VLAN_RX);
+ #endif /* NETIF_F_HW_VLAN_CTAG_RX */
+ #endif /* HAVE_VLAN_RX_REGISTER */
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Disable VLAN assist if Marvell headers
++	if (netdev == wg_dsa_dev[0]) {
++		/* disable VLAN tag insert/strip */
++		ctrl = E1000_READ_REG(hw, E1000_CTRL);
++		ctrl &= ~E1000_CTRL_VME;
++		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
++		printk(KERN_INFO "%s: Blocking HW_VLAN_CTAG_RX on %s\n",
++		       __FUNCTION__, netdev->name);
++		return;
++	}
++#endif
+ 
+ 	if (enable) {
+ 		/* enable VLAN tag insert/strip */
+--- igb-5.3.5.3/src/e1000_82575.c.orig	2022-05-26 11:32:56.660105225 -0700
++++ igb-5.3.5.3/src/e1000_82575.c	2022-05-26 11:32:56.748101622 -0700
+@@ -35,6 +35,8 @@
+ #include "e1000_api.h"
+ #include "e1000_i210.h"
+ 
++#include "igb.h"	// WG:JB Needed in e1000_check_fiberstore_sfp()
++
+ static s32  e1000_init_phy_params_82575(struct e1000_hw *hw);
+ static s32  e1000_init_mac_params_82575(struct e1000_hw *hw);
+ static s32  e1000_acquire_phy_82575(struct e1000_hw *hw);
+@@ -1665,6 +1667,12 @@
+ 	switch (ctrl_ext & E1000_CTRL_EXT_LINK_MODE_MASK) {
+ 	case E1000_CTRL_EXT_LINK_MODE_SGMII:
+ 		/* sgmii mode lets the phy handle forcing speed/duplex */
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Turn off autoneg for SGMII ports
++		if ((wg_seattle) &&
++		    (hw->device_id == E1000_DEV_ID_I354_SGMII))
++			pcs_autoneg = false;
++		else
++#endif	// CONFIG_WG_PLATFORM
+ 		pcs_autoneg = true;
+ 		/* autoneg time out should be disabled for SGMII mode */
+ 		reg &= ~(E1000_PCS_LCTL_AN_TIMEOUT);
+@@ -1756,6 +1764,8 @@
+ 	return ret_val;
+ }
+ 
++extern int wg_igb_serdes_only; // WG:JB Lanner SFP fix
++
+ /**
+  *  e1000_get_media_type_82575 - derives current media type.
+  *  @hw: pointer to the HW structure
+@@ -1818,6 +1828,14 @@
+ 			break;
+ 		}
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Lanner SFP fix
++		if (wg_igb_serdes_only) {
++			hw->phy.media_type = e1000_media_type_internal_serdes;
++			ctrl_ext &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
++			ctrl_ext |= E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES;
++			E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
++		}
++#endif	// CONFIG_WG_PLATFORM
+ 		/* do not change link mode for 100BaseFX */
+ 		if (dev_spec->eth_flags.e100_base_fx)
+ 			break;
+@@ -1830,6 +1848,12 @@
+ 		else
+ 			ctrl_ext |= E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES;
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Lanner SFP fix
++		if (wg_igb_serdes_only) {
++			ctrl_ext &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
++			ctrl_ext |= E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES;
++		}
++#endif	// CONFIG_WG_PLATFORM
+ 		E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
+ 
+ 		break;
+@@ -1903,10 +1927,182 @@
+ 	ret_val = E1000_SUCCESS;
+ out:
+ 	/* Restore I2C interface setting */
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Lanner SFP fix
++	if (!wg_igb_serdes_only)
++#endif	// CONFIG_WG_PLATFORM
++	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
++	return ret_val;
++}
++
++#ifdef	CONFIG_WG_PLATFORM // WG:JB Lanner SFP fix
++
++/* FBX-6424 - dump extra info from the SFP+ transceivers to help debug the problems in the field.
++ * Since the extra info also includes the vendor string, it replaces existing subroutine that
++ * queries vendor string only
++ */
++#define SFP_BASIC_FIELD_SIZE	64
++static void e1000_dump_extra_sfp_info(struct e1000_hw *hw)
++{
++  	int i;
++	int ret;
++	unsigned char tmp;
++	struct igb_adapter *adapter = hw->back;
++	unsigned char sfp_info[SFP_BASIC_FIELD_SIZE] = {0,};
++
++  
++	for (i = 0; i < SFP_BASIC_FIELD_SIZE; i++) {
++	  	ret = e1000_read_sfp_data_byte(hw, E1000_I2CCMD_SFP_DATA_ADDR(i), &sfp_info[i]);
++		if (ret) {
++		  	printk(KERN_WARNING "## %s reading sfp+ byte # %d error\n", adapter->netdev->name, i);
++		  	break;
++		}
++	}
++
++	/* start dumping the SFP+ info just read ... */
++	printk(KERN_INFO "@@ %s SFP+ ID: 0x%02x, Ext. ID: 0x%02x, Connector: 0x%02x, Tx Compat: 0x%02x\n",
++		   adapter->netdev->name, sfp_info[0], sfp_info[1], sfp_info[2], sfp_info[36]);
++	print_hex_dump(KERN_INFO, "byte 03 to 18: ", DUMP_PREFIX_NONE, 16, 1, &sfp_info[3], 16, 0);
++	sfp_info[36] = '\0'; 	// NULL terminator for Vendor Name string, already done with byte 36
++	tmp = sfp_info[56];
++	sfp_info[56] = '\0';	// NULL terminator for P/N string
++	printk(KERN_INFO "Vendor ID: %02x%02x%02x, Vendor Name: %s, P/N: %s\n",
++		   sfp_info[37], sfp_info[38], sfp_info[39], &sfp_info[20], &sfp_info[40]);
++	sfp_info[56] = tmp;		// recover byte 56
++	tmp = sfp_info[60];
++	sfp_info[60] = '\0';	// NULL terminator for P/N Revision string
++	printk(KERN_INFO "P/N rev: %s, Wave Length: %02x%02x\n", &sfp_info[56], tmp, sfp_info[61]);
++
++	return;
++}
++
++static s32 e1000_set_current_sfp_media_type_and_set_link_mode_82575(struct e1000_hw *hw)
++{
++	s32 ret_val = E1000_ERR_CONFIG;
++	u32 ctrl_ext = 0, ctrl_ext_reg=0;
++	struct e1000_dev_spec_82575 *dev_spec = &hw->dev_spec._82575;
++	struct sfp_e1000_flags *eth_flags = &dev_spec->eth_flags;
++	u8 tranceiver_type = 0;
++	s32 timeout = 3;
++
++	/* Turn I2C interface ON and power on sfp cage */
++	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
++	ctrl_ext_reg = ctrl_ext;
++	ctrl_ext &= ~E1000_CTRL_EXT_SDP3_DATA;
++	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext | E1000_CTRL_I2C_ENA);
++
++	E1000_WRITE_FLUSH(hw);
++
++	msec_delay(200);
++	e1000_dump_extra_sfp_info(hw);
++
++	/* Read SFP module data */
++	while (timeout) {
++		ret_val = e1000_read_sfp_data_byte(hw,
++			E1000_I2CCMD_SFP_DATA_ADDR(E1000_SFF_IDENTIFIER_OFFSET),
++			&tranceiver_type);
++		if (ret_val == E1000_SUCCESS)
++			break;
++		msec_delay(100);
++		timeout--;
++	}
++	if (ret_val != E1000_SUCCESS)
++		goto err_out;
++
++	ret_val = e1000_read_sfp_data_byte(hw,
++			E1000_I2CCMD_SFP_DATA_ADDR(E1000_SFF_ETH_FLAGS_OFFSET),
++			(u8 *)eth_flags);
++	if (ret_val != E1000_SUCCESS)
++		goto err_out;
++
++	/* Check if there is some SFP module plugged and powered */
++	if ((tranceiver_type == E1000_SFF_IDENTIFIER_SFP) ||
++	    (tranceiver_type == E1000_SFF_IDENTIFIER_SFF)) {
++		dev_spec->module_plugged = true;
++		if (eth_flags->e1000_base_lx || eth_flags->e1000_base_sx) {
++			DEBUGOUT("PHY module = fiber\n");
++			hw->phy.media_type = e1000_media_type_internal_serdes;
++			ctrl_ext_reg &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
++			ctrl_ext_reg |= E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES;
++		} else if (eth_flags->e100_base_fx) {
++			DEBUGOUT("PHY module = e100_base_fx\n");
++			dev_spec->sgmii_active = true;
++			hw->phy.media_type = e1000_media_type_internal_serdes;
++
++		} else if (eth_flags->e1000_base_t) {
++			dev_spec->sgmii_active = true;
++			DEBUGOUT("PHY module = e1000_base_t\n");
++			hw->phy.media_type = e1000_media_type_copper;
++			ctrl_ext_reg &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
++			ctrl_ext_reg |= E1000_CTRL_EXT_LINK_MODE_SGMII;
++
++		} else {
++			hw->phy.media_type = e1000_media_type_unknown;
++			DEBUGOUT("PHY module has not been recognized\n");
++			hw->phy.media_type = e1000_media_type_internal_serdes;
++			ctrl_ext_reg &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
++			ctrl_ext_reg |= E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES;
++
++			goto out;
++		}
++	} else {
++		hw->phy.media_type = e1000_media_type_unknown;
++	}
++	ret_val = E1000_SUCCESS;
++out:
++	/* For Kirkland, no need to do vendor string comparison for special handling any more due to 
++	 * FBX-4968. The only outcome of existing e1000_check_fiberstore_sfp() is to gather vendor string
++	 * info from the SFP+ transceiver for debugging. It's replaced by e1000_dump_extra_sfp_info(),
++	 * which includes dumping vendor string as well as other extra info
++	 */
++	if (wg_kirkland) {
++		ctrl_ext_reg &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
++		ctrl_ext_reg |= E1000_CTRL_EXT_LINK_MODE_PCIE_SERDES;
++	}
++	ctrl_ext = ctrl_ext_reg;
++err_out:
++	/* Restore I2C interface setting */
+ 	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
+ 	return ret_val;
+ }
+ 
++void e1000_get_current_media_type_82575(struct e1000_hw *hw)
++{
++	s32 ret_val = E1000_ERR_CONFIG;
++	struct e1000_mac_info *mac = &hw->mac;
++	struct e1000_dev_spec_82575 *dev_spec = &hw->dev_spec._82575;
++	struct e1000_phy_info *phy = &hw->phy;
++
++	/* Set internal phy as default */
++	dev_spec->module_plugged = true;
++
++	/* read current plugged module and set correspond link mode */
++	ret_val = e1000_set_current_sfp_media_type_and_set_link_mode_82575(hw);
++
++	/* setup correct interface*/
++	mac->ops.setup_physical_interface =
++		(hw->phy.media_type == e1000_media_type_copper)
++		? e1000_setup_copper_link_82575 : e1000_setup_serdes_link_82575;
++
++	hw->phy.type = e1000_phy_i210;
++
++	if (e1000_sgmii_active_82575(hw)) {
++		hw->phy.addr = 6;
++		phy->autoneg_mask	= AUTONEG_ADVERTISE_SPEED_DEFAULT;
++		phy->ops.reset = e1000_phy_hw_reset_sgmii_82575;
++		phy->ops.read_reg = e1000_read_phy_reg_sgmii_82575;
++		phy->ops.write_reg = e1000_write_phy_reg_sgmii_82575;
++	} else {
++		hw->phy.addr = 0;
++		phy->ops.reset = e1000_phy_hw_reset_generic;
++		phy->ops.read_reg = e1000_read_phy_reg_gs40g;
++		phy->ops.write_reg = e1000_write_phy_reg_gs40g;
++	}
++
++	return;
++}
++
++#endif	// CONFIG_WG_PLATFORM
++
+ /**
+  *  e1000_valid_led_default_82575 - Verify a valid default LED config
+  *  @hw: pointer to the HW structure
+@@ -2367,6 +2563,9 @@
+ 
+ 	DEBUGFUNC("e1000_read_phy_reg_82580");
+ 
++#ifdef CONFIG_WG_PLATFORM // WG: XD FBX-5661
++	local_bh_disable();
++#endif
+ 	ret_val = hw->phy.ops.acquire(hw);
+ 	if (ret_val)
+ 		goto out;
+@@ -2376,6 +2575,9 @@
+ 	hw->phy.ops.release(hw);
+ 
+ out:
++#ifdef CONFIG_WG_PLATFORM // WG: XD FBX-5661
++	local_bh_enable();
++#endif
+ 	return ret_val;
+ }
+ 
+@@ -2734,7 +2936,39 @@
+ 
+ 	DEBUGFUNC("e1000_validate_nvm_checksum_i350");
+ 
++#ifdef	CONFIG_WG_PLATFORM // WG:MJ BUG72184 WORKAROUND
++	/* MukundJ: Moving to this (igb 4.1.2) driver breaks spokane network interfaces.
++	 *  It breaks because the nvm_checksum is being detected a INVALID.
++	 *  The same checksum check does not fail on igb 2.4.12.
++	 *
++	 *  GIST of the problem: it is driver change problem.
++	 *
++	 *  Ground info:  I350 is a Quad port card. There is only one EEPROM for all the 4 ports.
++	 *                According to the I350 datasheet, there are 4 different configuration spaces on the
++	 *		  EEPROM for each of the ports.
++	 *
++	 *  Functional info:
++	 *   old driver: (2.4.12)
++	 *		validate/update checksum: Updates the checksum on only one of 4 LAN configuration spaces.
++	 *					  Only the first configuration space (LAN0) is updated even
++	 *					   if the configuration on LAN1/2/3 have changed.
++	 *					  Validates only first one configuration space (LAN0) @ load time.
++	 *					  This is a buddy behavior on the driver part
++	 *   new driver: (4.1.2)
++	 *		validate/update checksum: Updates the checksum on all 4 LAN configuration spaces.
++	 *		                          Validates all configuration space (LAN0/1/2/3) @ load time
++	 *
++	 *
++	 *   Solution: Fix the new driver to calculate update/validate the checksum only on First
++	 *   	       LAN(lan0) config space.
++	 *   	      We can also fix it in the field but it is very risky to do that in the field
++	 *	      and it is not absolutely necessary as it does not break any functionality.
++	 *
++	 */
++	for (j = 0; j < 1; j++) {
++#else	// CONFIG_WG_PLATFORM
+ 	for (j = 0; j < 4; j++) {
++#endif	// CONFIG_WG_PLATFORM
+ 		nvm_offset = NVM_82580_LAN_FUNC_OFFSET(j);
+ 		ret_val = e1000_validate_nvm_checksum_with_offset(hw,
+ 								  nvm_offset);
+--- igb-5.3.5.3/src/e1000_i210.c.orig	2022-05-26 11:32:56.664105061 -0700
++++ igb-5.3.5.3/src/e1000_i210.c	2022-05-26 11:32:56.764100967 -0700
+@@ -85,6 +85,14 @@
+ 
+ 	DEBUGFUNC("e1000_acquire_swfw_sync_i210");
+ 
++#ifdef	CONFIG_WG_PLATFORM	//WG:XD FBX-9848
++	/* if we are in irq context, we can't afford long busy waiting to acquire
++	 * the hw samphore to access the PHY. We rather it fail under IRQ context
++	 */
++	if (irq_count())
++		timeout = 2;
++#endif
++
+ 	while (i < timeout) {
+ 		if (e1000_get_hw_semaphore_i210(hw)) {
+ 			ret_val = -E1000_ERR_SWFW_SYNC;
+--- igb-5.3.5.3/src/e1000_phy.c.orig	2022-05-26 11:32:56.668104898 -0700
++++ igb-5.3.5.3/src/e1000_phy.c	2022-05-26 11:32:56.792099820 -0700
+@@ -247,6 +247,1342 @@
+ 	return hw->phy.ops.write_reg(hw, M88E1000_PHY_GEN_CONTROL, 0);
+ }
+ 
++#ifdef	CONFIG_WG_ARCH_X86 // WG:JB Marvell 98DX3035 init code
++
++struct	mvl98dx3035_init_desc {
++	u32 offset;
++	u32 val;
++};
++
++struct	mvl98dx3035_init_desc dx3035[] = {
++	// Disable switch
++	{0x00000058 , 0x04104002},
++	// Prefer Master, SMI1 AutoNeg preformed.
++	{0x04004034 , 0x00000140},
++	{0x05004034 , 0x00000140},
++	// set SMI0 fast_mdc to div/64
++	{0x04004200 , 0x000B0000},
++	// set SMI1 fast_mdc to div/64
++	{0x05004200 , 0x00030000},
++	// set PHY polling address 88E1680 0x0~0xF, 0x10~0x17
++	{0x04004030 , 0x0A418820},
++	{0x04804030 , 0x16A4A0E6},
++	{0x05004030 , 0x2307B9AC},
++	{0x05804030 , 0x2F6AD272},
++	// Pipe0 access DFX Setting- Pipe Select
++	{0x308F8004 , 0x00000001},
++	// PCL TCAM-DFX Setting
++	{0x30804050 , 0x00020003},
++	// RTR TCAM-DFX Setting
++	{0x3080C050 , 0x00020003},
++	// changed in xCat2, GPP PAD control
++	{0x008F8304 , 0x00000048},
++	// changed in xCat2, SSMII PAD control
++	{0x008F8314 , 0x00000048},
++	// changed in xCat2, RGMII PAD control
++	{0x008F8310 , 0x00000048},
++	// changed in xCat2, LED PAD control       
++	{0x008F8300 , 0x00000048},
++	// disable PECL receiver and common_0_PECL_EN=CMOS
++	{0x0000009C , 0x061B0CC3},
++	// Set Extended Control Register - TTPan: SGMII 2.5G bit22 & bit14 = 1 -> Org=0x00807405 New=0x00C07405
++	{0x0000005C , 0x00807405},
++	// Disable SSMII CLK
++	{0x00000028 , 0x2000000},
++	{0x00000028 , 0x2000000},
++	// Start QSGMII Initial
++	// Power up 5G SERDESs
++	// Set SERDES ref clock register
++	{0x09800000 , 0x00003E80},
++	{0x09800400 , 0x00003E80},
++	{0x09801000 , 0x00003E80},
++	{0x09801400 , 0x00003E80},
++	{0x09802000 , 0x00003E80},
++	{0x09802400 , 0x00003E80},
++	// Wait 10mSec,
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// Deactivate sd_reset
++	{0x09800004 , 0x00000008},
++	{0x09800404 , 0x00000008},
++	{0x09801004 , 0x00000008},
++	{0x09801404 , 0x00000008},
++	{0x09802004 , 0x00000008},
++	{0x09802404 , 0x00000008},
++	// Wait for Calibration done (0x09800008 bit 3)
++	// Wait 10mSec,
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// Reference Ferquency select = 62.5MHz ; Use registers bits to control speed configuration      
++	{0x0980020C , 0x0000800A},
++	{0x0980060C , 0x0000800A},
++	{0x0980120C , 0x0000800A},
++	{0x0980160C , 0x0000800A},
++	{0x0980220C , 0x0000800A},
++	{0x0980260C , 0x0000800A},
++	// Transmitter/Reciver Divider force, interpulator force; 1.25G: intpi = 25uA , VCO divided by 4 ; 2.5G: intpi = 25uA , VCO divided by 2  ; 3.125G: intpi = 30uA , VCO divided by 2 ; 3.75G: intpi = 20uA , VCO not divided; 6.25G: intpi = 30uA , VCO not divided; 5.15G: intpi = 25uA , VCO not divided
++	{0x09800210 , 0x00004414},
++	{0x09800610 , 0x00004414},
++	{0x09801210 , 0x00004414},
++	{0x09801610 , 0x00004414},
++	{0x09802210 , 0x00004414},
++	{0x09802610 , 0x00004414},
++	// Force FbDiv/RfDiv
++	{0x09800214 , 0x0000A150},
++	{0x09800614 , 0x0000A150},
++	{0x09801214 , 0x0000A150},
++	{0x09801614 , 0x0000A150},
++	{0x09802214 , 0x0000A150},
++	{0x09802614 , 0x0000A150},
++	// Force: PLL Speed, sel_v2i, loadcap_pll,sel_fplres
++	{0x09800218 , 0x0000BAAB},
++	{0x09800618 , 0x0000BAAB},
++	{0x09801218 , 0x0000BAAB},
++	{0x09801618 , 0x0000BAAB},
++	{0x09802218 , 0x0000BAAB},
++	{0x09802618 , 0x0000BAAB},
++	// icp force
++	{0x0980021C , 0x0000882C},
++	{0x0980061C , 0x0000882C},
++	{0x0980121C , 0x0000882C},
++	{0x0980161C , 0x0000882C},
++	{0x0980221C , 0x0000882C},
++	{0x0980261C , 0x0000882C},
++	//  0 = kvco-2
++	{0x098003CC , 0x00002000},
++	{0x098007CC , 0x00002000},
++	{0x098013CC , 0x00002000},
++	{0x098017CC , 0x00002000},
++	{0x098023CC , 0x00002000},
++	{0x098027CC , 0x00002000},
++	// External TX/Rx Impedance changed from 6 to 0 while auto calibration results are used  - based on lab measurments it seems that we need to force the auto imedance calibration values
++	{0x0980022C , 0x00000000},
++	{0x0980062C , 0x00000000},
++	{0x0980122C , 0x00000000},
++	{0x0980162C , 0x00000000},
++	{0x0980222C , 0x00000000},
++	{0x0980262C , 0x00000000},
++	// Auto KVCO,  PLL is not forced to max speed during power up sequence - 
++	{0x09800230 , 0x00000000},
++	{0x09800630 , 0x00000000},
++	{0x09801230 , 0x00000000},
++	{0x09801630 , 0x00000000},
++	{0x09802230 , 0x00000000},
++	{0x09802630 , 0x00000000},
++	// Sampler OS Scale was changed from 5mV/Step to 3.3mV/Step; RX_IMP_VTHIMCAL was chnge from 3 to 0
++	{0x09800234 , 0x00004000},
++	{0x09800634 , 0x00004000},
++	{0x09801234 , 0x00004000},
++	{0x09801634 , 0x00004000},
++	{0x09802234 , 0x00004000},
++	{0x09802634 , 0x00004000},
++	// Use value wiritten to register for process calibration instead of th eauto calibration; Select process from register
++	{0x0980023C , 0x00000018},
++	{0x0980063C , 0x00000018},
++	{0x0980123C , 0x00000018},
++	{0x0980163C , 0x00000018},
++	{0x0980223C , 0x00000018},
++	{0x0980263C, 0x00000018},
++	// DCC should be dissabled at baud 3.125 and below = 8060
++	{0x09800250 , 0x0000A0C0},
++	{0x09800650 , 0x0000A0C0},
++	{0x09801250 , 0x0000A0C0},
++	{0x09801650 , 0x0000A0C0},
++	{0x09802250 , 0x0000A0C0},
++	{0x09802650 , 0x0000A0C0},
++	// Wait 10mSec,
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// DCC should be dissabled at baud 3.125 and below = 8060
++	{0x09800250 , 0x0000A060},
++	{0x09800650 , 0x0000A060},
++	{0x09801250 , 0x0000A060},
++	{0x09801650 , 0x0000A060},
++	{0x09802250 , 0x0000A060},
++	{0x09802650 , 0x0000A060},
++	// PE Setting
++	{0x09800254 , 0x00007F2D},
++	{0x09800654 , 0x00007F2D},
++	{0x09801254 , 0x00007F2D},
++	{0x09801654 , 0x00007F2D},
++	{0x09802254 , 0x00007F2D},
++	{0x09802654 , 0x00007F2D},
++	// PE Type
++	{0x09800258 , 0x00000100},
++	{0x09800658 , 0x00000100},
++	{0x09801258 , 0x00000100},
++	{0x09801658 , 0x00000100},
++	{0x09802258 , 0x00000100},
++	{0x09802658 , 0x00000100},
++	// selmupi/mupf - low value for lower baud
++	{0x0980027C , 0x000090AA},
++	{0x0980067C , 0x000090AA},
++	{0x0980127C , 0x000090AA},
++	{0x0980167C , 0x000090AA},
++	{0x0980227C , 0x000090AA},
++	{0x0980267C , 0x000090AA},
++	// DTL_FLOOP_EN = Dis
++	{0x09800280 , 0x00000800},
++	{0x09800680 , 0x00000800},
++	{0x09801280 , 0x00000800},
++	{0x09801680 , 0x00000800},
++	{0x09802280 , 0x00000800},
++	{0x09802680 , 0x00000800},
++	// FFE Setting DB 24G is 0x363
++	{0x0980028C , 0x00000377},
++	{0x0980068C , 0x00000377},
++	{0x0980128C , 0x00000377},
++	{0x0980168C , 0x00000377},
++	{0x0980228C , 0x00000377},
++	{0x0980268C , 0x00000377},
++	// Slicer Enable; Tx  Imp was changed from 50ohm to 43ohm
++	{0x0980035C , 0x0000423F},
++	{0x0980075C , 0x0000423F},
++	{0x0980135C , 0x0000423F},
++	{0x0980175C , 0x0000423F},
++	{0x0980235C , 0x0000423F},
++	{0x0980275C , 0x0000423F},
++	// Not need to be configure - Same as default 
++	{0x09800364 , 0x00005555},
++	{0x09800764 , 0x00005555},
++	{0x09801364 , 0x00005555},
++	{0x09801764 , 0x00005555},
++	{0x09802364 , 0x00005555},
++	{0x09802764 , 0x00005555},
++	// Disable ana_clk_det
++	{0x0980036C , 0x00000000},
++	{0x0980076C , 0x00000000},
++	{0x0980136C , 0x00000000},
++	{0x0980176C , 0x00000000},
++	{0x0980236C , 0x00000000},
++	{0x0980276C , 0x00000000},
++	// Configure rx_imp_vthimpcal to 0x0 (default value = 0x3); Configure Sampler_os_scale to 3.3mV/step (default value = 5mV/step)
++	{0x09800234 , 0x00004000},
++	{0x09800634 , 0x00004000},
++	{0x09801234 , 0x00004000},
++	{0x09801634 , 0x00004000},
++	{0x09802234 , 0x00004000},
++	{0x09802634 , 0x00004000},
++	// Configure IMP_VTHIMPCAL to 56.7ohm (default value = 53.3 ohm); Configure cal_os_ph_rd to 0x60 (default value = 0x0); Configure Cal_rxclkalign90_ext to use an external ovride value
++	{0x09800228 , 0x0000DAC0},
++	{0x09800628 , 0x0000DAC0},
++	{0x09801228 , 0x0000DAC0},
++	{0x09801628 , 0x0000DAC0},
++	{0x09802228 , 0x0000DAC0},
++	{0x09802628 , 0x0000DAC0},
++	// Reset dtl_rx ; Enable ana_clk_det
++	{0x0980036C , 0x00008040},
++	{0x0980076C , 0x00008040},
++	{0x0980136C , 0x00008040},
++	{0x0980176C , 0x00008040},
++	{0x0980236C , 0x00008040},
++	{0x0980276C , 0x00008040},
++	// Un reset dtl_rx
++	{0x0980036C , 0x00008000},
++	{0x0980076C , 0x00008000},
++	{0x0980136C , 0x00008000},
++	{0x0980176C , 0x00008000},
++	{0x0980236C , 0x00008000},
++	{0x0980276C , 0x00008000},
++	// Wait 10mSec,
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// ?
++	{0x09800224 , 0x00000000},
++	{0x09800624 , 0x00000000},
++	{0x09801224 , 0x00000000},
++	{0x09801624 , 0x00000000},
++	{0x09802224 , 0x00000000},
++	{0x09802624 , 0x00000000},
++	// CAL Start
++	{0x09800224 , 0x00008000},
++	{0x09800624 , 0x00008000},
++	{0x09801224 , 0x00008000},
++	{0x09801624 , 0x00008000},
++	{0x09802224 , 0x00008000},
++	{0x09802624 , 0x00008000},
++	{0x09800224 , 0x00000000},
++	{0x09800624 , 0x00000000},
++	{0x09801224 , 0x00000000},
++	{0x09801624 , 0x00000000},
++	{0x09802224 , 0x00000000},
++	{0x09802624 , 0x00000000},
++	// Wait for RxClk_x2
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// Set RxInit to 0x1 (remember that bit 3 is already set to 0x1)
++	{0x09800004 , 0x00000018},
++	{0x09800404 , 0x00000018},
++	{0x09801004 , 0x00000018},
++	{0x09801404 , 0x00000018},
++	{0x09802004 , 0x00000018},
++	{0x09802404 , 0x00000018},
++	// Wait for p_clk = 1 and p_clk = 0
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// Set RxInit to 0x0
++	{0x09800004 , 0x00000008},
++	{0x09800404 , 0x00000008},
++	{0x09801004 , 0x00000008},
++	{0x09801404 , 0x00000008},
++	{0x09802004 , 0x00000008},
++	{0x09802404 , 0x00000008},
++	// Wait for ALL PHY_RDY = 1 (0x09800008 bit 0)
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// ?
++	{0x09800004 , 0x00000028},
++	{0x09800404 , 0x00000028},
++	{0x09801004 , 0x00000028},
++	{0x09801404 , 0x00000028},
++	{0x09802004 , 0x00000028},
++	{0x09802404 , 0x00000028},
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// MAC control
++	{0x0a800000 , 0x0000c801},
++	{0x0a800400 , 0x0000c801},
++	{0x0a800800 , 0x0000c801},
++	{0x0a800c00 , 0x0000c801},
++	{0x0a801000 , 0x0000c801},
++	{0x0a801400 , 0x0000c801},
++	{0x0a801800 , 0x0000c801},
++	{0x0a801c00 , 0x0000c801},
++	{0x0a802000 , 0x0000c801},
++	{0x0a802400 , 0x0000c801},
++	{0x0a802800 , 0x0000c801},
++	{0x0a802c00 , 0x0000c801},
++	{0x0a803000 , 0x0000c801},
++	{0x0a803400 , 0x0000c801},
++	{0x0a803800 , 0x0000c801},
++	{0x0a803c00 , 0x0000c801},
++	{0x0a804000 , 0x0000c801},
++	{0x0a804400 , 0x0000c801},
++	{0x0a804800 , 0x0000c801},
++	{0x0a804c00 , 0x0000c801},
++	{0x0a805000 , 0x0000c801},
++	{0x0a805400 , 0x0000c801},
++	{0x0a805800 , 0x0000c801},
++	{0x0a805c00 , 0x0000c801},
++	//?
++	{0x0A800008 , 0x0000C008},
++	{0x0A801008 , 0x0000C008},
++	{0x0A802008 , 0x0000C008},
++	{0x0A803008 , 0x0000C008},
++	{0x0A804008 , 0x0000C008},
++	{0x0A805008 , 0x0000C008},
++	{0x0A800408 , 0x0000C008},
++	{0x0A801408 , 0x0000C008},
++	{0x0A802408 , 0x0000C008},
++	{0x0A803408 , 0x0000C008},
++	{0x0A804408 , 0x0000C008},
++	{0x0A805408 , 0x0000C008},
++	{0x0A800808 , 0x0000C008},
++	{0x0A801808 , 0x0000C008},
++	{0x0A802808 , 0x0000C008},
++	{0x0A803808 , 0x0000C008},
++	{0x0A804808 , 0x0000C008},
++	{0x0A805808 , 0x0000C008},
++	{0x0A800C08 , 0x0000C008},
++	{0x0A801C08 , 0x0000C008},
++	{0x0A802C08 , 0x0000C008},
++	{0x0A803C08 , 0x0000C008},
++	{0x0A804C08 , 0x0000C008},
++	{0x0A805C08 , 0x0000C008},
++	// MAC AN speed/duplex/FC
++	{0x0A80000C , 0x0000BAE8},
++	{0x0A80100C , 0x0000BAE8},
++	{0x0A80200C , 0x0000BAE8},
++	{0x0A80300C , 0x0000BAE8},
++	{0x0A80400C , 0x0000BAE8},
++	{0x0A80500C , 0x0000BAE8},
++	{0x0A80040C , 0x0000BAE8},
++	{0x0A80140C , 0x0000BAE8},
++	{0x0A80240C , 0x0000BAE8},
++	{0x0A80340C , 0x0000BAE8},
++	{0x0A80440C , 0x0000BAE8},
++	{0x0A80540C , 0x0000BAE8},
++	{0x0A80080C , 0x0000BAE8},
++	{0x0A80180C , 0x0000BAE8},
++	{0x0A80280C , 0x0000BAE8},
++	{0x0A80380C , 0x0000BAE8},
++	{0x0A80480C , 0x0000BAE8},
++	{0x0A80580C , 0x0000BAE8},
++	{0x0A800C0C , 0x0000BAE8},
++	{0x0A801C0C , 0x0000BAE8},
++	{0x0A802C0C , 0x0000BAE8},
++	{0x0A803C0C , 0x0000BAE8},
++	{0x0A804C0C , 0x0000BAE8},
++	{0x0A805C0C , 0x0000BAE8},
++	// back pressure en
++	{0x0A800014 , 0x000008D4},
++	{0x0A801014 , 0x000008D4},
++	{0x0A802014 , 0x000008D4},
++	{0x0A803014 , 0x000008D4},
++	{0x0A804014 , 0x000008D4},
++	{0x0A805014 , 0x000008D4},
++	{0x0A800414 , 0x000008D4},
++	{0x0A801414 , 0x000008D4},
++	{0x0A802414 , 0x000008D4},
++	{0x0A803414 , 0x000008D4},
++	{0x0A804414 , 0x000008D4},
++	{0x0A805414 , 0x000008D4},
++	{0x0A800814 , 0x000008D4},
++	{0x0A801814 , 0x000008D4},
++	{0x0A802814 , 0x000008D4},
++	{0x0A803814 , 0x000008D4},
++	{0x0A804814 , 0x000008D4},
++	{0x0A805814 , 0x000008D4},
++	{0x0A800C14 , 0x000008D4},
++	{0x0A801C14 , 0x000008D4},
++	{0x0A802C14 , 0x000008D4},
++	{0x0A803C14 , 0x000008D4},
++	{0x0A804C14 , 0x000008D4},
++	{0x0A805C14 , 0x000008D4},
++	// EEE - Bit_0= 0: Disable LPI, 1: Enable LPI 
++	{0x0A8000C4 , 0x00000101},
++	{0x0A8004C4 , 0x00000101},
++	{0x0A8008C4 , 0x00000101},
++	{0x0A800CC4 , 0x00000101},
++	{0x0A8010C4 , 0x00000101},
++	{0x0A8014C4 , 0x00000101},
++	{0x0A8018C4 , 0x00000101},
++	{0x0A801CC4 , 0x00000101},
++	{0x0A8020C4 , 0x00000101},
++	{0x0A8024C4 , 0x00000101},
++	{0x0A8028C4 , 0x00000101},
++	{0x0A802CC4 , 0x00000101},
++	{0x0A8030C4 , 0x00000101},
++	{0x0A8034C4 , 0x00000101},
++	{0x0A8038C4 , 0x00000101},
++	{0x0A803CC4 , 0x00000101},
++	{0x0A8040C4 , 0x00000101},
++	{0x0A8044C4 , 0x00000101},
++	{0x0A8048C4 , 0x00000101},
++	{0x0A804CC4 , 0x00000101},
++	{0x0A8050C4 , 0x00000101},
++	{0x0A8054C4 , 0x00000101},
++	{0x0A8058C4 , 0x00000101},
++	{0x0A805CC4 , 0x00000101},
++	// ?
++	{0x0A8000C8 , 0x0000017D},
++	{0x0A8004C8 , 0x0000017D},
++	{0x0A8008C8 , 0x0000017D},
++	{0x0A800CC8 , 0x0000017D},
++	{0x0A8010C8 , 0x0000017D},
++	{0x0A8014C8 , 0x0000017D},
++	{0x0A8018C8 , 0x0000017D},
++	{0x0A801CC8 , 0x0000017D},
++	{0x0A8020C8 , 0x0000017D},
++	{0x0A8024C8 , 0x0000017D},
++	{0x0A8028C8 , 0x0000017D},
++	{0x0A802CC8 , 0x0000017D},
++	{0x0A8030C8 , 0x0000017D},
++	{0x0A8034C8 , 0x0000017D},
++	{0x0A8038C8 , 0x0000017D},
++	{0x0A803CC8 , 0x0000017D},
++	{0x0A8040C8 , 0x0000017D},
++	{0x0A8044C8 , 0x0000017D},
++	{0x0A8048C8 , 0x0000017D},
++	{0x0A804CC8 , 0x0000017D},
++	{0x0A8050C8 , 0x0000017D},
++	{0x0A8054C8 , 0x0000017D},
++	{0x0A8058C8 , 0x0000017D},
++	{0x0A805CC8 , 0x0000017D},
++	// END QSGMII Initial
++	// Start SGMII Initial
++	// Power up 1.25G SERDESs
++	// Set SERDES ref clock register
++	{0x09803000 , 0x0000BE80},
++	{0x09803400 , 0x0000BE80},
++	{0x09804000 , 0x0000BE80},
++	{0x09804400 , 0x0000BE80},
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// Deactivate sd_reset
++	{0x09803004 , 0x00000008},
++	{0x09803404 , 0x00000008},
++	{0x09804004 , 0x00000008},
++	{0x09804404 , 0x00000008},
++	// Wait for Calibration done (0x09800008 bit 3)
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// Reference Ferquency select = 62.5MHz   ;Use registers bits to control speed configuration
++	{0x0980320C , 0x0000800A},
++	{0x0980360C , 0x0000800A},
++	{0x0980420C , 0x0000800A},
++	{0x0980460C , 0x0000800A},
++	// Transmitter/Reciver Divider force, interpulator force; 1.25G: intpi = 25uA , VCO divided by 4 ; 2.5G: intpi = 25uA , VCO divided by 2  ; 3.125G: intpi = 30uA , VCO divided by 2 ; 3.75G: intpi = 20uA , VCO not divided; 6.25G: intpi = 30uA , VCO not divided; 5.15G: intpi = 25uA , VCO not divided
++	{0x09803210 , 0x00006614},
++	{0x09803610 , 0x00006614},
++	{0x09804210 , 0x00006614},
++	{0x09804610 , 0x00006614},
++	// Force FbDiv/RfDiv
++	{0x09803214 , 0x0000A150},
++	{0x09803614 , 0x0000A150},
++	{0x09804214 , 0x0000A150},
++	{0x09804614 , 0x0000A150},
++	// Force: PLL Speed, sel_v2i, loadcap_pll,sel_fplres
++	{0x09803218 , 0x0000BAAB},
++	{0x09803618 , 0x0000BAAB},
++	{0x09804218 , 0x0000BAAB},
++	{0x09804618 , 0x0000BAAB},
++	// icp force
++	{0x0980321C , 0x00008B2C},
++	{0x0980361C , 0x00008B2C},
++	{0x0980421C , 0x00008B2C},
++	{0x0980461C , 0x00008B2C},
++	//  0 = kvco-2
++	{0x098033CC , 0x00002000},
++	{0x098037CC , 0x00002000},
++	{0x098043CC , 0x00002000},
++	{0x098047CC , 0x00002000},
++	// External TX/Rx Impedance changed from 6 to 0 while auto calibration results are used  - based on lab measurments it seems that we need to force the auto imedance calibration values
++	{0x0980322C , 0x00000000},
++	{0x0980362C , 0x00000000},
++	{0x0980422C , 0x00000000},
++	{0x0980462C , 0x00000000},
++	// Auto KVCO,  PLL is not forced to max speed during power up sequence - 
++	{0x09803230 , 0x00000000},
++	{0x09803630 , 0x00000000},
++	{0x09804230 , 0x00000000},
++	{0x09804630 , 0x00000000},
++	// Sampler OS Scale was changed from 5mV/Step to 3.3mV/Step; RX_IMP_VTHIMCAL was chnge from 3 to 0
++	{0x09803234 , 0x00004000},
++	{0x09803634 , 0x00004000},
++	{0x09804234 , 0x00004000},
++	{0x09804634 , 0x00004000},
++	// Use value wiritten to register for process calibration instead of th eauto calibration; Select process from register
++	{0x0980323C , 0x00000018},
++	{0x0980363C , 0x00000018},
++	{0x0980423C , 0x00000018},
++	{0x0980463C , 0x00000018},
++	// DCC should be dissabled at baud 3.125 and below = 8060
++	{0x09803250 , 0x000080C0},
++	{0x09803650 , 0x000080C0},
++	{0x09804250 , 0x000080C0},
++	{0x09804650 , 0x000080C0},
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// DCC should be dissabled at baud 3.125 and below = 8060
++	{0x09803250 , 0x00008060},
++	{0x09803650 , 0x00008060},
++	{0x09804250 , 0x00008060},
++	{0x09804650 , 0x00008060},
++	// PE Setting
++	{0x09803254 , 0x0000770A},
++	{0x09803654 , 0x0000770A},
++	{0x09804254 , 0x0000770A},
++	{0x09804654 , 0x0000770A},
++	// PE Type
++	{0x09803258 , 0x00000000},
++	{0x09803658 , 0x00000000},
++	{0x09804258 , 0x00000000},
++	{0x09804658 , 0x00000000},
++	// selmupi/mupf - low value for lower baud
++	{0x0980327C , 0x0000905A},
++	{0x0980367C , 0x0000905A},
++	{0x0980427C , 0x0000905A},
++	{0x0980467C , 0x0000905A},
++	// DTL_FLOOP_EN = Dis
++	{0x09803280 , 0x00000800},
++	{0x09803680 , 0x00000800},
++	{0x09804280 , 0x00000800},
++	{0x09804680 , 0x00000800},
++	// FFE Setting
++	{0x0980328C , 0x00000266},
++	{0x0980368C , 0x00000266},
++	{0x0980428C , 0x00000266},
++	{0x0980468C , 0x00000266},
++	// Slicer Enable; Tx  Imp was changed from 50ohm to 43ohm
++	{0x0980335C , 0x0000423F},
++	{0x0980375C , 0x0000423F},
++	{0x0980435C , 0x0000423F},
++	{0x0980475C , 0x0000423F},
++	// Not need to be configure - Same as default 
++	{0x09803364 , 0x00005555},
++	{0x09803764 , 0x00005555},
++	{0x09804364 , 0x00005555},
++	{0x09804764 , 0x00005555},
++	// Disable ana_clk_det
++	{0x0980336C , 0x00000000},
++	{0x0980376C , 0x00000000},
++	{0x0980436C , 0x00000000},
++	{0x0980476C , 0x00000000},
++	// Configure rx_imp_vthimpcal to 0x0 (default value = 0x3); Configure Sampler_os_scale to 3.3mV/step (default value = 5mV/step)
++	{0x09803234 , 0x00004000},
++	{0x09803634 , 0x00004000},
++	{0x09804234 , 0x00004000},
++	{0x09804634 , 0x00004000},
++	// Configure IMP_VTHIMPCAL to 56.7ohm (default value = 53.3 ohm); Configure cal_os_ph_rd to 0x60 (default value = 0x0); Configure Cal_rxclkalign90_ext to use an external ovride value
++	{0x09803228 , 0x0000DAC0},
++	{0x09803628 , 0x0000DAC0},
++	{0x09804228 , 0x0000DAC0},
++	{0x09804628 , 0x0000DAC0},
++	// Reset dtl_rx ; Enable ana_clk_det
++	{0x0980336C , 0x00008040},
++	{0x0980376C , 0x00008040},
++	{0x0980436C , 0x00008040},
++	{0x0980476C , 0x00008040},
++	// Un reset dtl_rx
++	{0x0980336C , 0x00008000},
++	{0x0980376C , 0x00008000},
++	{0x0980436C , 0x00008000},
++	{0x0980476C , 0x00008000},
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// ?
++	{0x09803224 , 0x00000000},
++	{0x09803624 , 0x00000000},
++	{0x09804224 , 0x00000000},
++	{0x09804624 , 0x00000000},
++	// CAL Start
++	{0x09803224 , 0x00008000},
++	{0x09803624 , 0x00008000},
++	{0x09804224 , 0x00008000},
++	{0x09804624 , 0x00008000},
++	{0x09803224 , 0x00000000},
++	{0x09803624 , 0x00000000},
++	{0x09804224 , 0x00000000},
++	{0x09804624 , 0x00000000},
++	// Wait for RxClk_x2
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// Set RxInit to 0x1 (remember that bit 3 is already set to 0x1)
++	{0x09803004 , 0x00000018},
++	{0x09803404 , 0x00000018},
++	{0x09804004 , 0x00000018},
++	{0x09804404 , 0x00000018},
++	// Wait for p_clk = 1 and p_clk = 0
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// Set RxInit to 0x0
++	{0x09803004 , 0x00000008},
++	{0x09803404 , 0x00000008},
++	{0x09804004 , 0x00000008},
++	{0x09804404 , 0x00000008},
++	// Wait for ALL PHY_RDY = 1 (0x09800008 bit 0)
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// ?
++	{0x09803004 , 0x00000028},
++	{0x09803404 , 0x00000028},
++	{0x09804004 , 0x00000028},
++	{0x09804404 , 0x00000028},
++	// Wait 10mSec
++	{0x000000F0 , 0x00000000},
++	{0x000000F0 , 0x00000001},
++	// End SGMII Initial
++	// port 24~27 SGMII force mode config
++	{0x0a806000 , 0x0000c801},
++	{0x0a806400 , 0x0000c801},
++	{0x0a806800 , 0x0000c801},
++	{0x0a806C00 , 0x0000c801},
++	// ?
++	{0x0a806008 , 0x0000C009},
++	{0x0a806408 , 0x0000C009},
++	{0x0a806808 , 0x0000C009},
++	{0x0a806C08 , 0x0000C009},
++	//  force FC enable
++	{0x0a80600C , 0x00009042},
++	{0x0a80640C , 0x00009042},
++	{0x0a80680C , 0x00009042},
++	{0x0a806C0C , 0x00009042},
++	//==============88E1680 init Start===================
++	// SMI_0 ========================
++	// -88E1680 PHY init settings for A2
++	//----- SMI0, PhyAddr=0x0~0xF
++	//QSGMII power up
++	{0x04004054 , 0x02C0C004},
++	{0x04004054 , 0x02C4C004},
++	{0x04004054 , 0x02C8C004},
++	{0x04004054 , 0x02CCC004},
++	{0x04004054 , 0x03488000},
++	// Global write
++	// 0x0~0xF
++	{0x04004054 , 0x02C0C000},
++	{0x04004054 , 0x02C1C000},
++	{0x04004054 , 0x02C2C000},
++	{0x04004054 , 0x02C3C000},
++	{0x04004054 , 0x02C4C000},
++	{0x04004054 , 0x02C5C000},
++	{0x04004054 , 0x02C6C000},
++	{0x04004054 , 0x02C7C000},
++	{0x04004054 , 0x02C8C000},
++	{0x04004054 , 0x02C9C000},
++	{0x04004054 , 0x02CAC000},
++	{0x04004054 , 0x02CBC000},
++	{0x04004054 , 0x02CCC000},
++	{0x04004054 , 0x02CDC000},
++	{0x04004054 , 0x02CEC000},
++	{0x04004054 , 0x02CFC000},
++	// Matrix LED fix
++	{0x04004054 , 0x02C0C004},
++	{0x04004054 , 0x03603FA0},
++	// Set Page FD
++	// Reg8=0b53 for QSGMII
++	{0x04004054 , 0x02C0C0FD},
++	{0x04004054 , 0x01000B53},
++	//Reg7=200d
++	{0x04004054 , 0x00E0200D},
++	// ?
++	{0x04004054 , 0x02C0C0FF},
++	{0x04004054 , 0x0220B030},
++	{0x04004054 , 0x0200215C},
++	{0x04004054 , 0x02C0C0FC},
++	{0x04004054 , 0x0300888C},
++	{0x04004054 , 0x0320888C},
++	//-Advertise EEE ability
++	{0x04004054 , 0x02C0C000},
++	{0x04004054 , 0x01A00007},
++	{0x04004054 , 0x01C0003C},
++	{0x04004054 , 0x01A04007},
++	{0x04004054 , 0x01C00006},
++	{0x04004054 , 0x00009140},
++	//Config Copper control register
++	{0x04004054 , 0x02C0c000},
++	//Enable Pause(FC) advertisment.
++	{0x04004054 , 0x00800de1},
++	{0x04004054 , 0x00009140},
++	//PHY LED
++	// LED_0 = LINK/ACT
++	// LED_[0:1] = Active high.(Reg_17(0x11)_[3:0]= 2'b0101)
++	{0x04004054 , 0x02c0c003},
++	{0x04004054 , 0x02001130},
++	// offset 0x04004054 0x02208800 ???
++	// PHY Soft Reset and power up PHY
++	{0x04004054 , 0x02c0c000},
++	{0x04004054 , 0x02003360},
++	{0x04004054 , 0x00009140},
++	{0x04004054 , 0x02C00000},
++	// SMI_0 ========================
++	// SMI_1 ========================
++	// -88E1680 PHY init settings for A2
++	//----- SMI0, PhyAddr=0x10~17
++	//QSGMII power up
++	{0x05004054 , 0x02D0C004},
++	{0x05004054 , 0x02D4C004},
++	{0x05004054 , 0x03508000},
++	// Global write
++	// 0x10~0x17
++	{0x05004054 , 0x02D0C000},
++	{0x05004054 , 0x02D1C000},
++	{0x05004054 , 0x02D2C000},
++	{0x05004054 , 0x02D3C000},
++	{0x05004054 , 0x02D4C000},
++	{0x05004054 , 0x02D5C000},
++	{0x05004054 , 0x02D6C000},
++	{0x05004054 , 0x02D7C000},
++	// Matrix LED fix
++	{0x05004054 , 0x02C0C004},
++	{0x05004054 , 0x03603FA0},
++	// Set Page FD
++	// Reg8=0b53 for QSGMII
++	{0x05004054 , 0x02D0C0FD},
++	{0x05004054 , 0x01100B53},
++	//Reg7=200d
++	{0x05004054 , 0x00F0200D},
++	// ?
++	{0x05004054 , 0x02D0C0FF},
++	{0x05004054 , 0x0230B030},
++	{0x05004054 , 0x0210215C},
++	{0x05004054 , 0x02D0C0FC},
++	{0x05004054 , 0x0310888C},
++	{0x05004054 , 0x0330888C},
++	//-Advertise EEE ability
++	{0x05004054 , 0x02D0C000},
++	{0x05004054 , 0x01B00007},
++	{0x05004054 , 0x01D0003C},
++	{0x05004054 , 0x01B04007},
++	{0x05004054 , 0x01D00006},
++	{0x05004054 , 0x00109140},
++	//Config Copper control register
++	{0x05004054 , 0x02D0c000},
++	//Enable Pause(FC) advertisment.
++	{0x05004054 , 0x00900de1},
++	{0x05004054 , 0x00109140},
++	//PHY LED
++	// LED_0 = LINK/ACT
++	// LED_[0:1] = Active high.(Reg_17(0x11)_[3:0]= 2'b0101)
++	{0x05004054 , 0x02D0c003},
++	{0x05004054 , 0x02101130},
++	// offset 0x05004054 0x02308800 ???
++	// PHY Soft Reset and power up PHY
++	{0x05004054 , 0x02D0c000},
++	{0x05004054 , 0x02103360},
++	{0x05004054 , 0x00109140},
++	{0x05004054 , 0x02D00000},
++	// SMI_1 ========================
++	//  VLAN MRU profile 0 and 1 = 9216
++	{0x02000300 , 0x24002400},
++	{0x00000058 , 0x04104003},
++	// 98DX3035 Initialized
++	{0x000000F0 , 0x12345678}
++};
++
++s32 e1000_read_98DX3035_reg_mdic(struct e1000_hw *hw, u32 offset, u32 *data)  // TTPan - MVL98DX3035_DEBUG Read
++{
++	u32 i, mdic = 0;
++
++	DEBUGFUNC("e1000_read_98DX3035_reg_mdic");
++
++	// 1. Write SMI Read Address - Hi-Word (Phy Offset 0x04)
++	mdic = (((u32) ((offset & 0xFFFF0000) >> 16)) |
++		(0x04 << E1000_MDIC_REG_SHIFT) |
++		(0x00 << E1000_MDIC_PHY_SHIFT) |
++		(E1000_MDIC_OP_WRITE));
++	E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++	for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++		usec_delay_irq(50);
++		mdic = E1000_READ_REG(hw, E1000_MDIC);
++		if (mdic & E1000_MDIC_READY)
++			break;
++	}
++	if (!(mdic & E1000_MDIC_READY)) {
++		DEBUGOUT("MDI Write did not complete\n");
++		printk("R4: MDI Write did not complete\n");
++		return -E1000_ERR_PHY;
++	}
++	if (mdic & E1000_MDIC_ERROR) {
++		DEBUGOUT("MDI Error\n");
++		printk("R4: MDI Error\n");
++		return -E1000_ERR_PHY;
++	}
++	if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x04) {
++		DEBUGOUT2("MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		printk("R4: MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		return -E1000_ERR_PHY;
++	}
++
++	// 2. Write SMI Read Address - Low-Word (Phy Offset 0x05)
++	mdic = (((u32) (offset & 0x0000FFFF)) |
++		(0x05 << E1000_MDIC_REG_SHIFT) |
++		(0x00 << E1000_MDIC_PHY_SHIFT) |
++		(E1000_MDIC_OP_WRITE));
++	E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++	for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++		usec_delay_irq(50);
++		mdic = E1000_READ_REG(hw, E1000_MDIC);
++		if (mdic & E1000_MDIC_READY)
++			break;
++	}
++	if (!(mdic & E1000_MDIC_READY)) {
++		DEBUGOUT("MDI Write did not complete\n");
++		printk("R5: MDI Write did not complete\n");
++		return -E1000_ERR_PHY;
++	}
++	if (mdic & E1000_MDIC_ERROR) {
++		DEBUGOUT("MDI Error\n");
++		printk("R5: MDI Error\n");
++		return -E1000_ERR_PHY;
++	}
++	if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x05) {
++		DEBUGOUT2("MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		printk("R5: MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		return -E1000_ERR_PHY;
++	}
++
++	// 3. Read SMI RW Status (Phy Offset 0x1f)
++	mdic = ((0x1F << E1000_MDIC_REG_SHIFT) |
++		(0x00 << E1000_MDIC_PHY_SHIFT) |
++		(E1000_MDIC_OP_READ));
++	E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++	for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++		usec_delay_irq(50);
++		mdic = E1000_READ_REG(hw, E1000_MDIC);
++		if (mdic & E1000_MDIC_READY)
++			break;
++	}
++	if (!(mdic & E1000_MDIC_READY)) {
++		DEBUGOUT("MDI Read did not complete\n");
++		printk("R1F: MDI Read did not complete\n");
++		return -E1000_ERR_PHY;
++	}
++	if (mdic & E1000_MDIC_ERROR) {
++		DEBUGOUT("MDI Error\n");
++		printk("R1F: MDI Error\n");
++		return -E1000_ERR_PHY;
++	}
++	if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x1F) {
++		DEBUGOUT2("MDI Read offset error - requested %d, returned %d\n",
++			offset,
++			(mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		printk("R1F: MDI Read offset error - requested %d, returned %d\n",
++			offset,
++			(mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		return -E1000_ERR_PHY;
++	}
++	if(mdic & 0x0001) { // SMI RW Status Register Read-Redy = 1
++		// 4. Read SMI Read Data - Hi-Word (Phy Offset 0x06)
++		mdic = ((0x06 << E1000_MDIC_REG_SHIFT) |
++			(0x00 << E1000_MDIC_PHY_SHIFT) |
++			(E1000_MDIC_OP_READ));
++		E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++		for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++			usec_delay_irq(50);
++			mdic = E1000_READ_REG(hw, E1000_MDIC);
++			if (mdic & E1000_MDIC_READY)
++				break;
++		}
++		if (!(mdic & E1000_MDIC_READY)) {
++			DEBUGOUT("MDI Read did not complete\n");
++			printk("R6: MDI Read did not complete\n");
++			return -E1000_ERR_PHY;
++		}
++		if (mdic & E1000_MDIC_ERROR) {
++			DEBUGOUT("MDI Error\n");
++			printk("R6: MDI Error\n");
++			return -E1000_ERR_PHY;
++		}
++		if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x06) {
++			DEBUGOUT2("MDI Read offset error - requested %d, returned %d\n",
++				offset,
++				(mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++			printk("R6: MDI Read offset error - requested %d, returned %d\n",
++				offset,
++				(mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++			return -E1000_ERR_PHY;
++		}
++		*data = mdic << 16;
++
++		// 5. Read SMI Read Data - Low-Word (Phy Offset 0x07)
++		mdic = ((0x07 << E1000_MDIC_REG_SHIFT) |
++			(0x00 << E1000_MDIC_PHY_SHIFT) |
++			(E1000_MDIC_OP_READ));
++		E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++		for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++			usec_delay_irq(50);
++			mdic = E1000_READ_REG(hw, E1000_MDIC);
++			if (mdic & E1000_MDIC_READY)
++				break;
++		}
++		if (!(mdic & E1000_MDIC_READY)) {
++			DEBUGOUT("MDI Read did not complete\n");
++			printk("R7 MDI Read did not complete\n");
++			return -E1000_ERR_PHY;
++		}
++		if (mdic & E1000_MDIC_ERROR) {
++			DEBUGOUT("MDI Error\n");
++			printk("R7: MDI Error\n");
++			return -E1000_ERR_PHY;
++		}
++		if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x07) {
++			DEBUGOUT2("MDI Read offset error - requested %d, returned %d\n",
++				offset,
++				(mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++			printk("R7: MDI Read offset error - requested %d, returned %d\n",
++				offset,
++				(mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++			return -E1000_ERR_PHY;
++		}
++		*data |= (mdic & 0x0000FFFF);
++	}
++
++	return E1000_SUCCESS;
++}
++EXPORT_SYMBOL(e1000_read_98DX3035_reg_mdic);
++
++s32 e1000_write_98DX3035_reg_mdic(struct e1000_hw *hw, u32 offset, u32 data)  // TTPan - MVL98DX3035_DEBUG Write
++{
++	u32 i, mdic = 0;
++
++	DEBUGFUNC("e1000_write_98DX3035_reg_mdic");
++
++	// 1. Write SMI Write Address - Hi-Word (Phy Offset 0x00)
++	mdic = (((u32) ((offset & 0xFFFF0000) >> 16)) |
++		(0x00 << E1000_MDIC_REG_SHIFT) |
++		(0x00 << E1000_MDIC_PHY_SHIFT) |
++		(E1000_MDIC_OP_WRITE));
++	E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++	for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++		usec_delay_irq(50);
++		mdic = E1000_READ_REG(hw, E1000_MDIC);
++		if (mdic & E1000_MDIC_READY)
++			break;
++	}
++	if (!(mdic & E1000_MDIC_READY)) {
++		DEBUGOUT("MDI Write did not complete\n");
++		printk("W0: MDI Write did not complete\n");
++		return -E1000_ERR_PHY;
++	}
++	if (mdic & E1000_MDIC_ERROR) {
++		DEBUGOUT("MDI Error\n");
++		printk("W0: MDI Error\n");
++		return -E1000_ERR_PHY;
++	}
++	if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x00) {
++		DEBUGOUT2("MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		printk("W0: MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		return -E1000_ERR_PHY;
++	}
++
++	// 2. Write SMI Write Address - Low-Word (Phy Offset 0x01)
++	mdic = (((u32) (offset & 0x0000FFFF)) |
++		(0x01 << E1000_MDIC_REG_SHIFT) |
++		(0x00 << E1000_MDIC_PHY_SHIFT) |
++		(E1000_MDIC_OP_WRITE));
++	E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++	for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++		usec_delay_irq(50);
++		mdic = E1000_READ_REG(hw, E1000_MDIC);
++		if (mdic & E1000_MDIC_READY)
++			break;
++	}
++	if (!(mdic & E1000_MDIC_READY)) {
++		DEBUGOUT("MDI Write did not complete\n");
++		printk("W1: MDI Write did not complete\n");
++		return -E1000_ERR_PHY;
++	}
++	if (mdic & E1000_MDIC_ERROR) {
++		DEBUGOUT("MDI Error\n");
++		printk("W1: MDI Error\n");
++		return -E1000_ERR_PHY;
++	}
++	if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x01) {
++		DEBUGOUT2("MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		printk("W1: MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		return -E1000_ERR_PHY;
++	}
++
++	// 3. Write SMI Write Data - Hi-Word (Phy Offset 0x02)
++	mdic = (((u32) ((data & 0xFFFF0000) >> 16)) |
++		(0x02 << E1000_MDIC_REG_SHIFT) |
++		(0x00 << E1000_MDIC_PHY_SHIFT) |
++		(E1000_MDIC_OP_WRITE));
++	E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++	for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++		usec_delay_irq(50);
++		mdic = E1000_READ_REG(hw, E1000_MDIC);
++		if (mdic & E1000_MDIC_READY)
++			break;
++	}
++	if (!(mdic & E1000_MDIC_READY)) {
++		DEBUGOUT("MDI Write did not complete\n");
++		printk("W2: MDI Write did not complete\n");
++		return -E1000_ERR_PHY;
++	}
++	if (mdic & E1000_MDIC_ERROR) {
++		DEBUGOUT("MDI Error\n");
++		printk("W2: MDI Error\n");
++		return -E1000_ERR_PHY;
++	}
++	if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x02) {
++		DEBUGOUT2("MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		printk("W2: MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		return -E1000_ERR_PHY;
++	}
++
++	// 4. Write SMI Write data - Low-Word (Phy Offset 0x3)
++	mdic = (((u32) (data & 0x0000FFFF)) |
++		(0x03 << E1000_MDIC_REG_SHIFT) |
++		(0x00 << E1000_MDIC_PHY_SHIFT) |
++		(E1000_MDIC_OP_WRITE));
++	E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++	for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 3); i++) {
++		usec_delay_irq(50);
++		mdic = E1000_READ_REG(hw, E1000_MDIC);
++		if (mdic & E1000_MDIC_READY)
++			break;
++	}
++	if (!(mdic & E1000_MDIC_READY)) {
++		DEBUGOUT("MDI Write did not complete\n");
++		printk("W3: MDI Write did not complete\n");
++		return -E1000_ERR_PHY;
++	}
++	if (mdic & E1000_MDIC_ERROR) {
++		DEBUGOUT("MDI Error\n");
++		printk("W3: MDI Error\n");
++		return -E1000_ERR_PHY;
++	}
++	if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x03) {
++		DEBUGOUT2("MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		printk("W3: MDI Write offset error - requested %d, returned %d\n",
++			  offset,
++			  (mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		return -E1000_ERR_PHY;
++	}
++
++	// 5. Read SMI RW Status (Phy Offset 0x1f)
++	mdic = ((0x1F << E1000_MDIC_REG_SHIFT) |
++		(0x00 << E1000_MDIC_PHY_SHIFT) |
++		(E1000_MDIC_OP_READ));
++	E1000_WRITE_REG(hw, E1000_MDIC, mdic);
++	for (i = 0; i < (E1000_GEN_POLL_TIMEOUT * 300); i++) {
++		usec_delay_irq(50);
++		mdic = E1000_READ_REG(hw, E1000_MDIC);
++		if (mdic & E1000_MDIC_READY)
++			break;
++	}
++	if (!(mdic & E1000_MDIC_READY)) {
++		DEBUGOUT("MDI Read did not complete\n");
++		printk("W1F: MDI Read did not complete\n");
++		return -E1000_ERR_PHY;
++	}
++	if (mdic & E1000_MDIC_ERROR) {
++		DEBUGOUT("MDI Error\n");
++		printk("W1F: MDI Error\n");
++		return -E1000_ERR_PHY;
++	}
++	if (((mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT) != 0x1F) {
++		DEBUGOUT2("MDI Read offset error - requested %d, returned %d\n",
++			offset,
++			(mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		printk("W1F: MDI Read offset error - requested %d, returned %d\n",
++			offset,
++			(mdic & E1000_MDIC_REG_MASK) >> E1000_MDIC_REG_SHIFT);
++		return -E1000_ERR_PHY;
++	}
++
++	if(mdic & 0x0002) return E1000_SUCCESS;
++	else return -E1000_ERR_PHY;
++}
++EXPORT_SYMBOL(e1000_write_98DX3035_reg_mdic);
++
++#include <linux/phy.h>
++
++extern	struct mii_bus* wg_pss_bus;
++
++int e1000_init_98DX3035(struct e1000_hw *hw)
++{
++	if ((wg_pss_bus != NULL)) return E1000_SUCCESS;
++
++	if ((wg_pss_bus = mdiobus_alloc())) {
++		wg_pss_bus->name   = "Marvell 98DX3035";
++		wg_pss_bus->priv   = hw;
++		wg_pss_bus->parent = NULL;
++
++		strncpy(wg_pss_bus->id, "98DX3035", MII_BUS_ID_SIZE);
++	} else {
++		printk(KERN_EMERG "%s: mii bus alloc failed\n", __FUNCTION__);
++		return -ENOMEM;
++	}
++
++	return E1000_SUCCESS;
++}
++
++int e1000_reset_98DX3035(struct e1000_hw *hw)
++{
++	static int ix = 0;
++
++	if (ix) return 0;
++
++	for (; ix < (sizeof(dx3035) / sizeof(dx3035[0])); ix++)
++		e1000_write_98DX3035_reg_mdic(hw, dx3035[ix].offset, dx3035[ix].val);
++
++	printk(KERN_INFO "%s: %d registers set\n", __FUNCTION__, ix);
++
++	return ix;
++}
++EXPORT_SYMBOL(e1000_reset_98DX3035);
++
++#endif	// CONFIG_WG_ARCH_X86
++
++#ifdef	CONFIG_WG_PLATFORM_DSA_MODULE
++
++#include <linux/phy.h>
++
++extern	struct mii_bus*  wg_dsa_bus;
++static	struct e1000_hw* wg_dsa_hw;
++
++static void set_phy(int phy)
++{
++	u32 mdicnfg;
++
++	mdicnfg  =  E1000_READ_REG(wg_dsa_hw, E1000_MDICNFG);
++	mdicnfg &= ~E1000_MDICNFG_PHY_MASK;
++	mdicnfg |= (phy << 21);
++	mdicnfg |=  E1000_MDICNFG_EXT_MDIO;
++	E1000_WRITE_REG(wg_dsa_hw, E1000_MDICNFG, mdicnfg);
++}
++
++int wg_igb_raw_phy_read (struct mii_bus* _bus, int phy_id, int reg_num)
++{
++	int err;
++	int phy = wg_dsa_hw->phy.addr;
++	u16 val = 0xDEAD;
++
++	wg_dsa_hw->phy.addr = 0;
++	set_phy(phy_id);
++	err = e1000_read_phy_reg_mdic(wg_dsa_hw, reg_num, &val);
++	wg_dsa_hw->phy.addr = phy;
++	if (unlikely(err || (wg_dsa_debug & 0x200)))
++	printk(KERN_EMERG "%s:  phy %2d reg %2d val %4x err %d\n",
++	       __FUNCTION__, phy_id, reg_num, val, err);
++	if (err < 0) return INT_MAX;
++	return val;
++}
++
++int wg_igb_raw_phy_write(struct mii_bus* _bus, int phy_id, int reg_num, u16 val)
++{
++	int err;
++	int phy = wg_dsa_hw->phy.addr;
++
++	wg_dsa_hw->phy.addr = 0;
++	set_phy(phy_id);
++	err = e1000_write_phy_reg_mdic(wg_dsa_hw, reg_num, val);
++	wg_dsa_hw->phy.addr = phy;
++	if (unlikely(err || (wg_dsa_debug & 0x200)))
++	printk(KERN_EMERG "%s: phy %2d reg %2d val %4x err %d\n",
++	       __FUNCTION__, phy_id, reg_num, val, err);
++	if (err < 0) return err;
++	return val;
++}
++
++static void wg_igb_wait(void)
++{
++	while (wg_igb_raw_phy_read(wg_dsa_bus, 28, 24) & 0x8000);
++}
++
++int wg_igb_phy_read (struct mii_bus* _bus, int phy, int reg)
++{
++	if (phy >= 16) return wg_igb_raw_phy_read (wg_dsa_bus, phy, reg);
++
++	wg_igb_wait();
++	wg_igb_raw_phy_write(wg_dsa_bus, 28, 24, 0x9800 | (phy << 5) | reg);
++	wg_igb_wait();
++
++	return wg_igb_raw_phy_read(wg_dsa_bus, 28, 25);
++}
++
++int wg_igb_phy_write(struct mii_bus* _bus, int phy, int reg, u16 val)
++{
++	if (phy >= 16) return wg_igb_raw_phy_write(wg_dsa_bus, phy, reg, val);
++
++	wg_igb_wait();
++	wg_igb_raw_phy_write(wg_dsa_bus, 28, 25, val);
++	wg_igb_raw_phy_write(wg_dsa_bus, 28, 24, 0x9400 | (phy << 5) | reg);
++	wg_igb_wait();
++
++	return val;
++}
++
++int wg_igb_get_phy_id(int phy)
++{
++	int id1 = wg_igb_phy_read(wg_dsa_bus, phy, 2);
++	int id2 = wg_igb_phy_read(wg_dsa_bus, phy, 3);
++
++	printk(KERN_EMERG "%s:  phy %2d id %4x %4x\n", __FUNCTION__, phy, id1, id2);
++
++	return (id1<<16) | id2;
++}
++
++void wg_igb_phy_init(void)
++{
++#if 1111|1111
++	// Set up so all ports talk only to CPU
++	wg_igb_phy_write(wg_dsa_bus, 16,  6, 0x0020);
++	wg_igb_phy_write(wg_dsa_bus, 17,  6, 0x0020);
++	wg_igb_phy_write(wg_dsa_bus, 18,  6, 0x0020);
++	wg_igb_phy_write(wg_dsa_bus, 19,  6, 0x0020);
++	wg_igb_phy_write(wg_dsa_bus, 20,  6, 0x0020);
++	wg_igb_phy_write(wg_dsa_bus, 21,  6, 0x001f);
++	wg_igb_phy_write(wg_dsa_bus, 22,  6, 0x0000);
++
++	// Needed to get enable ports
++	wg_igb_phy_write(wg_dsa_bus, 16,  4, 0x007f);
++	wg_igb_phy_write(wg_dsa_bus, 17,  4, 0x007f);
++	wg_igb_phy_write(wg_dsa_bus, 18,  4, 0x007f);
++	wg_igb_phy_write(wg_dsa_bus, 19,  4, 0x007f);
++	wg_igb_phy_write(wg_dsa_bus, 20,  4, 0x007f);
++	wg_igb_phy_write(wg_dsa_bus, 21,  4, 0x007f);
++	wg_igb_phy_write(wg_dsa_bus, 22,  4, 0x007c);
++
++#if 0	// Seano stuuf we don't need
++	wg_igb_phy_write(wg_dsa_bus, 28,  3, 0x0000);
++	wg_igb_phy_write(wg_dsa_bus, 28,  5, 0x04f7);
++	wg_igb_phy_write(wg_dsa_bus, 27, 26, 0xff5f);
++	wg_igb_phy_write(wg_dsa_bus, 28,  9, 0x9000);
++	wg_igb_phy_write(wg_dsa_bus, 28,  9, 0xcf01);
++	wg_igb_phy_write(wg_dsa_bus, 28, 10, 0x0004);
++	wg_igb_phy_write(wg_dsa_bus, 28,  9, 0xbf01);
++#endif
++
++	// Needed to get external phys to link
++	wg_igb_phy_write(wg_dsa_bus,  0,  0, 0x1140);
++	wg_igb_phy_write(wg_dsa_bus,  1,  0, 0x1140);
++	wg_igb_phy_write(wg_dsa_bus,  2,  0, 0x1140);
++	wg_igb_phy_write(wg_dsa_bus,  3,  0, 0x1140);
++	wg_igb_phy_write(wg_dsa_bus,  4,  0, 0x1140);
++
++	// Needed to get sw link up
++	wg_igb_phy_write(wg_dsa_bus, 15, 22, 0x0001);
++	wg_igb_phy_write(wg_dsa_bus, 15,  0, 0x9340);
++
++	// Display PHY Ids
++	wg_igb_get_phy_id( 0);
++	wg_igb_get_phy_id( 1);
++	wg_igb_get_phy_id( 2);
++	wg_igb_get_phy_id( 3);
++	wg_igb_get_phy_id( 4);
++	wg_igb_get_phy_id(15);
++#endif
++}
++
++int e1000_init_88E6176(struct e1000_hw *hw)
++{
++	if ((wg_dsa_bus != NULL ) ||
++	    (hw->device_id != E1000_DEV_ID_I210_SERDES))
++		return E1000_SUCCESS;
++
++	/* Turn on I2C Enabled or we cannot access mdio */
++	e1000_set_i2c_bb(wg_dsa_hw = hw);
++
++	printk(KERN_INFO "%s: Device: %x\n", __FUNCTION__, hw->device_id);
++
++	if ((wg_dsa_bus = mdiobus_alloc())) {
++
++		wg_dsa_bus->name   = "Marvell 886176";
++		wg_dsa_bus->priv   = hw;
++		wg_dsa_bus->parent = NULL;
++		wg_dsa_bus->read   = wg_igb_phy_read;
++		wg_dsa_bus->write  = wg_igb_phy_write;
++
++		strncpy(wg_dsa_bus->id, "88E6176", MII_BUS_ID_SIZE);
++	} else {
++		printk(KERN_EMERG "%s: mii bus alloc failed\n", __FUNCTION__);
++		return -ENOMEM;
++	}
++
++	wg_igb_phy_init();
++
++	return E1000_SUCCESS;
++}
++
++#endif	// CONFIG_WG_PLATFORM_DSA_MODULE
++
+ /**
+  *  e1000_read_phy_reg_mdic - Read MDI control register
+  *  @hw: pointer to the HW structure
+@@ -268,6 +1604,29 @@
+ 		return -E1000_ERR_PARAM;
+ 	}
+ 
++#ifdef	CONFIG_WG_ARCH_X86 // WG:JB Marvell 98DX3035 fake phy read
++	if (wg_seattle)
++	if (hw->device_id == E1000_DEV_ID_I354_SGMII)
++	switch(offset) {
++		default: printk(KERN_EMERG "%s: Bad offset %d\n",
++				__FUNCTION__, offset);
++			 *data = 0x0000; return E1000_SUCCESS;
++		case  0: *data = 0x0140; return E1000_SUCCESS;
++		case  1: *data = 0x796D; return E1000_SUCCESS;
++		case  2: *data = 0x0141; return E1000_SUCCESS;
++		case  3: *data = 0x0EA1; return E1000_SUCCESS;
++		case  4: *data = 0x0DE1; return E1000_SUCCESS;
++		case  5: *data = 0x0DE1; return E1000_SUCCESS;
++		case  9: *data = 0x0E00; return E1000_SUCCESS;
++		case 10: *data = 0x4800; return E1000_SUCCESS;
++		case 14: *data = 0x0006; return E1000_SUCCESS;
++		case 16: *data = 0x5860; return E1000_SUCCESS;
++		case 17: *data = 0x0000; return E1000_SUCCESS;
++		case 21: *data = 0x0000; return E1000_SUCCESS;
++		case 22: *data = 0x0000; return E1000_SUCCESS;
++	}
++#endif	// CONFIG_WG_ARCH_X86
++
+ 	/* Set up Op-code, Phy Address, and register offset in the MDI
+ 	 * Control register.  The MAC will take care of interfacing with the
+ 	 * PHY to retrieve the desired data.
+@@ -327,6 +1686,12 @@
+ 		return -E1000_ERR_PARAM;
+ 	}
+ 
++#ifdef	CONFIG_WG_ARCH_X86 // WG:JB Marvell 98DX3035 fake phy write
++	if (wg_seattle)
++	if (hw->device_id == E1000_DEV_ID_I354_SGMII)
++		return E1000_SUCCESS;
++#endif	// CONFIG_WG_ARCH_X86
++
+ 	/* Set up Op-code, Phy Address, and register offset in the MDI
+ 	 * Control register.  The MAC will take care of interfacing with the
+ 	 * PHY to retrieve the desired data.
+@@ -3226,9 +4591,19 @@
+ 	DEBUGFUNC("e1000_read_phy_reg_gs40g");
+ 
+ 	offset = offset & GS40G_OFFSET_MASK;
++#ifdef	CONFIG_WG_PLATFORM	// BUG83358 XTM440 lockup
++	local_bh_disable();
++#endif	// CONFIG_WG_PLATFORM
+ 	ret_val = hw->phy.ops.acquire(hw);
++#ifdef	CONFIG_WG_PLATFORM	//WG:XD FBX-9848
++	if (ret_val) {
++		local_bh_enable();
++		return ret_val;
++	}
++#else
+ 	if (ret_val)
+ 		return ret_val;
++#endif
+ 
+ 	ret_val = e1000_write_phy_reg_mdic(hw, GS40G_PAGE_SELECT, page);
+ 	if (ret_val)
+@@ -3237,6 +4612,9 @@
+ 
+ release:
+ 	hw->phy.ops.release(hw);
++#ifdef	CONFIG_WG_PLATFORM	// BUG83358 XTM440 lockup
++	local_bh_enable();
++#endif	// CONFIG_WG_PLATFORM
+ 	return ret_val;
+ }
+ 
+--- igb-5.3.5.3/igb.7.orig	2022-05-26 11:32:56.652105553 -0700
++++ igb-5.3.5.3/igb.7	1969-12-31 16:00:00.000000000 -0800
+@@ -1,310 +0,0 @@
+-.\" LICENSE
+-.\"
+-.\" This software program is released under the terms of a license agreement between you ('Licensee') and Intel. Do not use or load this software or any associated materials (collectively, the 'Software') until you have carefully read the full terms and conditions of the LICENSE located in this software package. By loading or using the Software, you agree to the terms of this Agreement. If you do not agree with the terms of this Agreement, do not install or use the Software.
+-.\"
+-.\" * Other names and brands may be claimed as the property of others.
+-.\"
+-.
+-.TH igb 1 "December 10, 2015"
+-.SH NAME
+-igb \-This file describes the Linux* Base Driver
+-for the Gigabit Family of Adapters.
+-.SH SYNOPSIS
+-.PD 0.4v
+-modprobe igb [<option>=<VAL1>,<VAL2>,...]
+-.PD 1v
+-.SH DESCRIPTION
+-This driver is intended for \fB2.6.30\fR and later kernels. 
+-This driver includes support for Intel(R) Itanium(R)2-based systems.
+-.LP
+-This driver is only supported as a loadable module at this time. Intel is
+-not supplying patches against the kernel source to allow for static linking of
+-the drivers.
+-
+-
+-For questions related to hardware requirements, refer to the documentation
+-supplied with your Intel adapter. All hardware requirements listed apply to
+-use with Linux.
+-
+-.LP
+-This driver supports 2.5 Gbps operating speed on 2500BASE-KX only for 
+-I354-based network connections.
+-.SH OPTIONS
+-The following optional parameters are used by entering them on the
+-command line with the modprobe command.
+-For example:
+-.IP
+-modprobe igb InterruptThrottleRate=16000,16000
+-.LP
+-.B InterruptThrottleRate
+-.IP
+-.B Valid Range:
+-0=off
+-1=dynamic
+-3=dynamic conservative
+-<min_ITR>-<max_ITR>
+-.IP
+-Interrupt Throttle Rate controls the number of interrupts each interrupt
+-vector can generate per second. Increasing ITR lowers latency at the cost of
+-increased CPU utilization, though it may help throughput in some circumstances.
+-.IP
+-0 = Setting InterruptThrottleRate to 0 turns off any interrupt moderation
+-  and may improve small packet latency. However, this is generally not
+-  suitable for bulk throughput traffic due to the increased CPU utilization
+-  of the higher interrupt rate.
+-  NOTES:
+-  - On 82599, and X540, and X550-based adapters, disabling InterruptThrottleRate
+-    will also result in the driver disabling HW RSC.
+-  - On 82598-based adapters, disabling InterruptThrottleRate will also
+-    result in disabling LRO (Large Receive Offloads).
+-.IP
+-1 = Setting InterruptThrottleRate to Dynamic mode attempts to moderate
+-  interrupts per vector while maintaining very low latency. This can
+-  sometimes cause extra CPU utilization. If planning on deploying igb
+-  in a latency sensitive environment, this parameter should be considered.
+-.IP
+-<min_ITR>-<max_ITR> = 100-100000
+-  Setting InterruptThrottleRate to a value greater or equal to <min_ITR>
+-  will program the adapter to send at most that many interrupts
+-  per second, even if more packets have come in. This reduces interrupt load
+-  on the system and can lower CPU utilization under heavy load, but will
+-  increase latency as packets are not processed as quickly.
+-
+- .IP
+-NOTE:
+-- Un-supported Adapters: InterruptThrottleRate is NOT supported by
+-  82542, 82543, or 82544-based adapters.
+-.LP
+-.B LLIPort
+-.IP
+-.B Valid Range: 0-65535
+-.IP
+-LLI is configured with the LLIPort command-line parameter, which specifies
+-which TCP port should generate Low Latency Interrupts.
+-.IP
+-For example, using LLIPort=80 would cause the board to generate an immediate
+-interrupt upon receipt of any packet sent to TCP port 80 on the local machine.
+-.IP
+-WARNING: Enabling LLI can result in an excessive number of interrupts/second
+-that may cause problems with the system and in some cases may cause a kernel
+-panic.
+-.LP
+-.B LLIPush
+-.IP
+-.B Valid Range: 0-1
+-.IP
+-LLIPush can be set to be enabled or disabled (default). It is most effective
+-in an environment with many small transactions.
+-.IP
+-NOTE: Enabling LLIPush may allow a denial of service attack.
+-.LP
+-.B LLISize
+-.IP
+-.B Valid Range: 0-1500
+-.IP
+-LLISize causes an immediate interrupt if the board receives a packet smaller
+-than the specified size.
+-.LP
+-.B IntMode
+-.IP
+-.B Valid Range: 0-2 (0 = Legacy Int, 1 = MSI and 2 = MSI-X)
+-.IP
+-IntMode controls allow load time control over the type of interrupt
+-registered for by the driver. MSI-X is required for multiple queue
+-support, and some kernels and combinations of kernel .config options
+-will force a lower level of interrupt support.
+-'cat /proc/interrupts' will show different values for each type of interrupt.
+-.LP
+-.B RSS
+-.IP
+-.B Valid Range: 0-8
+-.IP
+-0 = Assign up to the lesser value of the number of CPUs or the number of queues
+-.IP
+-X = Assign X queues, where X is less than or equal to the maximum number of
+-queues (8 queues). 
+-The driver allows maximum supported queue value. For example,
+-I350-based adapters allow RSS=8, where 8 queues is the maximum allowable
+-queues.
+-.IP
+-NOTE: For 82575-based adapters, the maximum number of queues is 4; for
+-82576-based and newer adapters it is 8; for I210-based adapters it is 4
+-queues; and for I211-based adapters it is 2 queues.
+-.IP
+-This parameter is also affected by the VMDq parameter in that it will limit
+-the queues more.
+-.IP
+-	VMDQ
+-Model 0 1 2 3+
+-82575 4 4 3 1
+-82576 8 2 2 2
+-82580 8 1 1 1
+-.LP
+-.B VMDQ
+-.IP
+-.B Valid Range: 0-4 on 82575-based adapters; 0-8 for 82576/82580-based adapters
+-.IP
+-Supports enabling VMDq pools as this is needed to support SR-IOV.
+-.IP
+-0 = Disabled
+-.IP
+-1 = Sets the netdev as pool 0
+-.IP
+-2+ = Add additional queues but they currently are not used
+-.IP
+-This parameter is forced to 1 or more if the max_vfs module parameter is used.
+-In addition, the number of queues available for RSS is limited if this is set
+-to 1 or greater.
+-.LP
+-.B max_vfs
+-This parameter adds support for SR-IOV. It causes the driver to spawn up to
+-max_vfs worth of virtual functions.
+-.IP
+-.B Valid Range: 0-7
+-.IP
+-If the value is greater than 0 it will also force the VMDq parameter to be 1
+-or more.
+-.IP
+-.IP
+-.LP
+-.B QueuePairs
+-.IP
+-.B Valid Range: 0-1
+-.IP
+-If set to 0, when MSI-X is enabled, the Tx and Rx will attempt to occupy
+-separate vectors.
+-.IP
+-This option can be overridden to 1 if there are not sufficient interrupts
+-available. This can occur if any combination of RSS, VMDQ, and max_vfs results
+-in more than 4 queues being used.
+-.LP
+-.B Node
+-.IP
+-.B Valid Range: 0-n
+-.IP
+-0 - n: where n is the number of the NUMA node that should be used to allocate
+-memory for this adapter port.
+-.IP
+--1: uses the driver default of allocating memory on whichever processor is
+-running modprobe.
+-.IP
+-The Node parameter allows you to choose which NUMA node you want to have the
+-adapter allocate memory from. All driver structures, in-memory queues, and
+-receive buffers will be allocated on the node specified. This parameter is
+-only useful when interrupt affinity is specified; otherwise, part of the
+-interrupt time could run on a different core than where the memory is
+-allocated causing slower memory access and impacting throughput, CPU, or both.
+-.LP
+-.B EEE
+-.IP
+-.B Valid Range: 0-1
+-.IP
+-0 = Disables EEE
+-.IP
+-1 = Enables EEE
+-.IP
+-A link between two EEE-compliant devices will result in periodic bursts of
+-data followed by periods where the link is in an idle state. This Low Power
+-Idle (LPI) state is supported in both 1 Gbps and 100 Mbps link speeds.
+-
+-NOTE: EEE support requires auto-negotiation.
+-.LP
+-.B DMAC
+-.IP
+-.B Valid Range: 0, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
+-9000, 10000
+-.IP
+-This parameter enables or disables DMA Coalescing feature. Values are in
+-microseconds and set the internal DMA Coalescing internal timer.
+-.IP
+-DMA (Direct Memory Access) allows the network device to move packet data
+-directly to the system's memory, reducing CPU utilization. However, the
+-frequency and random intervals at which packets arrive do not allow the
+-system to enter a lower power state. DMA Coalescing allows the adapter
+-to collect packets before it initiates a DMA event. This may increase
+-network latency but also increases the chances that the system will enter
+-a lower power state.
+-.IP
+-Turning on DMA Coalescing may save energy with kernel 2.6.32 and newer.
+-DMA Coalescing must be enabled across all active ports in order to save
+-platform power.
+-.LP
+-.B MDD (Malicious Driver Detection)
+-.IP
+-.B Valid Range: 0-1
+-.IP
+-0 = Disabled
+-.IP>
+-1 = Enabled
+-.IP
+-This parameter is only relevant for I350 devices operating in SR-IOV mode.
+-When this parameter is set, the driver detects malicious VF driver and
+-disables its Tx/Rx queues until a VF driver reset occurs.
+-.SH Jumbo Frames
+-.LP
+-Jumbo Frames support is enabled by changing the Maximum Transmission Unit
+-(MTU) to a value larger than the default value of 1500.
+-
+-Use the ifconfig command to increase the MTU size. For example, enter the
+-following where <x> is the interface number:
+-
+-   ifconfig eth<x> mtu 9000 up
+-
+-.LP
+-NOTES:
+-- The maximum MTU setting for Jumbo Frames is 9216. This value coincides
+-  with the maximum Jumbo Frames size of 9234 bytes.
+-- Using Jumbo frames at 10 or 100 Mbps is not supported and may result in
+-  poor performance or loss of link.
+-See the section "Jumbo Frames" in the Readme.
+-.SH ethtool
+-.LP
+-The driver utilizes the ethtool interface for driver configuration and
+-diagnostics, as well as displaying statistical information. The latest
+-ethtool version is required for this functionality. Download it at
+-http://ftp.kernel.org/pub/software/network/ethtool/
+-
+-
+-.LP
+-.B LRO
+-.IP
+-.B Valid Range: 0(off), 1(on)
+-Large Receive Offload (LRO) is a technique for increasing inbound throughput
+-of high-bandwidth network connections by reducing CPU overhead. It works by
+-aggregating multiple incoming packets from a single stream into a larger
+-buffer before they are passed higher up the networking stack, thus reducing
+-the number of packets that have to be processed. LRO combines multiple
+-Ethernet frames into a single receive in the stack, thereby potentially
+-decreasing CPU utilization for receives.
+-.IP
+-NOTE: LRO requires 2.4.22 or later kernel version.
+-.IP
+-IGB_LRO is a compile time flag. The user can enable it at compile time to add
+-support for LRO from the driver. The flag is used by adding
+-CFLAGS_EXTRA="-DIGB_LRO" to the make file when it's being compiled.
+-# make CFLAGS_EXTRA="-DIGB_LRO" install
+-.IP
+-You can verify that the driver is using LRO by looking at these counters in
+-ethtool:
+-.LP
+-- lro_aggregated - counts total packets that were combined
+-.LP
+-- lro_flushed - counts the number of packets flushed out of LRO
+-.LP
+-- lro_recycled - counts the number of buffers returned to the ring from
+-  recycling
+-.IP
+-NOTE: IPv6 and UDP are not supported by LRO.
+-.SH SUPPORT
+-.LP
+-For additional information regarding building and installation,
+-see the
+-README
+-included with the driver.
+-For general information, go to the Intel support website at:
+-.B www.intel.com/support/
+-.LP
+-If an issue is identified with the released source code on a supported
+-kernel with a supported adapter, email the specific information related to the
+-issue to e1000-devel@lists.sf.net.
+-.LP
+--- igb-5.3.5.3/pci.updates.orig	2022-05-26 11:32:56.656105389 -0700
++++ igb-5.3.5.3/pci.updates	1969-12-31 16:00:00.000000000 -0800
+@@ -1,100 +0,0 @@
+-# updates for the system pci.ids file
+-#
+-# IMPORTANT!  Entries in this list must be sorted as they
+-#             would appear in the system pci.ids file.  Entries
+-#             are sorted by ven, dev, subven, subdev
+-#             (numerical order).
+-#
+-8086  Intel Corporation
+-	0438  DH8900CC Series Gigabit Network Connection
+-	043a  DH8900CC Series Gigabit Fiber Network Connection
+-	043c  DH8900CC Series Gigabit Backplane Network Connection
+-	0440  DH8900CC Series Gigabit SFP Network Connection
+-	10a7  82575EB Gigabit Network Connection
+-		8086 10a8  82575EB Gigabit Riser Card
+-	10a9  82575EB Gigabit Backplane Connection
+-	10c9  82576 Gigabit Network Connection
+-		8086 a01c  Gigabit ET Dual Port Server Adapter
+-		8086 a03c  Gigabit ET Dual Port Server Adapter
+-	10d6  82575GB Gigabit Network Connection
+-		8086 10d6  Gigabit VT Quad Port Server Adapter
+-		8086 145a  Gigabit VT Quad Port Server Adapter
+-		8086 147a  Gigabit VT Quad Port Server Adapter
+-	10e6  82576 Gigabit Network Connection
+-		8086 a01f  Gigabit EF Dual Port Server Adapter
+-		8086 a02f  Gigabit EF Dual Port Server Adapter
+-	10e7  82576 Gigabit Network Connection
+-	10e8  82576 Gigabit Network Connection
+-		8086 a02b  Gigabit ET Quad Port Server Adapter
+-		8086 a02c  Gigabit ET Quad Port Server Adapter
+-	150a  82576NS Gigabit Network Connection
+-	150d  82576 Gigabit Backplane Connection
+-		8086 a10c  Gigabit ET Quad Port Mezzanine Card
+-	150e  82580 Gigabit Network Connection
+-		8086 12a1  Ethernet Server Adapter I340-T4
+-		8086 12a2  Ethernet Server Adapter I340-T4
+-	150f  82580 Gigabit Fiber Network Connection
+-	1510  82580 Gigabit Backplane Connection
+-	1511  82580 Gigabit SFP Connection
+-	1516  82580 Gigabit Network Connection
+-		8086 12b1  Ethernet Server Adapter I340-T2
+-		8086 12b2  Ethernet Server Adapter I340-T2
+-	1518  82576NS SerDes Gigabit Network Connection
+-	1521  I350 Gigabit Network Connection
+-		1028 04cf  Gigabit 2P I350-t LOM
+-		1028 0602  Gigabit 2P I350-t LOM
+-		1028 1f60  Gigabit 4P I350-t rNDC
+-		1028 1f62  Gigabit 4P X540/I350 rNDC
+-		1028 1f73  Gigabit 4P X520/I350 rNDC
+-		1028 1f9a  Gigabit 4P X710/I350 rNDC
+-		103c 17d1  Ethernet 1Gb 4-port 366FLR Adapter
+-		103c 337f  Ethernet 1Gb 2-port 361i Adapter
+-		103c 3380  Ethernet 1Gb 4-port 366i Adapter
+-		103c 339e  Ethernet 1Gb 2-port 361T Adapter
+-		103c 2003  Ethernet 1Gb 2-port 367i Adapter
+-		103c 2226  Ethernet 1Gb 1-port 364i Adapter
+-		103c 8157  Ethernet 1Gb 4-port 366T Adapter
+-		108e 7b16  Quad Port GbE PCIe 2.0 ExpressModule, UTP
+-		108e 7b18  Quad Port GbE PCIe 2.0 Low Profile Adapter, UTP
+-		17aa 1074  Lenovo ThinkServer I350-T4 AnyFabric
+-		8086 0001  Ethernet Server Adapter I350-T4
+-		8086 0002  Ethernet Server Adapter I350-T2
+-		8086 00a1  Ethernet Server Adapter I350-T4
+-		8086 00a2  Ethernet Server Adapter I350-T2
+-		8086 5001  Ethernet Server Adapter I350-T4
+-		8086 5002  Ethernet Server Adapter I350-T2
+-	1522  I350 Gigabit Fiber Network Connection
+-		108e 7b17  Quad Port GbE PCIe 2.0 ExpressModule, MMF
+-		108e 7b19  Dual Port GbE PCIe 2.0 Low Profile Adapter, MMF
+-		8086 0003  Ethernet Server Adapter I350-F4
+-		8086 0004  Ethernet Server Adapter I350-F2
+-		8086 0005  Ethernet Server Adapter I350-F1
+-		8086 00a3  Ethernet Server Adapter I350-F4
+-		8086 00a4  Ethernet Server Adapter I350-F2
+-	1523  I350 Gigabit Backplane Connection
+-		1028 0660  Gigabit 2P I350 LOM
+-		1028 1f9b  Gigabit 4P I350 bNDC
+-		103c 18d1  Ethernet 1Gb 2-port 361FLB Adapter
+-		103c 1989  Ethernet 1Gb 2-port 363i Adapter
+-		103c 339f  Ethernet 1Gb 4-port 366M Adapter
+-		8086 1f52  1GbE 4P I350 Mezz
+-	1524  I350 Gigabit Connection
+-	1526  82576 Gigabit Network Connection
+-		8086 a05c  Gigabit ET2 Quad Port Server Adapter
+-		8086 a06c  Gigabit ET2 Quad Port Server Adapter
+-	1527  82580 Gigabit Fiber Network Connection
+-		8086 0001  Ethernet Server Adapter I340-F4
+-		8086 0002  Ethernet Server Adapter I340-F4
+-	1533  I210 Gigabit Network Connection
+-		103c 0003  Ethernet I210-T1 GbE NIC
+-		8086 0001  Ethernet Server Adapter I210-T1
+-		8086 0002  Ethernet Server Adapter I210-T1
+-	1536  I210 Gigabit Fiber Network Connection
+-	1538  I210 Gigabit Network Connection
+-	157b  I210 Gigabit Network Connection
+-	157c  I210 Gigabit Backplane Connection
+-	1539  I211 Gigabit Network Connection
+-	1f40  Ethernet Connection I354 1.0 GbE Backplane
+-		1028 05f1  Ethernet Connection I354 1.0 GbE Backplane
+-	1f41  Ethernet Connection I354
+-	1f45  Ethernet Connection I354 2.5 GbE Backplane
+--- igb-5.3.5.3/README.orig	2022-05-26 11:32:56.640106044 -0700
++++ igb-5.3.5.3/README	1969-12-31 16:00:00.000000000 -0800
+@@ -1,936 +0,0 @@
+-
+-igb Linux* Base Driver for Intel(R) Ethernet Network Connection
+--------------------------------------------------------------
+-
+-================================================================================
+-
+-May 2, 2016
+-
+-================================================================================
+-
+-- Overview
+-- Identifying Your Adapter
+-- Building and Installation
+-- Command Line Parameters
+-- Additional Configurations
+-- Known Issues
+-- Support
+-- License
+-
+-
+-================================================================================
+-
+-
+-Important Notes
+----------------
+-
+-Configuring SR-IOV for improved network security
+-------------------------------------------------
+-
+-In a virtualized environment, on Intel(R) Server Adapters that support SR-IOV,
+-the virtual function (VF) may be subject to malicious behavior. Software-
+-generated layer two frames, like IEEE 802.3x (link flow control), IEEE 802.1Qbb
+-(priority based flow-control), and others of this type, are not expected and
+-can throttle traffic between the host and the virtual switch, reducing
+-performance. To resolve this issue, configure all SR-IOV enabled ports for
+-VLAN tagging. This configuration allows unexpected, and potentially malicious,
+-frames to be dropped.
+-
+-
+-
+-Overview
+---------
+-
+-This driver supports kernel versions 2.6.30 or newer.
+-
+-It supports Itanium(R)2 based systems.
+-
+-Driver information can be obtained using ethtool, lspci, and ifconfig.
+-Instructions on updating ethtool can be found in the section Additional
+-Configurations later in this document.
+-
+-This driver is only supported as a loadable module at this time. Intel is
+-not supplying patches against the kernel source to allow for static linking of
+-the drivers.
+-
+-For questions related to hardware requirements, refer to the documentation
+-supplied with your Intel adapter. All hardware requirements listed apply to
+-use with Linux.
+-
+-The following features are now available in supported kernels:
+-- Native VLANs
+-- Channel Bonding (teaming)
+-- SNMP
+-
+-Adapter teaming is implemented using the native Linux Channel bonding
+-module. This is included in supported Linux kernels.
+-
+-Channel Bonding documentation can be found in the Linux kernel source:
+-/documentation/networking/bonding.txt
+-
+-The driver information previously displayed in the /proc file system is not
+-supported in this release.
+-
+-The igb driver supports IEEE 1588 time stamping for kernels 2.6.30 and newer.
+-
+-The igb driver supports 2.5 Gbps operating speed on 2500BASE-KX only for
+-I354-based network connections.
+-
+-
+-================================================================================
+-
+-
+-Identifying Your Adapter
+-------------------------
+-For information on how to identify your adapter, go to the Adapter &
+-Driver ID Guide at:
+-http://support.intel.com/support/go/network/adapter/proidguide.htm
+-
+-For the latest Intel network drivers, refer to the
+-following website and select your adapter.
+-http://www.intel.com/support
+-
+-
+-================================================================================
+-
+-
+-Building and Installation
+--------------------------
+-
+-To build a binary RPM* package of this driver, run 'rpmbuild -tb
+-igb-<x.x.x>.tar.gz', where <x.x.x> is the version number for the driver tar file.
+-
+-NOTES:
+-
+-- For the build to work properly, the currently running kernel MUST match
+-  the version and configuration of the installed kernel sources. If you have
+-  just recompiled the kernel reboot the system before building.
+-- RPM functionality has only been tested in Red Hat distributions.
+-
+-1. Move the base driver tar file to the directory of your choice. For
+-   example, use '/home/username/igb' or '/usr/local/src/igb'.
+-
+-2. Untar/unzip the archive, where <x.x.x> is the version number for the
+-   driver tar file:
+-   tar zxf igb-<x.x.x>.tar.gz
+-
+-3. Change to the driver src directory, where <x.x.x> is the version number
+-   for the driver tar:
+-   cd igb-<x.x.x>/src/
+-
+-4. Compile the driver module:
+-   # make install
+-   The binary will be installed as:
+-   /lib/modules/<KERNEL VERSION>/updates/drivers/net/ethernet/intel/igb/igb.ko
+-
+-   The install location listed above is the default location. This may differ
+-   for various Linux distributions.
+-
+-5. Load the module using the modprobe command:
+-   modprobe <igb> [parameter=port1_value,port2_value]
+-
+-   Make sure that any older igb drivers are removed from the kernel before
+-   loading the new module:
+-   rmmod igb; modprobe igb
+-
+-6. Assign an IP address to the interface by entering the following,
+-   where ethX is the interface name that was shown in dmesg after modprobe:
+-   
+-   ip address add <IP_address>/<netmask bits> dev ethX
+-
+-7. Verify that the interface works. Enter the following, where IP_address
+-   is the IP address for another machine on the same subnet as the interface
+-   that is being tested:
+-   ping <IP_address>
+-
+-
+-
+-To build igb driver with DCA
+-----------------------------
+-
+-If your kernel supports DCA, the driver will build by default with DCA enabled.
+-NOTE:
+-   For certain distributions like (but not limited to) RedHat Enterprise
+-   Linux 7 and Ubuntu, once the driver is installed the initrd/initramfs
+-   file may need to be updated to prevent the OS loading old versions
+-   of the igb driver. The dracut utility may be used on RedHat
+-   distributions:
+-	# dracut --force
+-   For Ubuntu:
+-	# update-initramfs -u
+-
+-
+-================================================================================
+-
+-
+-Command Line Parameters
+------------------------
+-If the driver is built as a module, the following optional parameters are used
+-by entering them on the command line with the modprobe command using this
+-syntax:
+-modprobe igb [<option>=<VAL1>,<VAL2>,...]
+-
+-There needs to be a <VAL#> for each network port in the system supported by
+-this driver. The values will be applied to each instance, in function order.
+-For example:
+-modprobe igb InterruptThrottleRate=16000,16000
+-
+-In this case, there are two network ports supported by igb in the system.
+-The default value for each parameter is generally the recommended setting,
+-unless otherwise noted.
+-
+-NOTES:
+-- For more information about the command line parameters, see the application
+-  note at: http://www.intel.com/design/network/applnots/ap450.htm.
+-- A descriptor describes a data buffer and attributes related to the data
+-  buffer. This information is accessed by the hardware.
+-
+-
+-InterruptThrottleRate
+----------------------
+-Valid Range:
+-0=off
+-1=dynamic
+-3=dynamic conservative
+-<min_ITR>-<max_ITR>
+-Interrupt Throttle Rate controls the number of interrupts each interrupt
+-vector can generate per second. Increasing ITR lowers latency at the cost of
+-increased CPU utilization, though it may help throughput in some circumstances.
+-0 = Setting InterruptThrottleRate to 0 turns off any interrupt moderation
+-  and may improve small packet latency. However, this is generally not
+-  suitable for bulk throughput traffic due to the increased CPU utilization
+-  of the higher interrupt rate.
+-  NOTES:
+-  - On 82599, and X540, and X550-based adapters, disabling InterruptThrottleRate
+-    will also result in the driver disabling HW RSC.
+-  - On 82598-based adapters, disabling InterruptThrottleRate will also
+-    result in disabling LRO (Large Receive Offloads).
+-1 = Setting InterruptThrottleRate to Dynamic mode attempts to moderate
+-  interrupts per vector while maintaining very low latency. This can
+-  sometimes cause extra CPU utilization. If planning on deploying igb
+-  in a latency sensitive environment, this parameter should be considered.
+-<min_ITR>-<max_ITR> = 100-100000
+-  Setting InterruptThrottleRate to a value greater or equal to <min_ITR>
+-  will program the adapter to send at most that many interrupts
+-  per second, even if more packets have come in. This reduces interrupt load
+-  on the system and can lower CPU utilization under heavy load, but will
+-  increase latency as packets are not processed as quickly.
+-
+- 
+-NOTE:
+-- Un-supported Adapters: InterruptThrottleRate is NOT supported by
+-  82542, 82543, or 82544-based adapters.
+-
+-
+-LLI (Low Latency Interrupts)
+-----------------------------
+-
+-LLI allows for immediate generation of an interrupt upon processing receive
+-packets that match certain criteria as set by the parameters described below.
+-LLI parameters are not enabled when Legacy interrupts are used. You must be
+-using MSI or MSI-X (see cat /proc/interrupts) to successfully use LLI.
+-
+-
+-LLIPort
+--------
+-Valid Range: 0-65535
+-LLI is configured with the LLIPort command-line parameter, which specifies
+-which TCP port should generate Low Latency Interrupts.
+-For example, using LLIPort=80 would cause the board to generate an immediate
+-interrupt upon receipt of any packet sent to TCP port 80 on the local machine.
+-WARNING: Enabling LLI can result in an excessive number of interrupts/second
+-that may cause problems with the system and in some cases may cause a kernel
+-panic.
+-
+-
+-LLIPush
+--------
+-Valid Range: 0-1
+-LLIPush can be set to be enabled or disabled (default). It is most effective
+-in an environment with many small transactions.
+-NOTE: Enabling LLIPush may allow a denial of service attack.
+-
+-
+-LLISize
+--------
+-Valid Range: 0-1500
+-LLISize causes an immediate interrupt if the board receives a packet smaller
+-than the specified size.
+-
+-
+-IntMode
+--------
+-Valid Range: 0-2 (0 = Legacy Int, 1 = MSI and 2 = MSI-X)
+-IntMode controls allow load time control over the type of interrupt
+-registered for by the driver. MSI-X is required for multiple queue
+-support, and some kernels and combinations of kernel .config options
+-will force a lower level of interrupt support.
+-'cat /proc/interrupts' will show different values for each type of interrupt.
+-
+-
+-RSS
+----
+-Valid Range: 0-8
+-0 = Assign up to the lesser value of the number of CPUs or the number of queues
+-X = Assign X queues, where X is less than or equal to the maximum number of
+-queues (8 queues). 
+-The driver allows maximum supported queue value. For example,
+-I350-based adapters allow RSS=8, where 8 queues is the maximum allowable
+-queues.
+-NOTE: For 82575-based adapters, the maximum number of queues is 4; for
+-82576-based and newer adapters it is 8; for I210-based adapters it is 4
+-queues; and for I211-based adapters it is 2 queues.
+-This parameter is also affected by the VMDq parameter in that it will limit
+-the queues more.
+-	VMDQ
+-Model 0 1 2 3+
+-82575 4 4 3 1
+-82576 8 2 2 2
+-82580 8 1 1 1
+-
+-
+-VMDQ
+-----
+-Valid Range: 0-4 on 82575-based adapters; 0-8 for 82576/82580-based adapters
+-Supports enabling VMDq pools as this is needed to support SR-IOV.
+-0 = Disabled
+-1 = Sets the netdev as pool 0
+-2+ = Add additional queues but they currently are not used
+-This parameter is forced to 1 or more if the max_vfs module parameter is used.
+-In addition, the number of queues available for RSS is limited if this is set
+-to 1 or greater.
+-
+-NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN filtering
+-and VLAN tag stripping/insertion will remain enabled.
+-
+-
+-max_vfs
+--------
+-This parameter adds support for SR-IOV. It causes the driver to spawn up to
+-max_vfs worth of virtual functions.
+-Valid Range: 0-7
+-If the value is greater than 0 it will also force the VMDq parameter to be 1
+-or more.
+-
+-The parameters for the driver are referenced by position. Thus, if you have a
+-dual port adapter, or more than one adapter in your system, and want N virtual
+-functions per port, you must specify a number for each port with each parameter
+-separated by a comma. For example:
+-
+-  modprobe igb max_vfs=4
+-
+-This will spawn 4 VFs on the first port.
+-
+-  modprobe igb max_vfs=2,4
+-
+-This will spawn 2 VFs on the first port and 4 VFs on the second port.
+-
+-NOTE: Caution must be used in loading the driver with these parameters.
+-Depending on your system configuration, number of slots, etc., it is impossible
+-to predict in all cases where the positions would be on the command line.
+-
+-NOTE: Neither the device nor the driver control how VFs are mapped into config
+-space. Bus layout will vary by operating system. On operating systems that
+-support it, you can check sysfs to find the mapping. 
+-NOTE: When either SR-IOV mode or VMDq mode is enabled, hardware VLAN
+-filtering and VLAN tag stripping/insertion will remain enabled. Please remove
+-the old VLAN filter before the new VLAN filter is added. For example,
+-ip link set eth0 vf 0 vlan 100	// set vlan 100 for VF 0
+-ip link set eth0 vf 0 vlan 0	// Delete vlan 100
+-ip link set eth0 vf 0 vlan 200	// set a new vlan 200 for VF 0
+-
+-
+-Configuring SR-IOV for improved network security
+-------------------------------------------------
+-
+-In a virtualized environment, on Intel(R) Server Adapters that support SR-IOV,
+-the virtual function (VF) may be subject to malicious behavior. Software-
+-generated layer two frames, like IEEE 802.3x (link flow control), IEEE 802.1Qbb
+-(priority based flow-control), and others of this type, are not expected and
+-can throttle traffic between the host and the virtual switch, reducing
+-performance. To resolve this issue, configure all SR-IOV enabled ports for
+-VLAN tagging. This configuration allows unexpected, and potentially malicious,
+-frames to be dropped.
+-
+-
+-Configuring VLAN tagging on SR-IOV enabled adapter ports
+---------------------------------------------------------
+-
+-To configure VLAN tagging for the ports on an SR-IOV enabled adapter,
+-use the following command. The VLAN configuration should be done 
+-before the VF driver is loaded or the VM is booted.
+-
+-$ ip link set dev <PF netdev id> vf <id> vlan <vlan id>
+-
+-For example, the following instructions will configure PF eth0 and 
+-the first VF on VLAN 10.
+-$ ip link set dev eth0 vf 0 vlan 10
+-.
+-
+-QueuePairs
+-----------
+-Valid Range: 0-1
+-If set to 0, when MSI-X is enabled, the Tx and Rx will attempt to occupy
+-separate vectors.
+-This option can be overridden to 1 if there are not sufficient interrupts
+-available. This can occur if any combination of RSS, VMDQ, and max_vfs results
+-in more than 4 queues being used.
+-
+-
+-Node
+-----
+-Valid Range: 0-n
+-0 - n: where n is the number of the NUMA node that should be used to allocate
+-memory for this adapter port.
+--1: uses the driver default of allocating memory on whichever processor is
+-running modprobe.
+-The Node parameter allows you to choose which NUMA node you want to have the
+-adapter allocate memory from. All driver structures, in-memory queues, and
+-receive buffers will be allocated on the node specified. This parameter is
+-only useful when interrupt affinity is specified; otherwise, part of the
+-interrupt time could run on a different core than where the memory is
+-allocated causing slower memory access and impacting throughput, CPU, or both.
+-
+-
+-EEE
+----
+-Valid Range: 0-1
+-0 = Disables EEE
+-1 = Enables EEE
+-A link between two EEE-compliant devices will result in periodic bursts of
+-data followed by periods where the link is in an idle state. This Low Power
+-Idle (LPI) state is supported in both 1 Gbps and 100 Mbps link speeds.
+-
+-NOTE: EEE support requires auto-negotiation.
+-
+-
+-DMAC
+-----
+-Valid Range: 0, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000,
+-9000, 10000
+-This parameter enables or disables DMA Coalescing feature. Values are in
+-microseconds and set the internal DMA Coalescing internal timer.
+-DMA (Direct Memory Access) allows the network device to move packet data
+-directly to the system's memory, reducing CPU utilization. However, the
+-frequency and random intervals at which packets arrive do not allow the
+-system to enter a lower power state. DMA Coalescing allows the adapter
+-to collect packets before it initiates a DMA event. This may increase
+-network latency but also increases the chances that the system will enter
+-a lower power state.
+-Turning on DMA Coalescing may save energy with kernel 2.6.32 and newer.
+-DMA Coalescing must be enabled across all active ports in order to save
+-platform power.
+-
+-
+-MDD (Malicious Driver Detection)
+---------------------------------
+-Valid Range: 0-1
+-0 = Disabled
+->
+-1 = Enabled
+-This parameter is only relevant for I350 devices operating in SR-IOV mode.
+-When this parameter is set, the driver detects malicious VF driver and
+-disables its Tx/Rx queues until a VF driver reset occurs.
+-
+-
+-================================================================================
+-
+-
+-Additional Features and Configurations
+--------------------------------------------
+-
+-
+-Configuring the Driver on Different Distributions
+--------------------------------------------------
+-
+-Configuring a network driver to load properly when the system is started is
+-distribution dependent. Typically, the configuration process involves adding
+-an alias line to /etc/modules.conf or /etc/modprobe.conf as well as editing
+-other system startup scripts and/or configuration files. Many popular Linux
+-distributions ship with tools to make these changes for you. To learn the
+-proper way to configure a network device for your system, refer to your
+-distribution documentation. If during this process you are asked for the
+-driver or module name, the name for the Base Driver is igb.
+-
+-For example, if you install the igb driver for two adapters (eth0
+-and eth1) and want to set the interrupt mode to MSI-X and MSI, respectively,
+-add the following to modules.conf or /etc/modprobe.conf:
+-alias eth0 igb
+-alias eth1 igb
+-options igb InterruptThrottleRate=3,1
+-
+-
+-Viewing Link Messages
+----------------------
+-
+-Link messages will not be displayed to the console if the distribution is
+-restricting system messages. In order to see network driver link messages on
+-your console, set dmesg to eight by entering the following:
+-dmesg -n 8
+-
+-NOTE: This setting is not saved across reboots.
+-
+-
+-Jumbo Frames
+-------------
+-Jumbo Frames support is enabled by changing the Maximum Transmission Unit
+-(MTU) to a value larger than the default value of 1500.
+-
+-Use the ifconfig command to increase the MTU size. For example, enter the
+-following where <x> is the interface number:
+-
+-   ifconfig eth<x> mtu 9000 up
+-
+-This setting is not saved across reboots. The setting change can be made
+-permanent by adding 'MTU=9000' to the file:
+-/etc/sysconfig/network-scripts/ifcfg-eth<x> for RHEL or to the file
+-/etc/sysconfig/network/<config_file> for SLES.
+-
+-NOTES:
+-- The maximum MTU setting for Jumbo Frames is 9216. This value coincides
+-  with the maximum Jumbo Frames size of 9234 bytes.
+-- Using Jumbo frames at 10 or 100 Mbps is not supported and may result in
+-  poor performance or loss of link.
+-
+-
+-ethtool
+--------
+-The driver utilizes the ethtool interface for driver configuration and
+-diagnostics, as well as displaying statistical information. The latest
+-ethtool version is required for this functionality. Download it at
+-http://ftp.kernel.org/pub/software/network/ethtool/
+-
+-
+-Speed and Duplex Configuration
+-------------------------------
+-
+-In addressing speed and duplex configuration issues, you need to
+-distinguish between copper-based adapters and fiber-based adapters.
+-
+-In the default mode, an Intel(R) Network Adapter using copper connections
+-will attempt to auto-negotiate with its link partner to determine the best
+-setting. If the adapter cannot establish link with the link partner using
+-auto-negotiation, you may need to manually configure the adapter and link
+-partner to identical settings to establish link and pass packets. This
+-should only be needed when attempting to link with an older switch that
+-does not support auto-negotiation or one that has been forced to a specific
+-speed or duplex mode. Your link partner must match the setting you choose.
+-
+-Speed and Duplex are configured through the ethtool* utility. ethtool is
+-included with all versions of Red Hat after Red Hat 7.2. For other Linux
+-distributions, download and install ethtool from the following website:
+-
+-   http://ftp.kernel.org/pub/software/network/ethtool/
+-
+-Caution: Only experienced network administrators should force speed and
+-duplex manually. The settings at the switch must always match the adapter
+-settings. Adapter performance may suffer or your adapter may not
+-operate if you configure the adapter differently from your switch.
+-
+-An Intel(R) Network Adapter using fiber-based connections, however, will not
+-attempt to auto-negotiate with its link partner since those adapters operate
+-only in full duplex and only at their native speed.
+-
+-NOTE: For the Intel(R) Ethernet Connection X552 10 GbE SFP+ you must specify
+-the desired speed. 
+-
+-
+-Enabling Wake on LAN* (WoL)
+----------------------------
+-
+-WoL is configured through the ethtool* utility. ethtool is included with all
+-versions of Red Hat after Red Hat 7.2. For other Linux distributions, download
+-and install ethtool from the following website:
+-http://ftp.kernel.org/pub/software/network/ethtool/.
+-
+-For instructions on enabling WoL with ethtool, refer to the website listed
+-above.
+-
+-WoL will be enabled on the system during the next shut down or reboot. For
+-this driver version, in order to enable WoL, the igb driver must be loaded
+-prior to shutting down or suspending the system.
+-
+-NOTES:
+-- Wake on LAN is only supported on port A of multi-port devices.
+-- Wake On LAN is not supported for the Intel(R) Gigabit VT Quad Port Server
+-  Adapter.
+-
+-
+-Multiqueue
+-----------
+-In this mode, a separate MSI-X vector is allocated for each queue and one for
+-"other" interrupts such as link status change and errors. All interrupts are
+-throttled via interrupt moderation. Interrupt moderation must be used to avoid
+-interrupt storms while the driver is processing one interrupt. The moderation
+-value should be at least as large as the expected time for the driver to
+-process an interrupt. Multiqueue is off by default.
+-
+-REQUIREMENTS: MSI-X support is required for Multiqueue. If MSI-X is not found,
+-the system will fallback to MSI or to Legacy interrupts. This driver supports
+-multiqueue in kernel versions 2.6.24 and newer. This driver supports receive
+-multiqueue on all kernels that support MSI-X.
+-
+-NOTES:
+-- Do not use MSI-X with the 2.6.19 or 2.6.20 kernels.
+-- On some kernels a reboot is required to switch between single queue mode
+-and multiqueue mode or vice-versa.
+-
+-
+-LRO
+----
+-Valid Range: 0(off), 1(on)
+-Large Receive Offload (LRO) is a technique for increasing inbound throughput
+-of high-bandwidth network connections by reducing CPU overhead. It works by
+-aggregating multiple incoming packets from a single stream into a larger
+-buffer before they are passed higher up the networking stack, thus reducing
+-the number of packets that have to be processed. LRO combines multiple
+-Ethernet frames into a single receive in the stack, thereby potentially
+-decreasing CPU utilization for receives.
+-NOTE: LRO requires 2.4.22 or later kernel version.
+-IGB_LRO is a compile time flag. The user can enable it at compile time to add
+-support for LRO from the driver. The flag is used by adding
+-CFLAGS_EXTRA="-DIGB_LRO" to the make file when it's being compiled.
+-# make CFLAGS_EXTRA="-DIGB_LRO" install
+-You can verify that the driver is using LRO by looking at these counters in
+-ethtool:
+-- lro_aggregated - counts total packets that were combined
+-- lro_flushed - counts the number of packets flushed out of LRO
+-- lro_recycled - counts the number of buffers returned to the ring from
+-  recycling
+-NOTE: IPv6 and UDP are not supported by LRO.
+-
+-
+-IEEE 1588 Precision Time Protocol (PTP) Hardware Clock (PHC)
+-------------------------------------------------------------
+-
+-Precision Time Protocol (PTP) is used to synchronize clocks in a computer
+-network and is supported in the igb driver.
+-
+-NOTE: PTP requires 3.0.0 or later kernel version that has PTP support enabled
+-in the kernel and a user-space software daemon.
+-
+-IGB_PTP is a compile time flag. The user can enable it at compile time to add
+-support for PTP from the driver. The flag is used by editing the make file
+-as follows when it is being compiled:
+-
+->make CFLAGS_EXTRA="-DIGB_PTP" install
+-
+-NOTE: The driver will fail to compile if your kernel does not support PTP.
+-
+-You can verify that the driver is using PTP by looking at the system log to
+-see whether a PHC was attempted to be registered or not. If you have a kernel
+-and version of ethtool with PTP support, you can check the PTP support in the
+-driver by executing:
+-ethtool -T ethX
+-
+-
+-MAC and VLAN anti-spoofing feature
+-----------------------------------
+-
+-When a malicious driver attempts to send a spoofed packet, it is dropped by
+-the hardware and not transmitted.
+-
+-An interrupt is sent to the PF driver notifying it of the spoof attempt.
+-When a spoofed packet is detected, the PF driver will send the following
+-message to the system log (displayed by the "dmesg" command):
+-Spoof event(s) detected on VF(n), where n = the VF that attempted to do the
+-spoofing
+-
+-
+-
+-Setting MAC Address, VLAN and Rate Limit Using IProute2 Tool
+-------------------------------------------------------------
+-You can set a MAC address of a Virtual Function (VF), a default VLAN and the
+-rate limit using the IProute2 tool. Download the latest version of the
+-IProute2 tool from Sourceforge if your version does not have all the features
+-you require.
+-
+-
+-================================================================================
+-
+-
+-Known Issues/Troubleshooting
+-----------------------------
+-
+-
+-MAC address of Virtual Function changes unexpectedly
+-----------------------------------------------------
+-
+-If a Virtual Function's MAC address is not assigned in the host, then the
+-VF (virtual function) driver will use a random MAC address. This random MAC
+-address may change each time the VF driver is reloaded. You can assign a
+-static MAC address in the host machine. This static MAC address will survive
+-a VF driver reload.
+-
+-
+-Hardware Issues
+----------------
+-
+-For known hardware and troubleshooting issues, either refer to the "Release
+-Notes" in your User Guide, or for more detailed information, go to
+-http://www.intel.com.
+-
+-In the search box enter your devices controller ID followed by "spec update"
+-(i.e., 82599 spec update). The specification update file has complete
+-information on known hardware issues.
+-
+-
+-Software Issues
+----------------
+-
+-NOTE: After installing the driver, if your Intel Ethernet Network Connection
+-is not working, verify that you have installed the correct driver.
+-
+-Intel(R) Active Management Technology 2.0, 2.1, 2.5 Not Supported in
+-Conjunction with Linux driver.
+-
+-
+-
+-Using the igb driver on 2.4 or older 2.6 based kernels
+-------------------------------------------------------
+-
+-Due to limited support for PCI-Express in 2.4 kernels and older 2.6 kernels,
+-the igb driver may run into interrupt related problems on some systems, such
+-as no link or hang when bringing up the device.
+-
+-We recommend the newer 2.6 based kernels, as these kernels correctly configure
+-the PCI-Express configuration space of the adapter and all intervening
+-bridges. If you are required to use a 2.4 kernel, use a 2.4 kernel newer than
+-2.4.30. For 2.6 kernels we recommend using the 2.6.21 kernel or newer.
+-
+-Alternatively, on 2.6 kernels you may disable MSI support in the kernel by
+-booting with the "pci=nomsi" option or permanently disable MSI support in your
+-kernel by configuring your kernel with CONFIG_PCI_MSI unset.
+-
+-
+-Detected Tx Unit Hang in Quad Port Adapters
+--------------------------------------------
+-
+-In some cases ports 3 and 4 don't pass traffic and report 'Detected Tx Unit
+-Hang' followed by 'NETDEV WATCHDOG: ethX: transmit timed out' errors. Ports 1
+-and 2 do not show any errors and will pass traffic.
+-
+-This issue may be resolved by updating to the latest kernel and BIOS. You should
+-use an OS that fully supports Message Signaled Interrupts (MSI) and make sure
+-that MSI is enabled in your system's BIOS.
+-
+-
+-Compiling the Driver
+---------------------
+-
+-When trying to compile the driver by running make install, the following error
+-may occur: "Linux kernel source not configured - missing version.h"
+-
+-To solve this issue, create the version.h file by going to the Linux source
+-tree and entering:
+-# make include/linux/version.h
+-
+-
+-Performance Degradation with Jumbo Frames
+------------------------------------------
+-
+-Degradation in throughput performance may be observed in some Jumbo frames
+-environments. If this is observed, increasing the application's socket buffer
+-size and/or increasing the /proc/sys/net/ipv4/tcp_*mem entry values may help.
+-See the specific application manual and
+-/usr/src/linux*/Documentation/networking/ip-sysctl.txt for more details.
+-
+-
+-Jumbo Frames on Foundry BigIron 8000 switch
+--------------------------------------------
+-There is a known issue using Jumbo frames when connected to a Foundry BigIron
+-8000 switch. This is a 3rd party limitation. If you experience loss of
+-packets, lower the MTU size.
+-
+-
+-Multiple Interfaces on Same Ethernet Broadcast Network
+-------------------------------------------------------
+-
+-Due to the default ARP behavior on Linux, it is not possible to have one
+-system on two IP networks in the same Ethernet broadcast domain
+-(non-partitioned switch) behave as expected. All Ethernet interfaces will
+-respond to IP traffic for any IP address assigned to the system. This results
+-in unbalanced receive traffic.
+-
+-If you have multiple interfaces in a server, either turn on ARP filtering by
+-entering:
+-echo 1 > /proc/sys/net/ipv4/conf/all/arp_filter
+-
+-This only works if your kernel's version is higher than 2.4.5.
+-
+-
+-NOTE: This setting is not saved across reboots. The configuration change can
+-be made permanent by adding the following line to the file /etc/sysctl.conf:
+-net.ipv4.conf.all.arp_filter = 1
+-
+-Another alternative is to install the interfaces in separate broadcast domains
+-(either in different switches or in a switch partitioned to VLANs).
+-
+-
+-Disable rx Flow Control with ethtool
+-------------------------------------
+-
+-In order to disable receive flow control using ethtool, you must turn off
+-auto-negotiation on the same command line:
+-ethtool -A eth? autoneg off rx off
+-
+-
+-Unplugging Network Cable While ethtool -p is Running
+-----------------------------------------------------
+-
+-In kernel versions 2.5.50 and newer, unplugging the network cable while
+-ethtool -p is running will cause the system to become unresponsive to
+-keyboard commands, except for control-alt-delete. Restarting the system
+-appears to be the only remedy.
+-
+-
+-Trouble Passing Traffic on Ports 1 and 2 Using RHEL3
+-----------------------------------------------------
+-
+-There is a known hardware compatibility issue on some systems with RHEL3
+-kernels. Traffic on ports 1 and 2 may be slower than expected, and ping times,
+-higher than expected.
+-
+-This issue MAY be resolved by updating to the latest kernel and BIOS. You can
+-check your system BIOS by downloading the Linux Firmware Developer Kit at
+-http://www.linuxfirmwarekit.org/.
+-
+-
+-Do Not Use LRO When Routing Packets
+------------------------------------
+-
+-Due to a known general compatibility issue with LRO and routing, do not use LRO
+-when routing packets.
+-
+-
+-Build Error with Asianux 3.0 - Redefinition of typedef 'irq_handler_t'
+-----------------------------------------------------------------------
+-
+-Some systems may experience build issues due to the redefinition of
+-irq_handler_t. To resolve this issue, build the driver (step 4 above) using
+-the command:
+-# make CFLAGS_EXTRA=-DAX_RELEASE_CODE=1 install
+-
+-
+-MSI-X Issues with Kernels Between 2.6.19 - 2.6.21 (inclusive)
+--------------------------------------------------------------
+-
+-Kernel panics and instability may be observed on any MSI-X hardware if you use
+-irqbalance with kernels between 2.6.19 and 2.6.21. If such problems are
+-encountered, you may disable the irqbalance daemon or upgrade to a newer
+-kernel.
+-
+-
+-Rx Page Allocation Errors
+--------------------------
+-
+-'Page allocation failure. order:0' errors may occur under stress with kernels
+-2.6.25 and newer. This is caused by the way the Linux kernel reports this
+-stressed condition.
+-
+-Under Redhat 5.4-GA, System May Crash when Closing Guest OS Window after
+-Loading/Unloading Physical Function (PF) Driver
+-
+-Do not remove the igb driver from Dom0 while Virtual Functions (VFs) are
+-assigned to guests. VFs must first use the xm "pci-detach" command to hot-plug
+-the VF device out of the VM it is assigned to or else shut down the VM.
+-
+-Unloading Physical Function (PF) Driver Causes System Reboots When VM is
+-Running and VF is Loaded on the VM.
+-
+-Do not unload the PF driver (igb) while VFs are assigned to guests.
+-
+-
+-SLES10 SP3 Random System Panic when Reloading Driver
+-----------------------------------------------------
+-
+-This is a known SLES-10 SP3 issue. After requesting interrupts for MSI-X
+-vectors, system may panic.
+-
+-Currently, the only known workaround is to build the driver with
+-CFLAGS_EXTRA=-DDISABLE_PCI_MSI if the driver needs to be loaded/unloaded.
+-Otherwise, the driver can be loaded once and will be safe, but unloading it
+-will lead to the issue.
+-
+-Enabling SR-IOV in a 32-bit Microsoft* Windows* Server 2008 Guest OS Using
+-Intel? 82576-based GbE or Intel? 82599-based 10GbE Controller Under KVM
+-KVM Hypervisor/VMM supports direct assignment of a PCIe device to a VM. This
+-includes traditional PCIe devices, as well as SR-IOV-capable devices using
+-Intel 82576-based and 82599-based controllers.
+-
+-While direct assignment of a PCIe device or an SR-IOV Virtual Function (VF) to
+-a Linux-based VM running 2.6.32 or newer kernel is functional, there is a
+-known issue with Microsoft Windows Server 2008 VM that results in a "yellow
+-bang" error. This problem is within the KVM VMM itself, not the Intel driver
+-or the SR-IOV logic of the VMM. The KVM emulates an older CPU model for the
+-guests, and this older CPU model does not support MSI-X interrupts, which is a
+-requirement for Intel SR-IOV.
+-
+-If you wish to use the Intel 82576- or 82599-based controllers in SR-IOV mode
+-with KVM and a Microsoft Windows Server 2008 guest, try the following
+-workaround. Configure KVM to emulate a different model of CPU
+-when using qemu to create the KVM guest:
+-"-cpu qemu64,model=13"
+-
+-
+-Host May Reboot after Removing PF when VF is Active in Guest
+-------------------------------------------------------------
+-
+-Using kernel versions earlier than 3.2, do not unload the PF driver with
+-active VFs. Doing this will cause your VFs to stop working until you reload
+-the PF driver and may cause a spontaneous reboot of your system.
+-
+-Prior to unloading the PF driver, you must first ensure that all VFs are
+-no longer active. Do this by shutting down all VMs and unloading the VF driver.
+-
+-
+-================================================================================
+-
+-
+-Support
+--------
+-For general information, go to the Intel support website at:
+-www.intel.com/support/
+-
+-or the Intel Wired Networking project hosted by Sourceforge at:
+-http://sourceforge.net/projects/e1000
+-If an issue is identified with the released source code on a supported
+-kernel with a supported adapter, email the specific information related to the
+-issue to e1000-devel@lists.sf.net.
+-
+-
+-================================================================================
+-
+-
+-License
+--------
+-
+-This program is free software; you can redistribute it and/or modify it under
+-the terms and conditions of the GNU General Public License, version 2, as
+-published by the Free Software Foundation.
+-
+-This program is distributed in the hope it will be useful, but WITHOUT ANY
+-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+-A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+-
+-You should have received a copy of the GNU General Public License along with
+-this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
+-St - Fifth Floor, Boston, MA 02110-1301 USA.
+-
+-The full GNU General Public License is included in this distribution in the
+-file called "COPYING".
+-
+-Copyright(c) 1999 - 2016 Intel Corporation.
+-================================================================================
+-
+-
+-
+-Trademarks
+-----------
+-
+-Intel, Itanium, and Pentium are trademarks or registered trademarks of Intel
+-Corporation or its subsidiaries in the United States and other countries.
+-
+-* Other names and brands may be claimed as the property of others.
+-
+-
+--- igb-5.3.5.3/igb.spec.orig	2022-05-26 11:32:56.652105553 -0700
++++ igb-5.3.5.3/igb.spec	1969-12-31 16:00:00.000000000 -0800
+@@ -1,405 +0,0 @@
+-Name: igb
+-Summary: Intel(R) Gigabit Ethernet Connection
+-Version: 5.3.5.3
+-Release: 1
+-Source: %{name}-%{version}.tar.gz
+-Vendor: Intel Corporation
+-License: GPL
+-ExclusiveOS: linux
+-Group: System Environment/Kernel
+-Provides: %{name}
+-URL: http://support.intel.com
+-BuildRoot: %{_tmppath}/%{name}-%{version}-root
+-# do not generate debugging packages by default - older versions of rpmbuild
+-# may instead need:
+-#%define debug_package %{nil}
+-%debug_package %{nil}
+-# macros for finding system files to update at install time (pci.ids, pcitable)
+-%define find() %(for f in %*; do if [ -e $f ]; then echo $f; break; fi; done)
+-%define _pciids   /usr/share/pci.ids        /usr/share/hwdata/pci.ids
+-%define _pcitable /usr/share/kudzu/pcitable /usr/share/hwdata/pcitable /dev/null
+-%define pciids    %find %{_pciids}
+-%define pcitable  %find %{_pcitable}
+-Requires: kernel, fileutils, findutils, gawk, bash
+-
+-%description
+-This package contains the Linux driver for the Intel(R) Gigabit Family of Server Adapters.
+-
+-%prep
+-%setup
+-
+-%build
+-make -C src clean
+-make -C src
+-
+-%install
+-make -C src INSTALL_MOD_PATH=%{buildroot} MANDIR=%{_mandir} install
+-# Append .new to driver name to avoid conflict with kernel RPM
+-cd %{buildroot}
+-find lib -name "igb.*o" -exec mv {} {}.new \; \
+-         -fprintf %{_builddir}/%{name}-%{version}/file.list "/%p.new\n"
+-mkdir -p $RPM_BUILD_ROOT/usr/share/pci.ids.d
+-install -D -m 644 %{pciids} $RPM_BUILD_ROOT/usr/share/pci.ids.d/pci.ids.intel-igb-%{version}
+-
+-
+-%clean
+-rm -rf %{buildroot}
+-
+-%files -f %{_builddir}/%{name}-%{version}/file.list
+-%defattr(-,root,root)
+-%{_mandir}/man7/igb.7.gz
+-/usr/share/pci.ids.d/pci.ids.intel-igb-%{version}
+-%doc COPYING
+-%doc README
+-%doc file.list
+-%doc pci.updates
+-
+-%post
+-FL="%{_docdir}/%{name}-%{version}/file.list
+-    %{_docdir}/%{name}/file.list"
+-FL=$(for d in $FL ; do if [ -e $d ]; then echo $d; break; fi;  done)
+-
+-if [ -d /usr/local/lib/%{name} ]; then
+-	rm -rf /usr/local/lib/%{name}
+-fi
+-if [ -d /usr/local/share/%{name} ]; then
+-	rm -rf /usr/local/share/%{name}
+-fi
+-
+-# Save old drivers (aka .o and .o.gz)
+-echo "original pci.ids saved in /usr/local/share/%{name}";
+-if [ "%{pcitable}" != "/dev/null" ]; then
+-	echo "original pcitable saved in /usr/local/share/%{name}";
+-fi
+-for k in $(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-]*\).*/\1/' $FL) ; 
+-do
+-	d_drivers=/lib/modules/$k
+-	d_usr=/usr/local/share/%{name}/$k
+-	mkdir -p $d_usr
+-	cd $d_drivers; find . -name %{name}.*o -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}_*.*o -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}.*o.gz -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cd $d_drivers; find . -name %{name}_*.*o.gz -exec cp --parents {} $d_usr \; -exec rm -f {} \;
+-	cp --parents %{pciids} /usr/local/share/%{name}/
+-	if [ "%{pcitable}" != "/dev/null" ]; then
+-		cp --parents %{pcitable} /usr/local/share/%{name}/
+-	fi
+-done
+-
+-# Add driver link
+-for f in $(sed 's/\.new$//' $FL) ; do
+-	ln -f $f.new $f 
+-done
+-
+-# Check if kernel version rpm was built on IS the same as running kernel
+-BK_LIST=$(sed 's/\/lib\/modules\/\([0-9a-zA-Z_\.\-]*\).*/\1/' $FL)
+-MATCH=no
+-for i in $BK_LIST
+-do
+-	if [ $(uname -r) == $i ] ; then
+-		MATCH=yes
+-		break
+-	fi
+-done
+-if [ $MATCH == no ] ; then
+-	echo -n "WARNING: Running kernel is $(uname -r).  "
+-	echo -n "RPM supports kernels (  "
+-	for i in $BK_LIST
+-	do
+-		echo -n "$i  "
+-	done
+-	echo ")"
+-fi
+-
+-LD="%{_docdir}/%{name}";
+-if [ -d %{_docdir}/%{name}-%{version} ]; then
+-	LD="%{_docdir}/%{name}-%{version}";
+-fi
+-
+-if [ -x /usr/bin/merge-pciids -a -x /usr/bin/perl ]; then
+-    /usr/bin/merge-pciids
+-else
+-#Yes, this really needs bash
+-bash -s %{pciids} \
+-	%{pcitable} \
+-	$LD/pci.updates \
+-	$LD/pci.ids.new \
+-	$LD/pcitable.new \
+-	%{name} \
+-<<"END"
+-#! /bin/bash
+-# $1 = system pci.ids file to update
+-# $2 = system pcitable file to update
+-# $3 = file with new entries in pci.ids file format
+-# $4 = pci.ids output file
+-# $5 = pcitable output file
+-# $6 = driver name for use in pcitable file
+-
+-exec 3<$1
+-exec 4<$2
+-exec 5<$3
+-exec 6>$4
+-exec 7>$5
+-driver=$6
+-IFS=
+-
+-# pattern matching strings
+-ID="[[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]]"
+-VEN="${ID}*"
+-DEV="	${ID}*"
+-SUB="		${ID}*"
+-TABLE_DEV="0x${ID}	0x${ID}	\"*"
+-TABLE_SUB="0x${ID}	0x${ID}	0x${ID}	0x${ID}	\"*"
+-
+-line=
+-table_line=
+-ids_in=
+-table_in=
+-vendor=
+-device=
+-ids_device=
+-table_device=
+-subven=
+-ids_subven=
+-table_subven=
+-subdev=
+-ids_subdev=
+-table_subdev=
+-ven_str=
+-dev_str=
+-sub_str=
+-
+-# force a sub-shell to fork with a new stdin
+-# this is needed if the shell is reading these instructions from stdin
+-while true
+-do
+-	# get the first line of each data file to jump start things
+-	exec 0<&3
+-	read -r ids_in
+-	if [ "$2" != "/dev/null" ];then
+-	exec 0<&4
+-	read -r table_in
+-	fi
+-
+-	# outer loop reads lines from the updates file
+-	exec 0<&5
+-	while read -r line
+-	do
+-		# vendor entry
+-		if [[ $line == $VEN ]]
+-		then
+-			vendor=0x${line:0:4}
+-			ven_str=${line#${line:0:6}}
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $VEN ||
+-				 0x${ids_in:0:4} < $vendor ]]
+-			do
+-				echo "$ids_in"
+-				read -r ids_in
+-			done
+-			echo "$line"
+-			if [[ 0x${ids_in:0:4} == $vendor ]]
+-			then
+-				read -r ids_in
+-			fi
+-
+-		# device entry
+-		elif [[ $line == $DEV ]]
+-		then
+-			device=`echo ${line:1:4} | tr "[:upper:]" "[:lower:]"`
+-			table_device=0x${line:1:4}
+-			dev_str=${line#${line:0:7}}
+-			ids_device=`echo ${ids_in:1:4} | tr "[:upper:]" "[:lower:]"`
+-			table_line="$vendor	$table_device	\"$driver\"	\"$ven_str|$dev_str\""
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $DEV ||
+-				 $ids_device < $device ]]
+-			do
+-				if [[ $ids_in == $VEN ]]
+-				then
+-					break
+-				fi
+-				if [[ $ids_device != ${ids_in:1:4} ]]
+-				then
+-					echo "${ids_in:0:1}$ids_device${ids_in#${ids_in:0:5}}"
+-				else
+-					echo "$ids_in"
+-				fi
+-				read -r ids_in
+-				ids_device=`echo ${ids_in:1:4} | tr "[:upper:]" "[:lower:]"`
+-			done
+-			if [[ $device != ${line:1:4} ]]
+-			then
+-				echo "${line:0:1}$device${line#${line:0:5}}"
+-			else
+-				echo "$line"
+-			fi
+-			if [[ $ids_device == $device ]]
+-			then
+-				read -r ids_in
+-			fi
+-			# add entry to pcitable
+-			if [ "$2" != "/dev/null" ];then
+-			exec 0<&4
+-			exec 1>&7
+-			while [[ $table_in != $TABLE_DEV ||
+-				 ${table_in:0:6} < $vendor ||
+-				 ( ${table_in:0:6} == $vendor &&
+-				   ${table_in:7:6} < $table_device ) ]]
+-			do
+-				echo "$table_in"
+-				read -r table_in
+-			done
+-			echo "$table_line"
+-			if [[ ${table_in:0:6} == $vendor &&
+-			      ${table_in:7:6} == $table_device ]]
+-			then
+-				read -r table_in
+-			fi
+-			fi
+-		# subsystem entry
+-		elif [[ $line == $SUB ]]
+-		then
+-			subven=`echo ${line:2:4} | tr "[:upper:]" "[:lower:]"`
+-			subdev=`echo ${line:7:4} | tr "[:upper:]" "[:lower:]"`
+-			table_subven=0x${line:2:4}
+-			table_subdev=0x${line:7:4}
+-			sub_str=${line#${line:0:13}}
+-			ids_subven=`echo ${ids_in:2:4} | tr "[:upper:]" "[:lower:]"`
+-			ids_subdev=`echo ${ids_in:7:4} | tr "[:upper:]" "[:lower:]"`
+-			table_line="$vendor	$table_device	$table_subven	$table_subdev	\"$driver\"	\"$ven_str|$sub_str\""
+-			# add entry to pci.ids
+-			exec 0<&3
+-			exec 1>&6
+-			while [[ $ids_in != $SUB ||
+-				 $ids_subven < $subven ||
+-				 ( $ids_subven == $subven && 
+-				   $ids_subdev < $subdev ) ]]
+-			do
+-				if [[ $ids_in == $VEN ||
+-				      $ids_in == $DEV ]]
+-				then
+-					break
+-				fi
+-				if [[ ! (${ids_in:2:4} == "1014" &&
+-					 ${ids_in:7:4} == "052C") ]]
+-				then
+-					if [[ $ids_subven != ${ids_in:2:4} || $ids_subdev != ${ids_in:7:4} ]]
+-					then
+-						echo "${ids_in:0:2}$ids_subven $ids_subdev${ids_in#${ids_in:0:11}}"
+-					else
+-						echo "$ids_in"
+-					fi
+-				fi
+-				read -r ids_in
+-				ids_subven=`echo ${ids_in:2:4} | tr "[:upper:]" "[:lower:]"`
+-				ids_subdev=`echo ${ids_in:7:4} | tr "[:upper:]" "[:lower:]"`
+-			done
+-			if [[ $subven != ${line:2:4} || $subdev != ${line:7:4} ]]
+-			then
+-				echo "${line:0:2}$subven $subdev${line#${line:0:11}}"
+-			else
+-				echo "$line"
+-			fi
+-			if [[ $ids_subven == $subven  &&
+-			      $ids_subdev == $subdev ]]
+-			then
+-				read -r ids_in
+-			fi
+-			# add entry to pcitable
+-			if [ "$2" != "/dev/null" ];then
+-			exec 0<&4
+-			exec 1>&7
+-			while [[ $table_in != $TABLE_SUB ||
+-				 ${table_in:14:6} < $table_subven ||
+-				 ( ${table_in:14:6} == $table_subven &&
+-				   ${table_in:21:6} < $table_subdev ) ]]
+-			do
+-				if [[ $table_in == $TABLE_DEV ]]
+-				then
+-					break
+-				fi
+-				if [[ ! (${table_in:14:6} == "0x1014" &&
+-					 ${table_in:21:6} == "0x052C") ]]
+-				then
+-					echo "$table_in"
+-				fi
+-				read -r table_in
+-			done
+-			echo "$table_line"
+-			if [[ ${table_in:14:6} == $table_subven &&
+-			      ${table_in:21:6} == $table_subdev ]]
+-			then
+-				read -r table_in
+-			fi
+-			fi
+-		fi
+-
+-		exec 0<&5
+-	done
+-
+-	# print the remainder of the original files
+-	exec 0<&3
+-	exec 1>&6
+-	echo "$ids_in"
+-	while read -r ids_in
+-	do
+-		echo "$ids_in"
+-	done
+-
+-	if [ "$2" != "/dev/null" ];then
+-	exec 0>&4
+-	exec 1>&7
+-	echo "$table_in"
+-	while read -r table_in
+-	do
+-		echo "$table_in"
+-	done
+-	fi
+-
+-	break
+-done <&5
+-
+-exec 3<&-
+-exec 4<&-
+-exec 5<&-
+-exec 6>&-
+-exec 7>&-
+-
+-END
+-fi
+-
+-mv -f $LD/pci.ids.new  %{pciids}
+-if [ "%{pcitable}" != "/dev/null" ]; then
+-mv -f $LD/pcitable.new %{pcitable}
+-fi
+-
+-uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+-
+-%preun
+-# If doing RPM un-install
+-if [ $1 -eq 0 ] ; then
+-	FL="%{_docdir}/%{name}-%{version}/file.list
+-    		%{_docdir}/%{name}/file.list"
+-	FL=$(for d in $FL ; do if [ -e $d ]; then echo $d; break; fi;  done)
+-
+-	# Remove driver link
+-	for f in $(sed 's/\.new$//' $FL) ; do
+-		rm -f $f
+-	done
+-
+-	# Restore old drivers
+-	if [ -d /usr/local/share/%{name} ]; then
+-		cd /usr/local/share/%{name}; find . -name '%{name}.*o*' -exec cp --parents {} /lib/modules/ \;
+-		cd /usr/local/share/%{name}; find . -name '%{name}_*.*o*' -exec cp --parents {} /lib/modules/ \;
+-		rm -rf /usr/local/share/%{name}
+-	fi
+-fi
+-
+-%postun
+-uname -r | grep BOOT || /sbin/depmod -a > /dev/null 2>&1 || true
+-
+--- igb-5.3.5.3/SUMS.orig	2022-05-26 11:32:56.652105553 -0700
++++ igb-5.3.5.3/SUMS	1969-12-31 16:00:00.000000000 -0800
+@@ -1,41 +0,0 @@
+-63711    35 README
+-38783    19 COPYING
+-46037    11 igb.7
+-00111     5 pci.updates
+-15690    10 igb.spec
+-49282     4 src/e1000_mbx.h
+-09383   105 src/e1000_82575.c
+-21046    31 src/igb_ptp.c
+-62280    22 src/igb_param.c
+-11517    29 src/kcompat_ethtool.c
+-11250     9 src/igb_procfs.c
+-19456     7 src/e1000_api.h
+-47171    61 src/e1000_defines.h
+-14177    87 src/igb_ethtool.c
+-19004   144 src/kcompat.h
+-25534    16 src/e1000_manage.c
+-49482    35 src/e1000_regs.h
+-15514    19 src/e1000_hw.h
+-25442    25 src/igb.h
+-42861    14 src/e1000_mbx.c
+-53689    65 src/e1000_mac.c
+-26513   266 src/igb_main.c
+-54960    13 src/Makefile
+-31287     4 src/e1000_manage.h
+-28036    13 src/igb_regtest.h
+-44424     2 src/igb_vmdq.h
+-24985    50 src/kcompat.c
+-58605    32 src/e1000_api.c
+-30434     4 src/e1000_i210.h
+-62121    21 src/e1000_82575.h
+-56585    92 src/e1000_phy.c
+-14248    13 src/igb_vmdq.c
+-55748     5 src/e1000_osdep.h
+-61154     8 src/igb_hwmon.c
+-44785     1 src/Module.supported
+-50881    26 src/e1000_nvm.c
+-16318     4 src/e1000_mac.h
+-44157     1 src/igb_debugfs.c
+-20651     3 src/e1000_nvm.h
+-65430    11 src/e1000_phy.h
+-51277    28 src/e1000_i210.c

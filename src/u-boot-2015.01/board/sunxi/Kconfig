@@ -1,0 +1,386 @@
+if ARCH_SUNXI
+
+choice
+	prompt "Sunxi SoC Variant"
+
+config MACH_SUN4I
+	bool "sun4i (Allwinner A10)"
+	select CPU_V7
+	select SUPPORT_SPL
+
+config MACH_SUN5I
+	bool "sun5i (Allwinner A13)"
+	select CPU_V7
+	select SUPPORT_SPL
+
+config MACH_SUN6I
+	bool "sun6i (Allwinner A31)"
+	select CPU_V7
+	select SUPPORT_SPL
+
+config MACH_SUN7I
+	bool "sun7i (Allwinner A20)"
+	select CPU_V7
+	select CPU_V7_HAS_NONSEC
+	select CPU_V7_HAS_VIRT
+	select SUPPORT_SPL
+	select ARMV7_BOOT_SEC_DEFAULT if OLD_SUNXI_KERNEL_COMPAT
+
+config MACH_SUN8I
+	bool "sun8i (Allwinner A23)"
+	select CPU_V7
+	select SUPPORT_SPL
+
+endchoice
+
+config DRAM_CLK
+	int "sunxi dram clock speed"
+	default 312 if MACH_SUN6I || MACH_SUN8I
+	default 360 if MACH_SUN4I || MACH_SUN5I || MACH_SUN7I
+	---help---
+	Set the dram clock speed, valid range 240 - 480, must be a multiple
+	of 24. Note on sun4i / sun5i / sun7i this is only used by boards
+	which use dram autoconfig.
+
+config DRAM_ZQ
+	int "sunxi dram zq value"
+	default 123 if MACH_SUN4I || MACH_SUN5I || MACH_SUN6I || MACH_SUN8I
+	default 127 if MACH_SUN7I
+	---help---
+	Set the dram zq value. Note on sun4i / sun5i / sun7i this is only
+	used by boards which use dram autoconfig.
+
+if MACH_SUN4I || MACH_SUN5I || MACH_SUN7I
+config DRAM_EMR1
+	int "sunxi dram emr1 value"
+	default 0 if MACH_SUN4I
+	default 4 if MACH_SUN5I || MACH_SUN7I
+	---help---
+	Set the dram controller emr1 value. Note this is only used by boards
+	which use dram autoconfig.
+endif
+
+config SYS_CONFIG_NAME
+	default "sun4i" if MACH_SUN4I
+	default "sun5i" if MACH_SUN5I
+	default "sun6i" if MACH_SUN6I
+	default "sun7i" if MACH_SUN7I
+	default "sun8i" if MACH_SUN8I
+
+choice
+	prompt "Board"
+
+config TARGET_A10S_OLINUXINO_M
+	bool "A10S_OLINUXINO_M"
+	depends on MACH_SUN5I
+
+config TARGET_A13_OLINUXINOM
+	bool "A13_OLINUXINOM"
+	depends on MACH_SUN5I
+
+config TARGET_A13_OLINUXINO
+	bool "A13_OLINUXINO"
+	depends on MACH_SUN5I
+
+config TARGET_A20_OLINUXINO_L2
+	bool "A20_OLINUXINO_L2"
+	depends on MACH_SUN7I
+
+config TARGET_A20_OLINUXINO_L
+	bool "A20_OLINUXINO_L"
+	depends on MACH_SUN7I
+
+config TARGET_A20_OLINUXINO_M
+	bool "A20_OLINUXINO_M"
+	depends on MACH_SUN7I
+
+config TARGET_AUXTEK_T004
+	bool "AUXTEK_T004"
+	depends on MACH_SUN5I
+
+config TARGET_BANANAPI
+	bool "BANANAPI"
+	depends on MACH_SUN7I
+
+config TARGET_BANANAPRO
+	bool "BANANAPRO"
+	depends on MACH_SUN7I
+
+config TARGET_CUBIEBOARD2
+	bool "CUBIEBOARD2"
+	depends on MACH_SUN7I
+
+config TARGET_CUBIETRUCK
+	bool "CUBIETRUCK"
+	depends on MACH_SUN7I
+
+config TARGET_PCDUINO3
+	bool "PCDUINO3"
+	depends on MACH_SUN7I
+
+config TARGET_MELE_M3
+	bool "MELE_M3"
+	depends on MACH_SUN7I
+
+config TARGET_MK802_A10S
+	bool "MK802_A10S"
+	depends on MACH_SUN5I
+
+config TARGET_MSI_PRIMO73
+	bool "MSI Primo73 (7\" tablet)"
+	depends on MACH_SUN7I
+	---help---
+	The MSI Primo73 is an A20 based tablet, with 1G RAM, 16G NAND,
+	1024x600 TN LCD display, mono speaker, 0.3 MP front camera, 2.0 MP
+	rear camera, 3000 mAh battery, gt911 touchscreen, mma8452 accelerometer
+	and rtl8188etv usb wifi. Has "power", "volume+" and "volume-" buttons
+	(both volume buttons are also connected to the UBOOT_SEL pin). The
+	external connectors are represented by MicroSD slot, MiniHDMI, MicroUSB
+	OTG and 3.5mm headphone jack. More details are available at
+	    http://linux-sunxi.org/MSI_Primo73
+
+config TARGET_I12_TVBOX
+	bool "I12_TVBOX"
+	depends on MACH_SUN7I
+
+config TARGET_R7DONGLE
+	bool "R7DONGLE"
+	depends on MACH_SUN5I
+
+endchoice
+
+config SYS_BOARD
+	default "sunxi"
+
+config SYS_SOC
+	default "sunxi"
+
+config SPL_FEL
+	bool "SPL/FEL mode support"
+	depends on SPL
+	default n
+
+config UART0_PORT_F
+	bool "UART0 on MicroSD breakout board"
+	depends on SPL_FEL
+	default n
+	---help---
+	Repurpose the SD card slot for getting access to the UART0 serial
+	console. Primarily useful only for low level u-boot debugging on
+	tablets, where normal UART0 is difficult to access and requires
+	device disassembly and/or soldering. As the SD card can't be used
+	at the same time, the system can be only booted in the FEL mode.
+	Only enable this if you really know what you are doing.
+
+config FDTFILE
+	string "Default fdtfile env setting for this board"
+
+config OLD_SUNXI_KERNEL_COMPAT
+	boolean "Enable workarounds for booting old kernels"
+	default n
+	---help---
+	Set this to enable various workarounds for old kernels, this results in
+	sub-optimal settings for newer kernels, only enable if needed.
+
+config MMC0_CD_PIN
+	string "Card detect pin for mmc0"
+	default ""
+	---help---
+	Set the card detect pin for mmc0, leave empty to not use cd. This
+	takes a string in the format understood by sunxi_name_to_gpio, e.g.
+	PH1 for pin 1 of port H.
+
+config MMC1_CD_PIN
+	string "Card detect pin for mmc1"
+	default ""
+	---help---
+	See MMC0_CD_PIN help text.
+
+config MMC2_CD_PIN
+	string "Card detect pin for mmc2"
+	default ""
+	---help---
+	See MMC0_CD_PIN help text.
+
+config MMC3_CD_PIN
+	string "Card detect pin for mmc3"
+	default ""
+	---help---
+	See MMC0_CD_PIN help text.
+
+config MMC_SUNXI_SLOT_EXTRA
+	int "mmc extra slot number"
+	default -1
+	---help---
+	sunxi builds always enable mmc0, some boards also have a second sdcard
+	slot or emmc on mmc1 - mmc3. Setting this to 1, 2 or 3 will enable
+	support for this.
+
+config USB0_VBUS_PIN
+	string "Vbus enable pin for usb0 (otg)"
+	default ""
+	---help---
+	Set the Vbus enable pin for usb0 (otg). This takes a string in the
+	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
+
+config USB1_VBUS_PIN
+	string "Vbus enable pin for usb1 (ehci0)"
+	default "PH6" if MACH_SUN4I || MACH_SUN7I
+	default "PH27" if MACH_SUN6I
+	---help---
+	Set the Vbus enable pin for usb1 (ehci0, usb0 is the otg). This takes
+	a string in the format understood by sunxi_name_to_gpio, e.g.
+	PH1 for pin 1 of port H.
+
+config USB2_VBUS_PIN
+	string "Vbus enable pin for usb2 (ehci1)"
+	default "PH3" if MACH_SUN4I || MACH_SUN7I
+	default "PH24" if MACH_SUN6I
+	---help---
+	See USB1_VBUS_PIN help text.
+
+config VIDEO
+	boolean "Enable graphical uboot console on HDMI, LCD or VGA"
+	default y
+	---help---
+	Say Y here to add support for using a cfb console on the HDMI, LCD
+	or VGA output found on most sunxi devices. See doc/README.video for
+	info on how to select the video output and mode.
+
+config VIDEO_HDMI
+	boolean "HDMI output support"
+	depends on VIDEO && !MACH_SUN8I
+	default y
+	---help---
+	Say Y here to add support for outputting video over HDMI.
+
+config VIDEO_VGA
+	boolean "VGA output support"
+	depends on VIDEO && (MACH_SUN4I || MACH_SUN7I)
+	default n
+	---help---
+	Say Y here to add support for outputting video over VGA.
+
+config VIDEO_VGA_VIA_LCD
+	boolean "VGA via LCD controller support"
+	depends on VIDEO && (MACH_SUN5I || MACH_SUN6I || MACH_SUN8I)
+	default n
+	---help---
+	Say Y here to add support for external DACs connected to the parallel
+	LCD interface driving a VGA connector, such as found on the
+	Olimex A13 boards.
+
+config VIDEO_VGA_EXTERNAL_DAC_EN
+	string "LCD panel power enable pin"
+	depends on VIDEO_VGA_VIA_LCD
+	default ""
+	---help---
+	Set the enable pin for the external VGA DAC. This takes a string in the
+	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
+
+config VIDEO_LCD_MODE
+	string "LCD panel timing details"
+	depends on VIDEO
+	default ""
+	---help---
+	LCD panel timing details string, leave empty if there is no LCD panel.
+	This is in drivers/video/videomodes.c: video_get_params() format, e.g.
+	x:800,y:480,depth:18,pclk_khz:33000,le:16,ri:209,up:22,lo:22,hs:30,vs:1,sync:0,vmode:0
+
+config VIDEO_LCD_DCLK_PHASE
+	int "LCD panel display clock phase"
+	depends on VIDEO
+	default 1
+	---help---
+	Select LCD panel display clock phase shift, range 0-3.
+
+config VIDEO_LCD_POWER
+	string "LCD panel power enable pin"
+	depends on VIDEO
+	default ""
+	---help---
+	Set the power enable pin for the LCD panel. This takes a string in the
+	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
+
+config VIDEO_LCD_BL_EN
+	string "LCD panel backlight enable pin"
+	depends on VIDEO
+	default ""
+	---help---
+	Set the backlight enable pin for the LCD panel. This takes a string in the
+	the format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of
+	port H.
+
+config VIDEO_LCD_BL_PWM
+	string "LCD panel backlight pwm pin"
+	depends on VIDEO
+	default ""
+	---help---
+	Set the backlight pwm pin for the LCD panel. This takes a string in the
+	format understood by sunxi_name_to_gpio, e.g. PH1 for pin 1 of port H.
+
+config VIDEO_LCD_BL_PWM_ACTIVE_LOW
+	bool "LCD panel backlight pwm is inverted"
+	depends on VIDEO
+	default y
+	---help---
+	Set this if the backlight pwm output is active low.
+
+
+# Note only one of these may be selected at a time! But hidden choices are
+# not supported by Kconfig
+config VIDEO_LCD_IF_PARALLEL
+	bool
+
+config VIDEO_LCD_IF_LVDS
+	bool
+
+
+choice
+	prompt "LCD panel support"
+	depends on VIDEO
+	---help---
+	Select which type of LCD panel to support.
+
+config VIDEO_LCD_PANEL_PARALLEL
+	bool "Generic parallel interface LCD panel"
+	select VIDEO_LCD_IF_PARALLEL
+
+config VIDEO_LCD_PANEL_LVDS
+	bool "Generic lvds interface LCD panel"
+	select VIDEO_LCD_IF_LVDS
+
+config VIDEO_LCD_PANEL_MIPI_4_LANE_513_MBPS_VIA_SSD2828
+	bool "MIPI 4-lane, 513Mbps LCD panel via SSD2828 bridge chip"
+	select VIDEO_LCD_SSD2828
+	select VIDEO_LCD_IF_PARALLEL
+	---help---
+	 7.85" 768x1024 LCD panels, such as LG LP079X01 or AUO B079XAN01.0
+
+config VIDEO_LCD_PANEL_HITACHI_TX18D42VM
+	bool "Hitachi tx18d42vm LCD panel"
+	select VIDEO_LCD_HITACHI_TX18D42VM
+	select VIDEO_LCD_IF_LVDS
+	---help---
+	7.85" 1024x768 Hitachi tx18d42vm LCD panel support
+
+endchoice
+
+
+config USB_MUSB_SUNXI
+	bool "Enable sunxi OTG / DRC USB controller in host mode"
+	default n
+	---help---
+	Say y here to enable support for the sunxi OTG / DRC USB controller
+	used on almost all sunxi boards. Note currently u-boot can only have
+	one usb host controller enabled at a time, so enabling this on boards
+	which also use the ehci host controller will result in build errors.
+
+config USB_KEYBOARD
+	boolean "Enable USB keyboard support"
+	default y
+	---help---
+	Say Y here to add support for using a USB keyboard (typically used
+	in combination with a graphical console).
+
+endif

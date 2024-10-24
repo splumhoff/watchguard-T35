@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<caf:beans
+   xmlns:caf="http://schemas.vmware.com/caf/schema/fx"
+   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="http://schemas.vmware.com/caf/schema/fx http://10.25.57.32/caf-downloads/schema/fx/CafIntegration.xsd">
+
+   <import resource="IntBeanConfigFile.xml"/>
+
+   <!-- <channel id="logger"/> -->
+   <!-- <int:logging-channel-adapter channel="logger" log-full-message="true" level="INFO"/> -->
+   <!-- <int:wire-tap channel="logger" pattern="*"/> -->
+
+   <!-- Listener Infrastructure -->
+
+   <bean
+      id="commPmeIntegrationObjectFactory"
+      class="com.vmware.caf.comm.integration.objectfactory" />
+
+   <bean
+      id="amqpIntegrationObjects"
+      class="com.vmware.caf.comm.integration.objects" />
+
+   <bean
+      id="replyToResolver"
+      class="com.vmware.caf.comm.integration.replytoresolver"/>
+
+   <bean
+      id="eventTopicCalculator"
+      class="com.vmware.caf.comm.integration.eventtopiccalculator"/>
+
+   <bean
+      id="outgoingMessageHandler"
+      class="com.vmware.caf.comm.integration.outgoingmessagehandler"/>
+
+   <bean
+      id="headerExprInvoker"
+      class="com.vmware.commonagent.integration.headerexpressioninvoker" />
+
+   <!-- Outbound messages -->
+   <channel id="responseFileChannel" />
+   <channel id="managementMessageOutboundAmqp" />
+
+   <file-inbound-channel-adapter
+      id="responseInboundChannel"
+      auto-create-directory="true"
+      filename-regex=".*\.xml"
+      directory="${var:globals:response_dir}"
+      channel="responseFileChannel" />
+
+   <chain
+      id="responseChain"
+      input-channel="responseFileChannel"
+      output-channel="managementMessageOutboundAmqp" >
+      <file-to-string-transformer
+         id="responseFileToString"
+         charset="UTF-8"
+         delete-files="true" />
+      <header-enricher
+         id="responseHeaderEnricher">
+         <header
+            name="replyTo"
+            expression="@replyToResolver.lookupReplyTo()"/>
+         <header
+            name="cafcomm.internal.msgflow"
+            value="OUTGOING"/>
+      </header-enricher>
+      <service-activator
+         id="outgoingMessageServiceActivator"
+         ref="outgoingMessageHandler"/>
+   </chain>
+
+   <!-- proactive messages -->
+   <channel id="eventFileChannel" />
+   <channel id="eventOutFileChannel" />
+   <file-inbound-channel-adapter
+      id="eventInboundChannel"
+      auto-create-directory="true"
+      filename-regex=".*\.xml"
+      directory="${var:globals:event_dir}"
+      channel="eventFileChannel" />
+
+   <chain
+      id="eventChain"
+      input-channel="eventFileChannel"
+      output-channel="eventOutFileChannel">
+      <file-to-string-transformer
+         id="eventFileToString"
+         charset="UTF-8"
+         delete-files="true" />
+      <header-enricher
+         id="eventHeaderEnricher">
+         <header
+            name="cafcomm.internal.msgflow"
+            value="OUTGOING"/>
+      </header-enricher>
+   </chain>
+
+   <!-- Inbound messages -->
+   <channel id="managementInboundAmqp" />
+   <channel id="managementInboundChannel" />
+
+   <chain
+      id="requestChain"
+      input-channel="managementInboundAmqp"
+      output-channel="managementInboundChannel">
+      <transformer
+         id="requestIncomingMessageHandler"
+         ref="commPmeIntegrationObjectFactory"
+         class="incoming-message-handler"/>
+      <transformer
+         id="requestReplyToCacher"
+         ref="commPmeIntegrationObjectFactory"
+         class="reply-to-cacher"
+         reply-to-resolver="replyToResolver"/>
+      <header-enricher
+         id="requestEnricher">
+         <header
+            name="cafcomm.internal.msgflow"
+            value="INCOMING"/>
+      </header-enricher>
+   </chain>
+
+   <file-outbound-channel-adapter
+      id="requestOutboundChannel"
+      channel="managementInboundChannel"
+      auto-create-directory="true"
+      charset="UTF-8"
+      directory="${var:globals:request_dir}"
+      temporary-file-suffix=".tmp" />
+
+   <!-- AMQP Infrastructure -->
+   <!-- SSL
+   <bean id="amqps-conn-factory" class="com.vmware.caf.commapi.integration.SslConnectionFactory">
+      <property name="uri" value="amqps://${brokerAddress}/${brokerVhost}"/>
+      <property name="connectionTimeout" value="10000"/>
+      <property name="clientCertPath" value="${brokerClientCertPath}"/>
+      <property name="clientKeyPath" value="${brokerClientKeyPath}"/>
+      <property name="caCertPath" value="${brokerCaCertPath}"/>
+      <property name="ciphers" value="${sslCiphers}"/>
+      <property name="protocol" value="${sslProtocol}"/>
+   </bean>
+
+   <bean id="connectionFactory" class="org.springframework.amqp.rabbit.connection.CachingConnectionFactory">
+      <constructor-arg ref="amqps-conn-factory"/>
+   </bean>
+   -->
+</caf:beans>

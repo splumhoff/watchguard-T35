@@ -1,0 +1,284 @@
+WatchGuard patches to sources for cavecreek-0.5.0-46 as of
+Thu May 26 11:26:01 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- cavecreek-0.5.0-46/quickassist/build_system/build_files/env_files/linux_2.6_user_space.mk.orig	2022-05-26 11:25:56.029310347 -0700
++++ cavecreek-0.5.0-46/quickassist/build_system/build_files/env_files/linux_2.6_user_space.mk	2022-05-26 11:25:56.421294336 -0700
+@@ -72,9 +72,9 @@
+ #
+ #-------------------------------------------------------------
+ 
+-#INCLUDES+=-I/usr/include \
++SYSTEM_INCLUDE ?= /usr/include
+ 
+-INCLUDES+= \
++INCLUDES+=-I$(SYSTEM_INCLUDE) \
+           -I$(API_DIR)   \
+           -I$(OSAL_DIR)/include \
+           -I$(OSAL_DIR)/src/linux/user_space/include
+--- cavecreek-0.5.0-46/quickassist/build_system/build_files/env_files/environment.mk.orig	2022-05-26 11:25:56.029310347 -0700
++++ cavecreek-0.5.0-46/quickassist/build_system/build_files/env_files/environment.mk	2022-05-26 11:25:56.421294336 -0700
+@@ -89,6 +89,7 @@
+ # ADF paths
+ #----------------------------------------------------------------------
+ ADF_TRANSPORT_DIR=$(ADF_DIR)/transport
++ADF_COMMS_DIR=$(ADF_DIR)
+ ADF_PLATFORM_DIR=$(ADF_DIR)/platform
+ ADF_DRIVERS_DIR=$(ADF_DIR)/drivers
+ ADF_ACCEL_MGR_DIR=$(ADF_DIR)/accel_mgr
+--- cavecreek-0.5.0-46/quickassist/adf/Makefile.orig	2022-05-26 11:25:55.993311817 -0700
++++ cavecreek-0.5.0-46/quickassist/adf/Makefile	2022-05-26 11:25:56.337297767 -0700
+@@ -124,11 +124,11 @@
+ 
+ adf_user: clean dirs
+ 	echo ; echo user/user_proxy/src ; cd user/user_proxy/src; \
+-	$(MAKE) ICP_OS_LEVEL=user_space && $(MAKE) copy || return 1 \
++	$(MAKE) ICP_OS_LEVEL=user_space && $(MAKE) copy || false \
+ 	echo ; echo ../../config_ctl/src ; cd ../../config_ctl/src; \
+-	$(MAKE) ICP_OS_LEVEL=user_space && $(MAKE) copy || return 1 \
++	$(MAKE) ICP_OS_LEVEL=user_space && $(MAKE) copy || false \
+ 	echo ; echo ../../icp_gige_watchdog ; cd ../../gige_watchdog; \
+-	$(MAKE) ICP_OS_LEVEL=user_space && $(MAKE) copy || return 1 \
++	$(MAKE) ICP_OS_LEVEL=user_space && $(MAKE) copy || false \
+ 	echo "ADF build done";
+ 
+ ######################
+@@ -146,6 +146,6 @@
+ 	$(RM) -rf $(ICP_BUILD_OUTPUT_DIR);
+ 	@for dir in  $(SUBDIRS); do \
+ 		(echo ; echo $$dir :; cd $$dir; \
+-	($(MAKE) clean) || return 1) \
++	($(MAKE) clean) || false) \
+ 	$(shell find ./ -name build | xargs rm -rf) \
+ 	done
+--- cavecreek-0.5.0-46/quickassist/adf/drivers/common/linux/src/adf_ctl_drv.c.orig	2022-05-26 11:25:56.013311000 -0700
++++ cavecreek-0.5.0-46/quickassist/adf/drivers/common/linux/src/adf_ctl_drv.c	2022-05-26 11:25:56.361296787 -0700
+@@ -870,7 +870,11 @@
+                 /* next is now the pointer to the head of the
+                  * key/value list for this section. next is
+                  * a pointer to memory in user space.*/
++#ifdef	CONFIG_WG_PLATFORM
++                next = section_curr->params;
++#else
+                 next = section_next->params;
++#endif
+                 /*NULL the head pointer in our linked list. */
+                 section_curr->params = NULL;
+ 
+--- cavecreek-0.5.0-46/quickassist/adf/drivers/common/linux/src/adf_proc_debug.c.orig	2022-05-26 11:25:56.013311000 -0700
++++ cavecreek-0.5.0-46/quickassist/adf/drivers/common/linux/src/adf_proc_debug.c	2022-05-26 11:25:56.373296296 -0700
+@@ -134,11 +134,15 @@
+                                    file_info->seq_read(file_info->private_data,
+                                    file_info->page, PAGE_SIZE - 1,
+                                    file_info->offset);
++#ifdef	CONFIG_WG_KERNEL_4_14
++                      seq_puts(sfile, (char*)file_info->page);
++#else
+                 ret = seq_puts(sfile, (char*)file_info->page);
+                 if (ret) {
+                         /* run out of space - need to reprint */
+                         file_info->offset = old_offset;
+                 }
++#endif
+         }
+         mutex_unlock(&proc_debug_lock);
+         return 0;
+--- cavecreek-0.5.0-46/quickassist/adf/drivers/ACCELDEV/linux/src/adf_acceldev_drv.c.orig	2022-05-26 11:25:56.009311163 -0700
++++ cavecreek-0.5.0-46/quickassist/adf/drivers/ACCELDEV/linux/src/adf_acceldev_drv.c	2022-05-26 11:25:56.349297277 -0700
+@@ -70,6 +70,7 @@
+  *      the main acceleration subsystem init and shutdown functions.
+  *****************************************************************************/
+ #include <linux/kernel.h>
++#include <linux/version.h>	// WG:JB Get Linux version
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/pci.h>
+@@ -85,6 +86,31 @@
+ #include <linux/workqueue.h>
+ #include <asm/io.h>
+ 
++#ifdef	CONFIG_WG_PLATFORM
++
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,12,0)
++
++#undef	hlist_for_each_entry
++#define	hlist_for_each_entry(a,b,c,d)	hlist_for_each_entry_safe(a,b,c,d)
++
++#if LINUX_VERSION_CODE <  KERNEL_VERSION(4,1,0)
++static inline struct pci_cap_saved_state *pci_find_saved_cap(struct pci_dev *pci_dev, char cap)
++{
++	struct pci_cap_saved_state *tmp;
++	struct hlist_node *pos;
++
++	hlist_for_each_entry_safe(tmp, pos, &pci_dev->saved_cap_space, next) {
++		if (tmp->cap.cap_nr == cap)
++			return tmp;
++	}
++	return NULL;
++}
++#endif
++
++#endif
++
++#endif	// CONFIG_WG_PLATFORM
++
+ #include "cpa.h"
+ #include "icp_accel_devices.h"
+ #include "icp_adf_init.h"
+--- cavecreek-0.5.0-46/quickassist/adf/include/icp_platform_linux.h.orig	2022-05-26 11:25:56.017310836 -0700
++++ cavecreek-0.5.0-46/quickassist/adf/include/icp_platform_linux.h	2022-05-26 11:25:56.401295153 -0700
+@@ -90,7 +90,12 @@
+ 
+ #include <linux/fs.h>
+ #include <linux/cdev.h>
++#ifdef	CONFIG_WG_KERNEL_4_14
++#include <linux/uaccess.h>
++#include <linux/sched/signal.h>
++#else
+ #include <asm/uaccess.h>
++#endif
+ 
+ #include "Osal.h"
+ 
+--- cavecreek-0.5.0-46/quickassist/adf/environment.mk.orig	2022-05-26 11:25:56.013311000 -0700
++++ cavecreek-0.5.0-46/quickassist/adf/environment.mk	2022-05-26 11:25:56.385295807 -0700
+@@ -84,6 +84,7 @@
+ OSAL_DIR=$(ICP_ROOT)/Acceleration/library/icp_utils/OSAL
+ 
+ ADF_TRANSPORT_DIR=$(ADF_DIR)/transport
++ADF_COMMS_DIR=$(ADF_DIR)
+ ADF_PLATFORM_DIR=$(ADF_DIR)/platform
+ ADF_DRIVERS_DIR=$(ADF_DIR)/drivers
+ ADF_ACCEL_MGR_DIR=$(ADF_DIR)/accel_mgr
+--- cavecreek-0.5.0-46/quickassist/utilities/osal/src/Makefile.orig	2022-05-26 11:25:56.217302668 -0700
++++ cavecreek-0.5.0-46/quickassist/utilities/osal/src/Makefile	2022-05-26 11:25:56.573288128 -0700
+@@ -118,13 +118,13 @@
+ lib_kernel::osal_clean
+ 	@for dir in  $(SUBDIRS); do \
+ 	(echo ; echo $$dir :; cd $$dir; \
+-		($(MAKE) OS_LEVEL=$(OS_LEVEL) ICP_OS_LEVEL=$(ICP_OS_LEVEL) clean && $(MAKE) OS_LEVEL=$(OS_LEVEL) ICP_OS_LEVEL=$(ICP_OS_LEVEL)) || return 1) \
++		($(MAKE) OS_LEVEL=$(OS_LEVEL) ICP_OS_LEVEL=$(ICP_OS_LEVEL) clean && $(MAKE) OS_LEVEL=$(OS_LEVEL) ICP_OS_LEVEL=$(ICP_OS_LEVEL)) || false) \
+ 	done
+ 
+ lib::osal_clean
+ 	@for dir in  $(SUBDIRS); do \
+ 	(echo ; echo $$dir :; cd $$dir; \
+-		$(MAKE) || return 1) \
++		$(MAKE) || false) \
+ 	done; \
+ 	test -d $(ICP_BUILD_OUTPUT_DIR) || mkdir -p $(ICP_BUILD_OUTPUT_DIR);\
+ 	mv $(OS_LEVEL)/$(ICP_OS_LEVEL)/$(ICP_BUILD_OUTPUT_DIR)/libosal.a $(ICP_BUILD_OUTPUT_DIR)
+@@ -161,5 +161,5 @@
+ 	$(RM) -rf $(ICP_BUILD_OUTPUT_DIR);
+ 	@for dir in  $(SUBDIRS); do \
+ 		(echo ; echo $$dir :; cd $$dir; \
+-	($(MAKE) clean) || return 1) \
++	($(MAKE) clean) || false) \
+ 	done
+--- cavecreek-0.5.0-46/quickassist/utilities/osal/src/linux/user_space/Makefile.orig	2022-05-26 11:25:56.221302505 -0700
++++ cavecreek-0.5.0-46/quickassist/utilities/osal/src/linux/user_space/Makefile	2022-05-26 11:25:56.585287638 -0700
+@@ -70,6 +70,8 @@
+ endif
+ EXTRA_CFLAGS+= -march=$(MACHINE)
+ 
++$(info ====== $(MACHINE))
++
+ #Add the name for the executable, Library or Module output definitions
+ OUTPUT_NAME=libosal
+ 
+--- cavecreek-0.5.0-46/quickassist/utilities/osal/src/linux/kernel_space/include/OsalOsTypes.h.orig	2022-05-26 11:25:56.221302505 -0700
++++ cavecreek-0.5.0-46/quickassist/utilities/osal/src/linux/kernel_space/include/OsalOsTypes.h	2022-05-26 11:25:56.585287638 -0700
+@@ -45,6 +45,13 @@
+ #include <asm/uaccess.h>
+ #include <linux/param.h>
+ 
++#ifdef	CONFIG_WG_PLATFORM
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,12,0)
++#include <linux/sched.h>
++#include <linux/sched/rt.h>
++#endif
++#endif
++
+ /* Include zlib to recover from error -7 in decompression */
+ #include <linux/zlib.h>
+ #include <linux/zutil.h>
+--- cavecreek-0.5.0-46/quickassist/utilities/osal/src/linux/kernel_space/OsalUsrKrlProxy.c.orig	2022-05-26 11:25:56.221302505 -0700
++++ cavecreek-0.5.0-46/quickassist/utilities/osal/src/linux/kernel_space/OsalUsrKrlProxy.c	2022-05-26 11:25:56.581287801 -0700
+@@ -45,7 +45,11 @@
+ #include <linux/mm.h>
+ #include <linux/slab.h>
+ 
++#ifdef	CONFIG_WG_KERNEL_4_14
++#include <linux/uaccess.h>
++#else
+ #include <asm/uaccess.h>
++#endif
+ #include <linux/string.h>
+ #include <asm/io.h>
+ 
+--- cavecreek-0.5.0-46/quickassist/utilities/osal/src/linux/kernel_space/Makefile.orig	2022-05-26 11:25:56.221302505 -0700
++++ cavecreek-0.5.0-46/quickassist/utilities/osal/src/linux/kernel_space/Makefile	2022-05-26 11:25:56.577287965 -0700
+@@ -46,7 +46,7 @@
+ EXTRA_CFLAGS+=-DOSAL_ENSURE_ON
+ 
+ ifndef CROSS_COMPILE
+-MACHINE:=$(shell uname -m)
++MACHINE?=$(shell uname -m)
+ else
+ ifndef MACHINE
+ $(error MACHINE is undefined)
+@@ -70,12 +70,10 @@
+ #include your $(ICP_OS)_$(ICP_OS_LEVEL).mk file
+ include $(ICP_ENV_DIR)/$(ICP_OS)_$(ICP_OS_LEVEL).mk
+ 
++$(info MACHINE = $(MACHINE), ARCH = $(ARCH))
++
+ ifneq ($(MACHINE), x86_64)
+ ASM_SOURCES+= OsalAtomicAddSub.S
+-else
+-ifeq ($(ARCH), i386)
+-ASM_SOURCES+= OsalAtomicAddSub.S
+-endif
+ endif
+ 
+ install: lib_static
+--- cavecreek-0.5.0-46/quickassist/lookaside/access_layer/Makefile.orig	2022-05-26 11:25:56.041309856 -0700
++++ cavecreek-0.5.0-46/quickassist/lookaside/access_layer/Makefile	2022-05-26 11:25:56.429294009 -0700
+@@ -125,7 +125,7 @@
+ 	@for rule in $(RULES); do \
+ 	for comp in $(COMP_LIST); do\
+         (echo ; echo $$rule ;  \
+-                $(MAKE) $$rule COMP=$$comp || return 1) \
++                $(MAKE) $$rule COMP=$$comp || false) \
+         done \
+ 	done;
+ 	$(MAKE) lac_kernel_module;
+--- cavecreek-0.5.0-46/quickassist/lookaside/access_layer/src/common/utils/lac_mem_pools.c.orig	2022-05-26 11:25:56.081308223 -0700
++++ cavecreek-0.5.0-46/quickassist/lookaside/access_layer/src/common/utils/lac_mem_pools.c	2022-05-26 11:25:56.465292539 -0700
+@@ -377,7 +377,15 @@
+ #else
+         LAC_SPINUNLOCK(&(pPoolID->headLock));
+ #endif
++#ifdef CONFIG_WG_PLATFORM // WG:JB FBX-7483
++#ifdef __KERNEL__
++        return in_atomic() ? NULL : (void*)CPA_STATUS_RETRY;
++#else
+         return (void*)CPA_STATUS_RETRY;
++#endif
++#else
++        return (void*)CPA_STATUS_RETRY;
++#endif
+     }
+ 
+     LAC_SPINUNLOCK(&(pPoolID->headLock));
+--- cavecreek-0.5.0-46/quickassist/lookaside/access_layer/src/Makefile.orig	2022-05-26 11:25:56.041309856 -0700
++++ cavecreek-0.5.0-46/quickassist/lookaside/access_layer/src/Makefile	2022-05-26 11:25:56.429294009 -0700
+@@ -232,5 +232,5 @@
+ 	$(RM) -rf $(ICP_BUILD_OUTPUT_DIR);
+ 	@for dir in  $(SUBDIRS); do \
+ 		(echo ; echo $$dir :; cd $$dir; \
+-	($(MAKE) clean) || return 1) \
++	($(MAKE) clean) || false) \
+ 	done

@@ -1,0 +1,22 @@
+WatchGuard patches to sources for i2c-tools-3.0.1 as of
+Thu May 26 11:32:54 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- i2c-tools-3.0.1/Makefile.orig	2022-05-26 11:32:54.032212831 -0700
++++ i2c-tools-3.0.1/Makefile	2022-05-26 11:32:54.128208900 -0700
+@@ -18,10 +18,10 @@
+ INSTALL_PROGRAM	:= $(INSTALL) -m 755
+ RM		:= rm -f
+ 
+-CC	:= gcc
+-CFLAGS	:= -Wall
+ 
+-CFLAGS	+= -O2
++CC	?= gcc
++CFLAGS	?= -Wall -O2
++
+ # When debugging, use the following instead
+ #CFLAGS	+= -O -g
+ 

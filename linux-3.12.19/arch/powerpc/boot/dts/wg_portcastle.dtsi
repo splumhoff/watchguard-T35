@@ -1,0 +1,522 @@
+/*
+ * P1011 RDB Device Tree Source
+ *
+ * Copyright 2010 Freescale Semiconductor Inc.
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ */
+
+/ {
+	compatible = "fsl,P1020RDB";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	aliases {
+		serial0 = &serial0;
+		serial1 = &serial1;
+		ethernet0 = &enet0;
+		ethernet1 = &enet1;
+		pci0 = &pci0;
+		pci1 = &pci1;
+	};
+
+	memory {
+		device_type = "memory";
+	};
+
+	l2sram@fff00000 {
+		device_type = "memory";
+		compatible = "fsl,l2sram";
+		reg = <0x0 0xfff00000 0 0x10000>;
+	};
+
+	localbus@ffe05000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		compatible = "fsl,p1020-elbc", "fsl,elbc", "simple-bus";
+		reg = <0 0xffe05000 0 0x1000>;
+		interrupts = <19 2>;
+		interrupt-parent = <&mpic>;
+
+		/* NOR, NAND Flashes */
+		ranges = <0x0 0x0 0x0 0xeff00000 0x00100000
+			  0x1 0x0 0x0 0xffa00000 0x00040000>;
+
+		/*
+		 *  Different Layouts
+                 *
+		 *  newcastle cut-1: 
+		 *    2MB NOR FLASH
+		 *	- (0MB - 1MB) Backup NOR FLASH
+		 *	- (1MB - 2MB) Active NOR FLASH
+		 *		- 256KB DTB
+		 *		- 192KB FUTURE USE
+		 *		- 64KB  U-BOOT ENV
+		 *		- 512KB U-BOOT Image
+		 *	
+		 *  newcastle cut-2: (FINAL-MAP + WG-MAP)
+		 *    1MB NOR FLASH
+		 *	- (0x0 - 1MB) ENTIRE NOR FLASH
+		 *		- 128KB CFG0
+		 *		- 192KB CFG1
+		 *		- 64KB  MFG-DATA or 128MB NOR FLASH test-AREA
+		 *		- 64KB  WG test-results
+		 *		- 64KB  U-boot ENV
+		 *		- 512KB U-boot Image
+		 */
+		nor@0,0 {   /* Stick to "newcastle cut-2" layout */
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "cfi-flash";
+			reg = <0x0 0x0 0x100000>;
+			bank-width = <2>;
+			device-width = <1>;
+
+			partition@0 {
+				/*128KB*/
+				reg = <0x0 0x00020000>;
+				label = "NOR (RW) WG CFG0 (NEW bootopt partition)";
+			};
+
+			partition@20000 {
+				/*192KB*/
+				reg = <0x0020000 0x00030000>;
+				label = "NOR (RW) WG CFG1";
+			};
+
+			/* NOTE: NOR Flash from (0x00040000 - 0x00060000) 128KB 
+                         *  used for NOR Flash tests (shared between CFG1 & MFG)
+                         *  plan: Will never run NOR tests from u-boot
+                         *  (unless changed to use some other offsets) */
+
+			partition@50000 {
+				/*64KB*/
+				reg = <0x00050000 0x00010000>;
+				label = "NOR (RW) WG MFG DATA";
+			};
+
+			partition@60000 {
+				/*64KB*/
+				reg = <0x00060000 0x000010000>;
+				label = "NOR (RW) WG test-results & bootOpt Data";
+			};
+
+			partition@70000 {
+				/*64KB*/
+				reg = <0x00070000 0x00010000>;
+				label = "NOR (RO) WG U-Boot ENV";
+			};
+
+			partition@80000 {
+				/*512KB*/
+				reg = <0x00080000 0x00080000>;
+				label = "NOR (RW) WG U-Boot Image";
+			};
+		};
+
+		nand@1,0 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "fsl,p1020-fcm-nand",
+				     "fsl,elbc-fcm-nand";
+			reg = <0x1 0x0 0x00040000>;
+
+			partition@00000000 {
+				/* 128KB for DTB Image */
+				reg = <0x00000000 0x00020000>;
+				label = "NAND (RW) WG DTB Image";
+			};
+
+			partition@00020000 {
+				/* 5MB for sysa kernel */
+				reg = <0x00020000 0x00500000>;
+				label = "NAND (RW) WG SYSA Kernel";
+			};
+
+			partition@00520000 {
+				/* 121MB for sysa code */
+				reg = <0x00520000 0x079e0000>;
+				label = "NAND (RW) WG SYSA_CODE";
+			};
+
+			partition@07f00000 {
+				/* 5MB for sysb kernel */
+				reg = <0x07f00000 0x00500000>;
+				label = "NAND (RW) WG SYSB Kernel";
+			};
+
+			partition@08400000 {
+				/* 24MB for sysb code */
+				reg = <0x08400000 0x01800000>;
+				label = "NAND (RW) WG SYSB_CODE";
+			};
+
+			partition@09c00000 {
+				/* 4MB for kdump */
+				reg = <0x09c00000 0x00400000>;
+				label = "NAND (RW) WG KDUMP";
+			};
+
+		};
+	};
+
+	soc@ffe00000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		device_type = "soc";
+		compatible = "fsl,p1020-immr", "simple-bus";
+		ranges = <0x0  0x0 0xffe00000 0x100000>;
+		bus-frequency = <0>;		// Filled out by uboot.
+
+		ecm-law@0 {
+			compatible = "fsl,ecm-law";
+			reg = <0x0 0x1000>;
+			fsl,num-laws = <12>;
+		};
+
+		ecm@1000 {
+			compatible = "fsl,p1020-ecm", "fsl,ecm";
+			reg = <0x1000 0x1000>;
+			interrupts = <16 2>;
+			interrupt-parent = <&mpic>;
+		};
+
+		memory-controller@2000 {
+			compatible = "fsl,p1020-memory-controller";
+			reg = <0x2000 0x1000>;
+			interrupt-parent = <&mpic>;
+			interrupts = <16 2>;
+		};
+
+		i2c@3000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			cell-index = <0>;
+			compatible = "fsl-i2c";
+			reg = <0x3000 0x100>;
+			interrupts = <43 2>;
+			interrupt-parent = <&mpic>;
+			dfsrr;
+			rtc@30 {
+				compatible = "seiko,s35390a";
+				reg = <0x30>;
+			};
+		};
+
+		i2c@3100 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			cell-index = <1>;
+			compatible = "fsl-i2c";
+			reg = <0x3100 0x100>;
+			interrupts = <43 2>;
+			interrupt-parent = <&mpic>;
+			dfsrr;
+		};
+
+		serial0: serial@4500 {
+			cell-index = <0>;
+			device_type = "serial";
+			compatible = "ns16550";
+			reg = <0x4500 0x100>;
+			clock-frequency = <0>;
+			interrupts = <42 2>;
+			interrupt-parent = <&mpic>;
+		};
+
+		serial1: serial@4600 {
+			cell-index = <1>;
+			device_type = "serial";
+			compatible = "ns16550";
+			reg = <0x4600 0x100>;
+			clock-frequency = <0>;
+			interrupts = <42 2>;
+			interrupt-parent = <&mpic>;
+		};
+
+		gpio: gpio-controller@f000 {
+			#gpio-cells = <2>;
+			compatible = "fsl,mpc8572-gpio";
+			reg = <0xf000 0x100>;
+			interrupts = <47 0x2>;
+			interrupt-parent = <&mpic>;
+			gpio-controller;
+		};
+
+		L2: l2-cache-controller@20000 {
+			compatible = "fsl,p1020-l2-cache-controller";
+			reg = <0x20000 0x1000>;
+			cache-line-size = <32>;	// 32 bytes
+			cache-size = <0x40000>; // L2,256K
+			interrupt-parent = <&mpic>;
+			interrupts = <16 2>;
+		};
+
+		dma@21300 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "fsl,eloplus-dma";
+			reg = <0x21300 0x4>;
+			ranges = <0x0 0x21100 0x200>;
+			cell-index = <0>;
+			dma-channel@0 {
+				compatible = "fsl,eloplus-dma-channel";
+				reg = <0x0 0x80>;
+				cell-index = <0>;
+				interrupt-parent = <&mpic>;
+				interrupts = <20 2>;
+			};
+			dma-channel@80 {
+				compatible = "fsl,eloplus-dma-channel";
+				reg = <0x80 0x80>;
+				cell-index = <1>;
+				interrupt-parent = <&mpic>;
+				interrupts = <21 2>;
+			};
+			dma-channel@100 {
+				compatible = "fsl,eloplus-dma-channel";
+				reg = <0x100 0x80>;
+				cell-index = <2>;
+				interrupt-parent = <&mpic>;
+				interrupts = <22 2>;
+			};
+			dma-channel@180 {
+				compatible = "fsl,eloplus-dma-channel";
+				reg = <0x180 0x80>;
+				cell-index = <3>;
+				interrupt-parent = <&mpic>;
+				interrupts = <23 2>;
+			};
+		};
+
+		mdio@24000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl,etsec2-mdio";
+			reg = <0x24000 0x1000 0xb0030 0x4>;
+
+			phy0: ethernet-phy@0 {
+				interrupt-parent = <&mpic>;
+				interrupts = <3 1>;
+				reg = <0x10>;
+			};
+		};
+
+		enet0: ethernet@B0000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			cell-index = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "fsl,etsec2";
+			fsl,num_rx_queues = <0x8>;
+			fsl,num_tx_queues = <0x8>;
+			local-mac-address = [ 00 00 00 00 00 00 ];
+			interrupt-parent = <&mpic>;
+			fixed-link = <1 1 1000 0 0>;
+			phy-connection-type = "rgmii-id";
+			queue-group@0{
+				#address-cells = <1>;
+				#size-cells = <1>;
+				reg = <0xB0000 0x1000>;
+				fsl,rx-err-int-map = <0xAA>;
+				fsl,tx-int-map = <0xAA>;
+				interrupts = <29 2 30 2 34 2>;
+			};
+			queue-group@1{
+				#address-cells = <1>;
+				#size-cells = <1>;
+				reg = <0xB4000 0x1000>;
+				fsl,rx-err-int-map = <0x55>;
+				fsl,tx-int-map = <0x55>;
+				interrupts = <17 2 18 2 24 2>;
+			};
+		};
+
+		enet1: ethernet@B2000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			cell-index = <0>;
+			device_type = "network";
+			model = "eTSEC";
+			compatible = "fsl,etsec2";
+			fsl,num_rx_queues = <0x8>;
+			fsl,num_tx_queues = <0x8>;
+			local-mac-address = [ 00 00 00 00 00 00 ];
+			interrupt-parent = <&mpic>;
+			#phy-handle = <&phy0>;
+			fixed-link = <2 1 1000 0 0>;
+			phy-connection-type = "rgmii-id";
+			queue-group@0{
+				#address-cells = <1>;
+				#size-cells = <1>;
+				reg = <0xB2000 0x1000>;
+				fsl,rx-err-int-map = <0xAA>;
+				fsl,tx-int-map = <0xAA>;
+				interrupts = <31 2 32 2 33 2>;
+			};
+			queue-group@1{
+				#address-cells = <1>;
+				#size-cells = <1>;
+				reg = <0xB6000 0x1000>;
+				fsl,rx-err-int-map = <0x55>;
+				fsl,tx-int-map = <0x55>;
+				interrupts = <25 2 26 2 27 2>;
+			};
+		};
+
+		usb@22000 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			compatible = "fsl-usb2-dr";
+			reg = <0x22000 0x1000>;
+			interrupt-parent = <&mpic>;
+			interrupts = <28 0x2>;
+			phy_type = "ulpi";
+		};
+
+		crypto@30000 {
+			compatible = "fsl,sec3.3", "fsl,sec3.1",
+				     "fsl,sec3.0", "fsl,sec2.4",
+				     "fsl,sec2.2", "fsl,sec2.1", "fsl,sec2.0";
+			reg = <0x30000 0x10000>;
+			interrupts = <45 2 58 2>;
+			interrupt-parent = <&mpic>;
+			fsl,num-channels = <4>;
+			fsl,channel-fifo-len = <24>;
+			fsl,exec-units-mask = <0x97c>;
+			fsl,descriptor-types-mask = <0x3a30abf>;
+			fsl,channel-remap = <0x3>;
+		};
+
+		mpic: pic@40000 {
+			interrupt-controller;
+			#address-cells = <0>;
+			#interrupt-cells = <2>;
+			reg = <0x40000 0x40000>;
+			compatible = "chrp,open-pic";
+			device_type = "open-pic";
+		};
+
+		message@41400 {
+			compatible = "fsl,p1020-msg", "fsl,mpic-msg";
+			reg = <0x41400 0x200>;
+			interrupts = <
+				0xb0 2
+				0xb1 2
+				0xb2 2
+				0xb3 2>;
+			interrupt-parent = <&mpic>;
+		};
+
+		message@42400 {
+			compatible = "fsl,p1020-msg", "fsl,mpic-msg";
+			reg = <0x42400 0x200>;
+			interrupts = <
+				0xb4 2
+				0xb5 2
+				0xb6 2
+				0xb7 2>;
+			interrupt-parent = <&mpic>;
+		};
+
+		msi@41600 {
+			compatible = "fsl,p1020-msi", "fsl,mpic-msi";
+			reg = <0x41600 0x80>;
+			msi-available-ranges = <0 0x100>;
+			interrupts = <
+				0xe0 0
+				0xe1 0
+				0xe2 0
+				0xe3 0
+				0xe4 0
+				0xe5 0
+				0xe6 0
+				0xe7 0>;
+			interrupt-parent = <&mpic>;
+		};
+
+		global-utilities@e0000 {	//global utilities block
+			compatible = "fsl,p2020-guts";
+			reg = <0xe0000 0x3000>;
+			fsl,has-rstcr;
+		};
+	};
+
+	pci0: pcie@ffe09000 {
+		cell-index = <1>;
+		compatible = "fsl,mpc8548-pcie";
+		device_type = "pci";
+		#interrupt-cells = <1>;
+		#size-cells = <2>;
+		#address-cells = <3>;
+		reg = <0 0xffe09000 0 0x1000>;
+		bus-range = <0 255>;
+		ranges = <0x2000000 0x0 0xa0000000 0 0xa0000000 0x0 0x20000000
+			  0x1000000 0x0 0x00000000 0 0xffc10000 0x0 0x10000>;
+		clock-frequency = <33333333>;
+		interrupt-parent = <&mpic>;
+		interrupts = <16 2>;
+		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+		interrupt-map = <
+			/* IDSEL 0x0 */
+			0000 0x0 0x0 0x1 &mpic 0x4 0x1
+			0000 0x0 0x0 0x2 &mpic 0x5 0x1
+			0000 0x0 0x0 0x3 &mpic 0x6 0x1
+			0000 0x0 0x0 0x4 &mpic 0x7 0x1
+			>;
+		pcie@0 {
+			reg = <0x0 0x0 0x0 0x0 0x0>;
+			#size-cells = <2>;
+			#address-cells = <3>;
+			device_type = "pci";
+			ranges = <0x2000000 0x0 0xa0000000
+				  0x2000000 0x0 0xa0000000
+				  0x0 0x20000000
+
+				  0x1000000 0x0 0x0
+				  0x1000000 0x0 0x0
+				  0x0 0x100000>;
+		};
+	};
+
+	pci1: pcie@ffe0a000 {
+		cell-index = <2>;
+		compatible = "fsl,mpc8548-pcie";
+		device_type = "pci";
+		#interrupt-cells = <1>;
+		#size-cells = <2>;
+		#address-cells = <3>;
+		reg = <0 0xffe0a000 0 0x1000>;
+		bus-range = <0 255>;
+		ranges = <0x2000000 0x0 0x80000000 0 0x80000000 0x0 0x20000000
+			  0x1000000 0x0 0x00000000 0 0xffc00000 0x0 0x10000>;
+		clock-frequency = <33333333>;
+		interrupt-parent = <&mpic>;
+		interrupts = <16 2>;
+		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+		interrupt-map = <
+			/* IDSEL 0x0 */
+			0000 0x0 0x0 0x1 &mpic 0x0 0x1
+			0000 0x0 0x0 0x2 &mpic 0x1 0x1
+			0000 0x0 0x0 0x3 &mpic 0x2 0x1
+			0000 0x0 0x0 0x4 &mpic 0x3 0x1
+			>;
+		pcie@0 {
+			reg = <0x0 0x0 0x0 0x0 0x0>;
+			#size-cells = <2>;
+			#address-cells = <3>;
+			device_type = "pci";
+			ranges = <0x2000000 0x0 0x80000000
+				  0x2000000 0x0 0x80000000
+				  0x0 0x20000000
+
+				  0x1000000 0x0 0x0
+				  0x1000000 0x0 0x0
+				  0x0 0x100000>;
+		};
+	};
+};

@@ -1,0 +1,234 @@
+WatchGuard patches to sources for lua-5.0.3 as of
+Thu May 26 11:36:25 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- lua-5.0.3/Makefile.orig	2022-05-26 11:36:24.699583475 -0700
++++ lua-5.0.3/Makefile	2022-05-26 11:36:24.759581017 -0700
+@@ -6,6 +6,8 @@
+ 
+ include $(LUA)/config
+ 
++CFLAGS= $(MYCFLAGS) $(PICFLAGS) $(WARN) $(INCS) $(DEFS)
++
+ # primary targets ("co" and "klean" are used for making the distribution)
+ all clean co klean:	dirs
+ 	cd include; $(MAKE) $@
+@@ -38,8 +40,8 @@
+ 
+ # shared libraries (for Linux)
+ so:
+-	ld -o lib/liblua.so.$V -shared src/*.o
+-	ld -o lib/liblualib.so.$V -shared src/lib/*.o
++	$(CC) -o lib/liblua.so.$V -shared src/*.o
++	$(CC) -o lib/liblualib.so.$V -shared src/lib/*.o
+ 	cd lib; ln -fs liblua.so.$V liblua.so; ln -fs liblualib.so.$V liblualib.so
+ 
+ # binaries using shared libraries
+--- lua-5.0.3/config.orig	2022-05-26 11:36:24.719582655 -0700
++++ lua-5.0.3/config	2022-05-26 11:36:24.763580852 -0700
+@@ -25,8 +25,8 @@
+ # interface (e.g., Linux, Solaris, IRIX, BSD, AIX, HPUX, and probably others),
+ # uncomment the next two lines.
+ #
+-#LOADLIB= -DUSE_DLOPEN=1
+-#DLLIB= -ldl
++LOADLIB= -DUSE_DLOPEN=1
++DLLIB= -ldl
+ #
+ # In Linux with gcc, you should also uncomment the next definition for
+ # MYLDFLAGS, which passes -E (= -export-dynamic) to the linker. This option
+@@ -34,6 +34,7 @@
+ # not need the Lua libraries. (Other systems may have an equivalent facility.)
+ #
+ #MYLDFLAGS= -Wl,-E
++MYLDFLAGS= -Wl,-E $(EXTRA_LDFLAGS)
+ #
+ # On Windows systems. support for dynamic loading is enabled by default.
+ # To disable this support, uncomment the next line.
+@@ -72,7 +73,7 @@
+ # Lua uses double for numbers. To change this, uncomment and edit the following
+ # line, changing USE_XXX to one of USE_DOUBLE, USE_FLOAT, USE_LONG, USE_INT.
+ #
+-#NUMBER= -DLUA_USER_H='"../etc/luser_number.h"' -DUSE_XXX
++NUMBER= -DLUA_USER_H='"../etc/luser_number.h"' -DUSE_INT
+ 
+ # When compiling Lua with gcc on a Pentium machine, using a fast rounding
+ # method for the conversion of doubles to ints can give around 20% speed
+@@ -108,6 +109,7 @@
+ # You need an ANSI C compiler. gcc is a popular one. We do not use -ansi in
+ # WARN because it disables POSIX features used in the libraries.
+ #
++# Set CC on command line!
+ CC= gcc
+ WARN= -Wall
+ 
+@@ -119,7 +121,7 @@
+ # debug information. If you only want the shared libraries, you may want to
+ # add -fPIC to MYCFLAGS.
+ #
+-MYCFLAGS= -O2
++MYCFLAGS= -O2 -g
+ #MYCFLAGS= -O3 -fomit-frame-pointer # -fPIC
+ 
+ # Write here any options you may need for your C linker.
+@@ -129,11 +131,13 @@
+ 
+ # This should work in all Unix systems.
+ #
++# Set AR on command line!
+ AR= ar rcu
+ 
+ # If your system doesn't have (or need) ranlib, use RANLIB=true.
+ # On some systems, "ar s" does what ranlib would do.
+ #
++# Set RANLIB on command line!
+ RANLIB= ranlib
+ #RANLIB= ar s
+ #RANLIB= true
+@@ -142,12 +146,14 @@
+ 
+ # This should work in all Unix systems, but you may want to add options.
+ #
++# Set STRIP on command line!
+ STRIP= strip
+ 
+ # ------------------------------------------------------------------ install
+ 
+ # Locations for "make install". You may need to be root do "make install".
+ #
++# Set INSTALL_ROOT on command line!
+ INSTALL_ROOT= /usr/local
+ INSTALL_BIN= $(INSTALL_ROOT)/bin
+ INSTALL_INC= $(INSTALL_ROOT)/include
+--- lua-5.0.3/src/lobject.c.orig	2022-05-26 11:36:25.091567414 -0700
++++ lua-5.0.3/src/lobject.c	2022-05-26 11:36:25.215562332 -0700
+@@ -23,7 +23,7 @@
+ 
+ /* function to convert a string to a lua_Number */
+ #ifndef lua_str2number
+-#define lua_str2number(s,p)     strtod((s), (p))
++#define lua_str2number(s,p)     strtol((s), (p), 10)
+ #endif
+ 
+ 
+--- lua-5.0.3/src/lib/Makefile.orig	2022-05-26 11:36:24.731582164 -0700
++++ lua-5.0.3/src/lib/Makefile	2022-05-26 11:36:24.775580361 -0700
+@@ -4,6 +4,8 @@
+ 
+ include $(LUA)/config
+ 
++CFLAGS= $(MYCFLAGS) $(PICFLAGS) $(WARN) $(INCS) $(DEFS)
++
+ EXTRA_DEFS= $(POPEN) $(TMPNAM) $(DEGREES) $(LOADLIB)
+ 
+ OBJS= lauxlib.o lbaselib.o ldblib.o liolib.o lmathlib.o ltablib.o lstrlib.o loadlib.o
+--- lua-5.0.3/src/lib/lstrlib.c.orig	2022-05-26 11:36:25.115566430 -0700
++++ lua-5.0.3/src/lib/lstrlib.c	2022-05-26 11:36:25.227561841 -0700
+@@ -146,7 +146,7 @@
+ */
+ 
+ #ifndef MAX_CAPTURES
+-#define MAX_CAPTURES 32  /* arbitrary limit */
++#define MAX_CAPTURES 96  /* arbitrary limit */
+ #endif
+ 
+ 
+--- lua-5.0.3/src/lundump.c.orig	2022-05-26 11:36:25.083567741 -0700
++++ lua-5.0.3/src/lundump.c	2022-05-26 11:36:25.215562332 -0700
+@@ -4,6 +4,8 @@
+ ** See Copyright Notice in lua.h
+ */
+ 
++#include <stdint.h>
++
+ #define lundump_c
+ 
+ #include "lua.h"
+@@ -24,6 +26,7 @@
+  Mbuffer* b;
+  int swap;
+  const char* name;
++ int src_size_t_len;
+ } LoadState;
+ 
+ static void unexpectedEOZ (LoadState* S)
+@@ -84,7 +87,19 @@
+ static size_t LoadSize (LoadState* S)
+ {
+  size_t x;
+- LoadBlock(S,&x,sizeof(x));
++ uint32_t src32;
++ uint64_t src64;
++ if (S->src_size_t_len == sizeof(src32)) {
++  LoadBlock(S,&src32,sizeof(src32));
++  x = src32;
++  src64 = src32;
++ } else {
++  LoadBlock(S,&src64,sizeof(src64));
++  x = src64;
++  src32 = src64;
++ }
++ if (src32 != src64)
++   luaG_runerror(S->L, "size_t overflow in %s", S->name);
+  return x;
+ }
+ 
+@@ -239,7 +254,11 @@
+ 	S->name,V(version),V(VERSION0));
+  S->swap=(luaU_endianness()!=LoadByte(S));	/* need to swap bytes? */
+  TESTSIZE(sizeof(int),"int");
+- TESTSIZE(sizeof(size_t), "size_t");
++ S->src_size_t_len = LoadByte(S);
++ if (S->src_size_t_len != 4 && S->src_size_t_len != 8)
++  luaG_runerror(S->L,"virtual machine mismatch in %s: " 
++        "size of %s is %d but read %d from bytecode header, expecting 4 or 8", 
++	S->name, "size_t", sizeof(size_t), S->src_size_t_len);
+  TESTSIZE(sizeof(Instruction), "Instruction");
+  TESTSIZE(SIZE_OP, "OP");
+  TESTSIZE(SIZE_A, "A");
+--- lua-5.0.3/src/llimits.h.orig	2022-05-26 11:36:25.091567414 -0700
++++ lua-5.0.3/src/llimits.h	2022-05-26 11:36:25.215562332 -0700
+@@ -10,6 +10,7 @@
+ 
+ #include <limits.h>
+ #include <stddef.h>
++#include <stdint.h>
+ 
+ 
+ #include "lua.h"
+@@ -114,7 +115,7 @@
+ ** type for virtual-machine instructions
+ ** must be an unsigned with (at least) 4 bytes (see details in lopcodes.h)
+ */
+-typedef unsigned long Instruction;
++typedef uint32_t Instruction;
+ 
+ 
+ /* maximum depth for calls (unsigned short) */
+--- lua-5.0.3/include/lua.h.orig	2022-05-26 11:36:25.123566103 -0700
++++ lua-5.0.3/include/lua.h	2022-05-26 11:36:25.235561514 -0700
+@@ -84,7 +84,7 @@
+ 
+ /* type of numbers in Lua */
+ #ifndef LUA_NUMBER
+-typedef double lua_Number;
++typedef long lua_Number;
+ #else
+ typedef LUA_NUMBER lua_Number;
+ #endif
+@@ -292,11 +292,11 @@
+ 
+ /* formats for Lua numbers */
+ #ifndef LUA_NUMBER_SCAN
+-#define LUA_NUMBER_SCAN		"%lf"
++#define LUA_NUMBER_SCAN		"%ld"
+ #endif
+ 
+ #ifndef LUA_NUMBER_FMT
+-#define LUA_NUMBER_FMT		"%.14g"
++#define LUA_NUMBER_FMT		"%ld"
+ #endif
+ 
+ /* }====================================================================== */

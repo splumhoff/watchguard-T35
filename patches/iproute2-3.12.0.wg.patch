@@ -1,0 +1,178 @@
+WatchGuard patches to sources for iproute2-3.12.0 as of
+Thu May 26 11:33:05 PDT 2022
+The patches shown here have been applied to source .tar.gz 
+files supplied with the WatchGuard Open Source Archive.
+
+==========================================================================
+--- iproute2-3.12.0/lib/libnetlink.c.orig	2022-05-26 11:33:02.551863968 -0700
++++ iproute2-3.12.0/lib/libnetlink.c	2022-05-26 11:33:02.679858727 -0700
+@@ -25,6 +25,8 @@
+ 
+ #include "libnetlink.h"
+ 
++int ignore_error = 0;
++
+ int rcvbuf = 1024 * 1024;
+ 
+ void rtnl_close(struct rtnl_handle *rth)
+@@ -380,6 +382,43 @@
+ 						return 0;
+ 					}
+ 
++					if (ignore_error != 0) {
++						if (err->error == -ENODEV) {
++							/*
++							 * Ignore such error. 
++							 * It's possible the device is deleted during executing a batch file 
++							 */
++							fprintf(stderr, "RTNETLINK answers: %s\n", strerror(-err->error));
++							return 0;
++						}
++
++						if (err->error == -ENOENT 
++							&& (n->nlmsg_type == RTM_DELQDISC 
++								|| n->nlmsg_type == RTM_DELTCLASS
++								|| n->nlmsg_type == RTM_DELTFILTER
++								|| n->nlmsg_type == RTM_DELACTION) ) {
++							/*
++							 * Ignore such error. 
++							 * It's not a real error in some cases.
++							 */
++							fprintf(stderr, "RTNETLINK answers: %s\n", strerror(-err->error));
++							return 0;
++						}
++						if (err->error == -EEXIST) {
++							switch (n->nlmsg_type) {
++							case RTM_NEWQDISC:
++							case RTM_NEWTCLASS:
++							case RTM_NEWTFILTER:
++							case RTM_NEWACTION:
++								/* Ignore errors like this as that's not real error as there's no convenient way to detect existing qdisc, class, filter, and action. */
++								fprintf(stderr, "Ignore RTNETLINK errors: %s\n", strerror(-err->error));
++								return 0;
++							default:
++								break;
++							}
++						}
++					}
++
+ 					fprintf(stderr, "RTNETLINK answers: %s\n", strerror(-err->error));
+ 					errno = -err->error;
+ 				}
+--- iproute2-3.12.0/tc/tc_filter.c.orig	2022-05-26 11:33:02.579862822 -0700
++++ iproute2-3.12.0/tc/tc_filter.c	2022-05-26 11:33:02.751855779 -0700
+@@ -163,6 +163,7 @@
+ 
+ 		if ((req.t.tcm_ifindex = ll_name_to_index(d)) == 0) {
+ 			fprintf(stderr, "Cannot find device \"%s\"\n", d);
++			not_find_device++;
+ 			return 1;
+ 		}
+ 	}
+--- iproute2-3.12.0/tc/tc_class.c.orig	2022-05-26 11:33:02.579862822 -0700
++++ iproute2-3.12.0/tc/tc_class.c	2022-05-26 11:33:02.739856270 -0700
+@@ -134,6 +134,7 @@
+ 
+ 		if ((req.t.tcm_ifindex = ll_name_to_index(d)) == 0) {
+ 			fprintf(stderr, "Cannot find device \"%s\"\n", d);
++			not_find_device++;
+ 			return 1;
+ 		}
+ 	}
+--- iproute2-3.12.0/tc/m_mirred.c.orig	2022-05-26 11:33:02.575862986 -0700
++++ iproute2-3.12.0/tc/m_mirred.c	2022-05-26 11:33:02.707857580 -0700
+@@ -149,6 +149,7 @@
+ 
+ 		if ((idx = ll_name_to_index(d)) == 0) {
+ 			fprintf(stderr, "Cannot find device \"%s\"\n", d);
++			not_find_device++;
+ 			return -1;
+ 		}
+ 
+--- iproute2-3.12.0/tc/tc_common.h.orig	2022-05-26 11:33:02.579862822 -0700
++++ iproute2-3.12.0/tc/tc_common.h	2022-05-26 11:33:02.739856270 -0700
+@@ -1,6 +1,8 @@
+ 
+ #define TCA_BUF_MAX	(64*1024)
+ 
++extern int not_find_device;
++
+ extern struct rtnl_handle rth;
+ extern int do_qdisc(int argc, char **argv);
+ extern int do_class(int argc, char **argv);
+--- iproute2-3.12.0/tc/tc_qdisc.c.orig	2022-05-26 11:33:02.579862822 -0700
++++ iproute2-3.12.0/tc/tc_qdisc.c	2022-05-26 11:33:02.751855779 -0700
+@@ -182,6 +182,7 @@
+ 
+ 		if ((idx = ll_name_to_index(d)) == 0) {
+ 			fprintf(stderr, "Cannot find device \"%s\"\n", d);
++			not_find_device++;
+ 			return 1;
+ 		}
+ 		req.t.tcm_ifindex = idx;
+--- iproute2-3.12.0/tc/tc.c.orig	2022-05-26 11:33:02.579862822 -0700
++++ iproute2-3.12.0/tc/tc.c	2022-05-26 11:33:02.719857089 -0700
+@@ -39,8 +39,11 @@
+ int resolve_hosts = 0;
+ int use_iec = 0;
+ int force = 0;
++int not_find_device = 0;
+ struct rtnl_handle rth;
+ 
++extern int ignore_error;
++
+ static void *BODY = NULL;	/* cached handle dlopen(NULL) */
+ static struct qdisc_util * qdisc_list;
+ static struct filter_util * filter_list;
+@@ -183,7 +186,7 @@
+ static void usage(void)
+ {
+ 	fprintf(stderr, "Usage: tc [ OPTIONS ] OBJECT { COMMAND | help }\n"
+-			"       tc [-force] -batch filename\n"
++			"       tc [-force] [-ignore] -batch filename\n"
+ 	                "where  OBJECT := { qdisc | class | filter | action | monitor }\n"
+ 	                "       OPTIONS := { -s[tatistics] | -d[etails] | -r[aw] | -p[retty] | -b[atch] [filename] }\n");
+ }
+@@ -248,6 +251,12 @@
+ 
+ 		if (do_cmd(largc, largv)) {
+ 			fprintf(stderr, "Command failed %s:%d\n", name, cmdlineno);
++
++			if (ignore_error != 0 && not_find_device > 0) {
++				/* Ignore such error */
++				continue;
++			}
++
+ 			ret = 1;
+ 			if (!force)
+ 				break;
+@@ -293,6 +302,8 @@
+ 			if (argc <= 1)
+ 				usage();
+ 			batch_file = argv[1];
++        } else if (matches(argv[1], "-ignore") == 0) {
++            ++ignore_error;
+ 		} else {
+ 			fprintf(stderr, "Option \"%s\" is unknown, try \"tc -help\".\n", argv[1]);
+ 			return -1;
+@@ -317,5 +328,10 @@
+ 	ret = do_cmd(argc-1, argv+1);
+ 	rtnl_close(&rth);
+ 
++    if (ignore_error != 0 && not_find_device > 0) {
++        /* Ignore such error */
++        ret = 0;
++    }
++
+ 	return ret;
+ }
+--- iproute2-3.12.0/tc/tc_core.c.orig	2022-05-26 11:33:02.579862822 -0700
++++ iproute2-3.12.0/tc/tc_core.c	2022-05-26 11:33:02.739856270 -0700
+@@ -20,6 +20,7 @@
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+ #include <string.h>
++#include <stdint.h>
+ 
+ #include "tc_core.h"
+ #include <linux/atm.h>
